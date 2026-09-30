@@ -637,19 +637,19 @@ INSERT INTO users (id, pegawai_id, username, password, nama_lengkap, role, is_ac
 -- Indeks untuk tabel barang
 --
 ALTER TABLE barang
-  ADD PRIMARY KEY (id),
+  ADD PRIMARY KEY (id);
 
 --
 -- Indeks untuk tabel barang_masuk
 --
 ALTER TABLE barang_masuk
-  ADD PRIMARY KEY (id),
+  ADD PRIMARY KEY (id);
 
 --
 -- Indeks untuk tabel detail_barang_keluar
 --
 ALTER TABLE detail_barang_keluar
-  ADD PRIMARY KEY (id),
+  ADD PRIMARY KEY (id);
 
 --
 -- Indeks untuk tabel kategori
@@ -673,7 +673,7 @@ ALTER TABLE riwayat_opname
 -- Indeks untuk tabel stok_kuasi
 --
 ALTER TABLE stok_kuasi
-  ADD PRIMARY KEY (id),
+  ADD PRIMARY KEY (id);
 
 --
 -- Indeks untuk tabel transaksi_keluar
