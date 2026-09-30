@@ -80,9 +80,11 @@ function nav_active(array $pages, string $current): string { return in_array($cu
             <a class="side-link <?= nav_active(['barang_keluar.php'], $current_page) ?>" href="barang_keluar.php"><i class="fa-solid fa-arrow-up"></i><span>Barang Keluar</span></a>
             <a class="side-link <?= nav_active(['stock_opname.php'], $current_page) ?>" href="stock_opname.php"><i class="fa-solid fa-clipboard-check"></i><span>Stock Opname</span></a>
             <div class="nav-label">Data & Laporan</div>
-            <a class="side-link <?= nav_active(['manage_barang.php'], $current_page) ?>" href="manage_barang.php"><i class="fa-solid fa-boxes-stacked"></i><span>Master Barang</span></a>
-            <a class="side-link <?= nav_active(['master_kategori.php'], $current_page) ?>" href="master_kategori.php"><i class="fa-solid fa-tags"></i><span>Kategori</span></a>
-            <a class="side-link <?= nav_active(['manage_pegawai.php'], $current_page) ?>" href="manage_pegawai.php"><i class="fa-solid fa-users"></i><span>Pegawai</span></a>
+            <?php if ($role === 'admin'): ?>
+                <a class="side-link <?= nav_active(['manage_barang.php'], $current_page) ?>" href="manage_barang.php"><i class="fa-solid fa-boxes-stacked"></i><span>Master Barang</span></a>
+                <a class="side-link <?= nav_active(['master_kategori.php'], $current_page) ?>" href="master_kategori.php"><i class="fa-solid fa-tags"></i><span>Kategori</span></a>
+                <a class="side-link <?= nav_active(['manage_pegawai.php'], $current_page) ?>" href="manage_pegawai.php"><i class="fa-solid fa-users"></i><span>Pegawai</span></a>
+            <?php endif; ?>
             <a class="side-link <?= nav_active(['kartu_persediaan.php'], $current_page) ?>" href="kartu_persediaan.php"><i class="fa-solid fa-book-open"></i><span>Kartu Persediaan</span></a>
             <a class="side-link <?= nav_active(['stok_kuasi.php'], $current_page) ?>" href="stok_kuasi.php"><i class="fa-solid fa-barcode"></i><span>Stok Dokumen Kuasi</span></a>
             <a class="side-link <?= nav_active(['riwayat_masuk.php','riwayat_keluar.php'], $current_page) ?>" href="riwayat_masuk.php"><i class="fa-solid fa-clock-rotate-left"></i><span>Riwayat Transaksi</span></a>
