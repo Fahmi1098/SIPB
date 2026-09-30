@@ -1,4 +1,4 @@
 window.SIPB_CONFIG = {
-  supabaseUrl: 'https://YOUR-PROJECT.supabase.co',
-  supabaseAnonKey: 'YOUR-PUBLISHABLE-OR-ANON-KEY'
+  supabaseUrl: 'https://ksaxogmwzcfzicjlqsqb.supabase.co',
+  supabaseAnonKey: 'sb_publishable_aMO22myOQcvXIW60pSfEIg_ZzbIM571'
 };
