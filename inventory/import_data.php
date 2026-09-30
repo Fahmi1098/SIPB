@@ -1,7 +1,8 @@
 <?php
-require 'cek_login.php'; 
+require 'cek_login.php';
 require 'koneksi.php';
 require_once 'functions.php';
+requireRole('admin');
 if ($_SERVER['REQUEST_METHOD'] === 'POST') { requireCsrf(); }
 
 $pesan = "";
