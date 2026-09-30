@@ -149,7 +149,6 @@ if (isset($_POST['import'])) {
         $status = "danger";
     }
 }
-?>
 
 require 'header.php';
 ?>
