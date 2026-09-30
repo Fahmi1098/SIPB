@@ -123,7 +123,6 @@ if (isset($_GET['edit'])) {
     $stmt_edit->execute([$id_edit]);
     $edit_data = $stmt_edit->fetch(PDO::FETCH_ASSOC);
 }
-?>
 
 require 'header.php';
 ?>
