@@ -82,8 +82,11 @@ function tableExportData(table){
   const headers=[...(table.tHead?.rows?.[0]?.cells||[])]
     .map((th,i)=>({i,label:th.textContent.replace(/[↑↓↕]/g,'').trim()}))
     .filter(x=>x.label&&x.label!=='Aksi');
-  const rows=[...(table.tBodies?.[0]?.rows||[])]
-    .filter(row=>!row.querySelector('.empty')&&row.dataset.tableSearchMatch!=='0'&&getComputedStyle(row).display!=='none'&&!row.classList.contains('table-pagination-hidden'));
+  const bodyRows=[...(table.tBodies?.[0]?.rows||[])];
+  const pagedHidden=bodyRows.filter(row=>row.classList.contains('table-pagination-hidden'));
+  pagedHidden.forEach(row=>row.classList.remove('table-pagination-hidden'));
+  const rows=bodyRows.filter(row=>!row.querySelector('.empty')&&row.dataset.tableSearchMatch!=='0'&&getComputedStyle(row).display!=='none');
+  pagedHidden.forEach(row=>row.classList.add('table-pagination-hidden'));
   return {
     headers:headers.map(x=>x.label),
     rows:rows.map(row=>headers.map(x=>String(row.cells[x.i]?.innerText||'').replace(/\s+/g,' ').trim()))
