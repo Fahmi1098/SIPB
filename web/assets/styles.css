@@ -4003,3 +4003,50 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
   background:transparent !important;
   color:rgba(255,255,255,.80) !important;
 }
+
+/* FINAL: clicked dropdown navigation — exactly one submenu, no hover competition. */
+.top-nav-group .top-submenu{
+  opacity:0 !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+  transform:translateY(-6px) !important;
+}
+.top-nav-group.open .top-submenu{
+  opacity:1 !important;
+  visibility:visible !important;
+  pointer-events:auto !important;
+  transform:translateY(0) !important;
+}
+.top-nav-group:hover .top-submenu,
+.top-nav-group:focus-within .top-submenu{
+  opacity:0 !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+  transform:translateY(-6px) !important;
+}
+.top-nav-group.open:hover .top-submenu,
+.top-nav-group.open:focus-within .top-submenu{
+  opacity:1 !important;
+  visibility:visible !important;
+  pointer-events:auto !important;
+  transform:translateY(0) !important;
+}
+.top-nav-group.open .top-nav-trigger{
+  background:rgba(255,255,255,.14) !important;
+  color:#fff !important;
+}
+.top-nav-group.open .nav-caret{
+  transform:rotate(180deg);
+}
+/* Remove the thin blue line under the top bar. */
+.top-nav-layout .top:after,
+.top:after{
+  display:none !important;
+  content:none !important;
+}
+/* Move the password eye slightly lower while keeping it centered on the right edge. */
+.password-toggle{
+  top:calc(50% + 3px) !important;
+  right:5px !important;
+  transform:translateY(-50%) !important;
+}
