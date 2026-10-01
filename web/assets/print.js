@@ -22,7 +22,7 @@
     weekday:'long'
   }).format(new Date(v)) : '-';
 
-  const dateWithDay = v => v ? `${dayName(v)}, ${dateText(v)}`` : '-';
+  const dateWithDay = v => v ? `${dayName(v)}, ${dateText(v)}` : '-';
 
   const dateFormalBAST = v => {
     if (!v) return '-';
@@ -30,7 +30,8 @@
     const dayWords = terbilang(d.getDate());
     const month = new Intl.DateTimeFormat('id-ID', {month:'long'}).format(d);
     const yearWords = terbilang(d.getFullYear());
-    return 'Pada hari ini ' + dayName(v) + ' tanggal ' + dayWords + ' ' + month + ' ' + yearWords;
+    const titleWords = s => String(s).split(' ').map(x => x ? x.charAt(0).toUpperCase() + x.slice(1) : x).join(' ');
+    return 'Pada hari ini ' + titleWords(dayName(v)) + ' tanggal ' + titleWords(dayWords) + ' ' + titleWords(month) + ' ' + titleWords(yearWords);
   };
 
   const rupiah = v => new Intl.NumberFormat('id-ID', {
