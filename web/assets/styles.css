@@ -5133,3 +5133,33 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
     max-width:94px !important;
   }
 }
+
+
+/* FINAL FIX 20261002-15 — restore Light/Dark label on main topbar */
+.top-nav-layout .top-actions .theme-toggle .top-action-label{
+  display:block !important;
+  flex:0 0 auto !important;
+  width:auto !important;
+  max-width:0 !important;
+  min-width:0 !important;
+  height:auto !important;
+  margin-left:0 !important;
+  padding:0 !important;
+  overflow:hidden !important;
+  opacity:0 !important;
+  visibility:hidden !important;
+  color:#fff !important;
+  white-space:nowrap !important;
+  font-size:.66rem !important;
+  font-weight:800 !important;
+  line-height:1.1 !important;
+  transition:max-width .22s cubic-bezier(.2,.7,.2,1),margin-left .16s ease,opacity .14s ease !important;
+}
+.top-nav-layout .top-actions .theme-toggle:hover .top-action-label,
+.top-nav-layout .top-actions .theme-toggle:focus-visible .top-action-label{
+  display:block !important;
+  max-width:104px !important;
+  margin-left:9px !important;
+  opacity:1 !important;
+  visibility:visible !important;
+}
