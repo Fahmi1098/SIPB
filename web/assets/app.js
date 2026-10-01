@@ -107,34 +107,19 @@ function bind(page){
   }
   if(page==='dashboard') document.querySelectorAll('[data-page="barang_keluar"]').forEach(b=>b.onclick=()=>renderApp('barang_keluar'));
   if(page==='barang'){
-    $('addBarang').onclick=async()=>{$('content').innerHTML=await barangForm();bindForm()};
+    const addBarang=$('addBarang'); if(addBarang) addBarang.onclick=async()=>{$('content').innerHTML=await barangForm();bindForm()};
     const apply=()=>{const q=$('barangSearch').value.toLowerCase().trim(),cat=$('barangFilter').value;let shown=0;document.querySelectorAll('#barangTable tbody tr[data-search]').forEach(r=>{const ok=(!q||r.dataset.search.includes(q))&&(!cat||r.dataset.kategori===cat);r.style.display=ok?'':'none';if(ok)shown++});$('barangCount').textContent=shown+' data'};
     $('barangSearch').oninput=apply;$('barangFilter').onchange=apply;
     document.querySelectorAll('.edit-barang').forEach(btn=>btn.onclick=async()=>{$('content').innerHTML=loading('Memuat barang...');$('content').innerHTML=await barangForm(+btn.dataset.id);bindForm(+btn.dataset.id)});
     document.querySelectorAll('.delete-barang').forEach(btn=>btn.onclick=async()=>{if(!confirm('Hapus barang ini?'))return;const {error}=await client.from('barang').delete().eq('id',+btn.dataset.id);if(error)return fail(error);toast('Barang berhasil dihapus');renderApp('barang')});
   }
   if(page==='kategori'){
-    $('addKategori').onclick=async()=>{const n=prompt('Nama kategori baru:');if(!n?.trim())return;const {error}=await client.from('kategori').insert({nama_kategori:n.trim()});if(error)return fail(error);toast('Kategori ditambahkan');renderApp('kategori')};
+    const addKategori=$('addKategori'); if(addKategori) addKategori.onclick=async()=>{const n=prompt('Nama kategori baru:');if(!n?.trim())return;const {error}=await client.from('kategori').insert({nama_kategori:n.trim()});if(error)return fail(error);toast('Kategori ditambahkan');renderApp('kategori')};
     document.querySelectorAll('.edit-kat').forEach(btn=>btn.onclick=async()=>{const {data,error}=await client.from('kategori').select('*').eq('id',+btn.dataset.id).single();if(error)return fail(error);const n=prompt('Nama kategori:',data.nama_kategori);if(!n?.trim())return;const {error:e}=await client.from('kategori').update({nama_kategori:n.trim()}).eq('id',+btn.dataset.id);if(e)return fail(e);toast('Kategori diperbarui');renderApp('kategori')});
     document.querySelectorAll('.delete-kat').forEach(btn=>btn.onclick=async()=>{if(!confirm('Hapus kategori ini? Barang yang masih memakai kategori ini dapat mencegah penghapusan.'))return;const {error}=await client.from('kategori').delete().eq('id',+btn.dataset.id);if(error)return fail(error);toast('Kategori dihapus');renderApp('kategori')});
   }
   if(page==='barang_masuk') $('addMasuk').onclick=async()=>{$('content').innerHTML=await barangMasukForm();bindMasukForm()};
-  if(page==='barang_keluar') { const add=$('addKeluar'); if(add) add.onclick=async()=>{$('content').innerHTML=await barangKeluarForm();bindKeluarForm()}; document.querySelectorAll('.cancel-keluar').forEach(btn=>btn.onclick=async()=>{const id=Number(btn.dataset.id);if(!id)return;if(!confirm('Batalkan transaksi barang keluar #'+id+'? Stok akan dikembalikan dan transaksi tetap tercatat sebagai DIBATALKAN.'))return;btn.disabled=true;btn.textContent='Membatalkan...';try{const result=await client.rpc('cancel_barang_keluar',{p_transaksi_id:id});if(result.error)throw result.error;toast('Transaksi #'+id+' dibatalkan. Stok telah dikembalikan.');renderApp('barang_keluar')}catch(e){btn.disabled=false;btn.textContent='Batalkan';fail(e)}}); }
-  if(page==='barang_keluar'){
-    document.querySelectorAll('.cancel-keluar').forEach(btn=>btn.onclick=async()=>{
-      const id=Number(btn.dataset.id);
-      if(!id)return;
-      if(!confirm('Batalkan transaksi barang keluar #'+id+'? Stok akan dikembalikan dan transaksi tetap tercatat sebagai DIBATALKAN.'))return;
-      btn.disabled=true;btn.textContent='Membatalkan...';
-      try{
-        const result=await client.rpc('cancel_barang_keluar',{p_transaksi_id:id});
-        if(result.error)throw result.error;
-        toast('Transaksi #'+id+' dibatalkan. Stok telah dikembalikan.');
-        renderApp('barang_keluar');
-      }catch(e){btn.disabled=false;btn.textContent='Batalkan';fail(e)}
-    });
-  }
-  if(page==='stock_opname') $('addOpname').onclick=async()=>{$('content').innerHTML=await stockOpnameForm();bindOpnameForm()};
+  if(page==='barang_keluar') { const add=$('addKeluar'); if(add) add.onclick=async()=>{$('content').innerHTML=await barangKeluarForm();bindKeluarForm()}; document.querySelectorAll('.cancel-keluar').forEach(btn=>btn.onclick=async()=>{const id=Number(btn.dataset.id);if(!id)return;if(!confirm('Batalkan transaksi barang keluar #'+id+'? Stok akan dikembalikan dan transaksi tetap tercatat sebagai DIBATALKAN.'))return;btn.disabled=true;btn.textContent='Membatalkan...';try{const result=await client.rpc('cancel_barang_keluar',{p_transaksi_id:id});if(result.error)throw result.error;toast('Transaksi #'+id+' dibatalkan. Stok telah dikembalikan.');renderApp('barang_keluar')}catch(e){btn.disabled=false;btn.textContent='Batalkan';fail(e)}}); }  if(page==='stock_opname') $('addOpname').onclick=async()=>{$('content').innerHTML=await stockOpnameForm();bindOpnameForm()};
   document.querySelectorAll('.retry').forEach(btn=>btn.onclick=()=>renderApp(btn.dataset.page));
 }
 function bindForm(id){$('backBarang').onclick=()=>renderApp('barang');$('cancelBarang').onclick=()=>renderApp('barang');$('saveBarang').onclick=async()=>{const payload={nama_barang:$('b_nama').value.trim(),kategori_id:$('b_kat').value?+$('b_kat').value:null,tipe:$('b_tipe').value.trim()||'-',merk:$('b_merk').value.trim()||'-',satuan:$('b_satuan').value.trim(),harga_terakhir:+$('b_harga').value||0,stok_minimum:+$('b_min').value||0};if(!payload.nama_barang)return toast('Nama barang wajib diisi.','error');const btn=$('saveBarang');btn.disabled=true;btn.textContent='Menyimpan...';const q=id?client.from('barang').update(payload).eq('id',id):client.from('barang').insert(payload);const {error}=await q;if(error){btn.disabled=false;btn.textContent=id?'Simpan Perubahan':'Simpan Barang';return fail(error)}toast(id?'Barang diperbarui':'Barang ditambahkan');renderApp('barang')}}
