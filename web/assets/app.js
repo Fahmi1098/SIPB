@@ -219,7 +219,15 @@ async function barangKeluarPage(){
 
 async function barangKeluarForm(){const [{data:items,error},{data:pegawai,error:pe}]=await Promise.all([client.from('barang').select('id,nama_barang,satuan,sisa,kategori:kategori_id(id,nama_kategori)').order('nama_barang'),client.from('pegawai').select('id,nama_pegawai,nip,status_pegawai,jabatan').order('nama_pegawai')]);if(error||pe)throw(error||pe);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h2>Rekam Barang Keluar</h2><p>Stok akan dikurangi setelah seluruh item lolos validasi.</p></div><button class="ghost" id="backKeluar">← Kembali</button></div><div class="form-grid"><label>Tanggal Keluar <input id="k_tanggal" type="date" value="${localDate()}"></label><label>Penyerah (Gudang) <select id="k_penyerah"><option value="">- Pilih penyerah -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penyerah <input id="k_penyerah_jabatan" readonly></label><label>NIP Penyerah <input id="k_penyerah_nip" readonly></label><label>Penerima (Pemohon) <select id="k_penerima"><option value="">- Pilih pegawai -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penerima <input id="k_jabatan" readonly></label><label>NIP Penerima <input id="k_nip" readonly></label><label>Tujuan / Ruangan <input id="k_tujuan" placeholder="Contoh: Subag Tata Usaha" required></label></div><div class="section-head compact"><div><h3>Daftar Barang</h3><p>Tambahkan satu atau beberapa item.</p></div><button class="ghost" id="addItemKeluar">＋ Tambah Item</button></div><div id="keluarItems"></div><div class="form-actions"><button class="primary" id="saveKeluar">Rekam Transaksi & Kurangi Stok</button><button class="ghost" id="cancelKeluar">Batal</button></div></section>`}
 
-function keluarItemRow(items){const id='ki_'+Math.random().toString(36).slice(2,9);return `<div class="transaction-row" data-row="${id}"><select class="ki-barang"><option value="">- Pilih barang -</option>${items.map(x=>{const kat=String(x.kategori?.nama_kategori||'').toLowerCase(),isKuasi=kat.includes('kuasi');return `<option value="${x.id}" data-stock="${x.sisa}" data-unit="${esc(x.satuan||'')} data-kuasi="${isKuasi?'kuasi':''}">${esc(x.nama_barang)} — stok ${x.sisa} ${esc(x.satuan||'')}${isKuasi?' — FIFO Kuasi':''}</option>`}).join('')}</select><input class="ki-jumlah" type="number" min="1" value="1" placeholder="Jumlah"><span class="kuasi-hint" aria-live="polite"></span><button type="button" class="btn-sm danger remove-item">×</button></div>`}
+function keluarItemRow(items){
+  const id='ki_'+Math.random().toString(36).slice(2,9);
+  return '<div class="transaction-row" data-row="'+id+'"><select class="ki-barang"><option value="">- Pilih barang -</option>'+
+    items.map(x=>{
+      const kat=String(x.kategori?.nama_kategori||'').toLowerCase(),isKuasi=kat.includes('kuasi');
+      return '<option value="'+x.id+'" data-stock="'+x.sisa+'" data-unit="'+esc(x.satuan||'')+'" data-kuasi="'+(isKuasi?'kuasi':'')+'">'+esc(x.nama_barang)+' — stok '+x.sisa+' '+esc(x.satuan||'')+(isKuasi?' — FIFO Kuasi':'')+'</option>';
+    }).join('')+
+    '</select><input class="ki-jumlah" type="number" min="1" value="1" placeholder="Jumlah"><span class="kuasi-hint" aria-live="polite"></span><button type="button" class="btn-sm danger remove-item" title="Hapus baris barang" aria-label="Hapus baris barang">×</button></div>';
+}
 
 async function stockOpnamePage(){const [{data:rows,error},{data:items,error:ie}]=await Promise.all([client.from('riwayat_opname').select('*,barang:barang_id(nama_barang)').order('id',{ascending:false}).limit(200),client.from('barang').select('id,nama_barang,sisa,satuan').order('nama_barang')]);if(error||ie)throw(error||ie);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PERSEDIAAN</span><h2>Stock Opname</h2><p>Penyesuaian stok fisik terhadap stok sistem.</p></div><button class="primary" id="addOpname">＋ Rekam Stock Opname</button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Barang</th><th>Sistem</th><th>Fisik</th><th>Selisih</th><th>Petugas</th><th>Keterangan</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${fmtDate(r.tanggal_opname)}</td><td>${esc(r.barang?.nama_barang||'-')}</td><td>${r.stok_sistem}</td><td>${r.stok_fisik}</td><td><span class="stock ${r.selisih<0?'low':''}">${r.selisih>0?'+':''}${r.selisih}</span></td><td>${esc(r.petugas||'-')}</td><td>${esc(r.keterangan||'-')}</td></tr>`).join('')||emptyRow(7)}</tbody></table></div></section>`}
 
@@ -346,6 +354,14 @@ function showHistoryDetail(k){
   document.body.appendChild(box);enhanceTables(box);const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.onclick=e=>{if(e.target===box)close()};
 }
 const menu=[['dashboard','Dashboard'],['barang_masuk','Barang Masuk'],['barang_keluar','Barang Keluar'],['stock_opname','Stock Opname'],['barang','Master Barang'],['kategori','Kategori'],['pegawai','Pegawai'],['kartu','Kartu Persediaan'],['kuasi','Stok Kuasi'],['riwayat','Riwayat Transaksi'],['pengguna','Kelola Pengguna']];
+const topNavGroups=[
+  {key:'dashboard',label:'Dashboard',icon:'dashboard',items:[['dashboard','Dashboard']]},
+  {key:'barang',label:'Barang',icon:'barang',items:[['barang_masuk','Barang Masuk'],['barang_keluar','Barang Keluar'],['barang','Master Barang']]},
+  {key:'persediaan',label:'Persediaan',icon:'stock_opname',items:[['stock_opname','Stock Opname'],['kartu','Kartu Persediaan'],['kuasi','Stok Kuasi']]},
+  {key:'referensi',label:'Data Referensi',icon:'kategori',items:[['kategori','Kategori'],['pegawai','Pegawai']]},
+  {key:'laporan',label:'Laporan',icon:'riwayat',items:[['riwayat','Riwayat Transaksi']]},
+  {key:'admin',label:'Admin',icon:'pengguna',items:[['pengguna','Kelola Pengguna']],adminOnly:true}
+];
 async function renderApp(page='dashboard', restoreScrollY=null){
   const r=await client.auth.getSession();
   session=r.data.session;
@@ -354,7 +370,7 @@ async function renderApp(page='dashboard', restoreScrollY=null){
   document.documentElement.dataset.theme=uiTheme;
   root.innerHTML=`<div class="dashboard top-nav-layout"><main class="main"><header class="top">
     <div class="top-brand"><div class="top-brand-mark"><img src="${BANTEN_LOGO}" alt="Lambang Provinsi Banten"></div><div class="top-brand-copy"><strong>SIPB</strong><span>UPTD PPD Malingping</span></div></div>
-    <nav class="top-nav" aria-label="Navigasi utama">${menu.map(m=>navItem(m,page)).join('')}</nav>
+    <nav class="top-nav" aria-label="Navigasi utama">${topNavGroups.filter(g=>!g.adminOnly||profile?.role==='admin').map(g=>topNavGroup(g,page)).join('')}</nav>
     <div class="top-title"><span>Administrasi Persediaan</span><h1>${menu.find(x=>x[0]===page)?.[1]||'Dashboard'}</h1></div>
     <div class="top-actions"><button class="theme-toggle" id="themeToggle" type="button" aria-label="Ubah tema"><span class="theme-icon">${uiTheme==='dark'?'☀':'☾'}</span><span>${uiTheme==='dark'?'Mode terang':'Mode gelap'}</span></button><span class="status-pill"><i></i> Sistem Online</span><button class="top-logout" id="logout" type="button" aria-label="Keluar">↪</button></div>
   </header><div id="content">${loading('Memuat data...')}</div></main></div>`;
@@ -379,7 +395,17 @@ async function renderApp(page='dashboard', restoreScrollY=null){
   }
 }
 function navSvg(key){const p={dashboard:'<path d="m3 10 9-7 9 7"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-7h6v7"/>',barang_masuk:'<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',barang_keluar:'<path d="M12 21V9"/><path d="m7 14 5-5 5 5"/><path d="M5 3h14"/>',stock_opname:'<path d="m5 12 4 4L19 6"/><rect x="3" y="3" width="18" height="18" rx="3"/>',barang:'<path d="M4 6h16v14H4z"/><path d="M8 6V4h8v2"/><path d="M8 11h8"/><path d="M8 15h5"/>',kategori:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/>',pegawai:'<circle cx="12" cy="8" r="3.5"/><path d="M5 21c.8-3.7 3-5.5 7-5.5s6.2 1.8 7 5.5"/>',kartu:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/>',kuasi:'<path d="M6 4h12v16H6z"/><path d="M9 8h6M9 12h6M9 16h4"/>',riwayat:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',pengguna:'<circle cx="12" cy="8" r="3"/><path d="M5 21c1-3.3 3.3-5 7-5s6 1.7 7 5"/>'};return '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+(p[key]||p.dashboard)+'</svg>'}
-function navItem(m,page){return `<a href="#${m[0]}" data-page="${m[0]}" class="${page===m[0]?'active':''}"><span class="nav-icon">${navSvg(m[0])}</span><span>${m[1]}</span></a>`}
+function navItem(m,page){return '<a href="#'+m[0]+'" data-page="'+m[0]+'" class="'+(page===m[0]?'active':'')+'"><span class="nav-icon">'+navSvg(m[0])+'</span><span>'+m[1]+'</span></a>'}
+function topNavGroup(group,page){
+  const active=group.items.some(m=>page===m[0]);
+  if(group.items.length===1){
+    const m=group.items[0];
+    return '<a href="#'+m[0]+'" data-page="'+m[0]+'" class="top-nav-link '+(active?'active':'')+'"><span class="nav-icon">'+navSvg(group.icon)+'</span><span>'+group.label+'</span></a>';
+  }
+  return '<div class="top-nav-group '+(active?'active':'')+'"><button type="button" class="top-nav-trigger" aria-haspopup="true"><span class="nav-icon">'+navSvg(group.icon)+'</span><span>'+group.label+'</span><span class="nav-caret" aria-hidden="true">⌄</span></button><div class="top-submenu">'+
+    group.items.map(m=>'<a href="#'+m[0]+'" data-page="'+m[0]+'" class="'+(page===m[0]?'active':'')+'"><span class="nav-icon">'+navSvg(m[0])+'</span><span>'+m[1]+'</span></a>').join('')+
+    '</div></div>';
+}
 
 function renderDashboardCharts(){
   if(typeof Chart==='undefined')return;
@@ -486,8 +512,12 @@ function bind(page){
     document.querySelectorAll('.edit-kat').forEach(btn=>btn.onclick=async()=>{const {data,error}=await client.from('kategori').select('*').eq('id',+btn.dataset.id).single();if(error)return fail(error);const n=prompt('Nama kategori:',data.nama_kategori);if(!n?.trim())return;const {error:e}=await client.from('kategori').update({nama_kategori:n.trim()}).eq('id',+btn.dataset.id);if(e)return fail(e);toast('Kategori diperbarui');renderApp('kategori')});
     document.querySelectorAll('.delete-kat').forEach(btn=>btn.onclick=async()=>{if(!confirm('Hapus kategori ini? Barang yang masih memakai kategori ini dapat mencegah penghapusan.'))return;const {error}=await client.from('kategori').delete().eq('id',+btn.dataset.id);if(error)return fail(error);toast('Kategori dihapus');renderApp('kategori')});
   }
-  if(page==='barang_masuk') $('addMasuk').onclick=async()=>{$('content').innerHTML=await barangMasukForm();bindMasukForm()};
-  if(page==='barang_keluar') { const add=$('addKeluar'); if(add) add.onclick=async()=>{$('content').innerHTML=await barangKeluarForm();bindKeluarForm()}; document.querySelectorAll('.cancel-keluar').forEach(btn=>btn.onclick=async()=>{const id=Number(btn.dataset.id);if(!id)return;if(!confirm('Batalkan transaksi barang keluar #'+id+'? Stok akan dikembalikan dan transaksi tetap tercatat sebagai DIBATALKAN.'))return;btn.disabled=true;btn.textContent='Membatalkan...';try{await cancelAndDeleteOutgoing(id);toast('Transaksi #'+id+' dibatalkan dan riwayatnya dihapus. Stok telah dikembalikan.');renderApp('barang_keluar')}catch(e){btn.disabled=false;btn.textContent='Batalkan';fail(e)}}); }  if(page==='stock_opname') $('addOpname').onclick=async()=>{$('content').innerHTML=await stockOpnameForm();bindOpnameForm()};
+  if(page==='barang_masuk'){
+    bindMasukForm().catch(fail);
+  }
+  if(page==='barang_keluar'){
+    bindKeluarForm().catch(fail);
+  }  if(page==='stock_opname') $('addOpname').onclick=async()=>{$('content').innerHTML=await stockOpnameForm();bindOpnameForm()};
 }
 function bindForm(id){$('backBarang').onclick=()=>renderApp('barang');$('cancelBarang').onclick=()=>renderApp('barang');$('saveBarang').onclick=async()=>{const payload={nama_barang:$('b_nama').value.trim(),kategori_id:$('b_kat').value?+$('b_kat').value:null,tipe:$('b_tipe').value.trim()||'-',merk:$('b_merk').value.trim()||'-',satuan:$('b_satuan').value.trim(),stok_minimum:+$('b_min').value||0};if(!payload.nama_barang)return toast('Nama barang wajib diisi.','error');const btn=$('saveBarang');btn.disabled=true;btn.textContent='Menyimpan...';const q=id?client.from('barang').update(payload).eq('id',id):client.from('barang').insert(payload);const {error}=await q;if(error){btn.disabled=false;btn.textContent=id?'Simpan Perubahan':'Simpan Barang';return fail(error)}toast(id?'Barang diperbarui':'Barang ditambahkan');renderApp('barang')}}
 document.addEventListener('click',e=>{
@@ -565,8 +595,13 @@ async function bindKeluarForm(){
   if(preferred){$('k_penyerah').value=preferred.nama_pegawai;fillPegawai('k_penyerah','k_penyerah_jabatan','k_penyerah_nip');}
 
   const box=$('keluarItems');
+  box.addEventListener('click',e=>{
+    const btn=e.target.closest('.remove-item');
+    if(!btn)return;
+    const row=btn.closest('.transaction-row');
+    if(row)row.remove();
+  });
   const wireRows=()=>{
-    box.querySelectorAll('.remove-item').forEach(btn=>btn.onclick=()=>btn.closest('.transaction-row').remove());
     box.querySelectorAll('.ki-barang').forEach(select=>select.onchange=async()=>{
       const hint=select.closest('.transaction-row').querySelector('.kuasi-hint');
       if(select.selectedOptions[0]?.dataset.kuasi==='kuasi'){
