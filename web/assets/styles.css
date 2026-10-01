@@ -5163,3 +5163,89 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
   opacity:1 !important;
   visibility:visible !important;
 }
+
+
+/* FINAL FIX 20261002-16 — restore original login theme button */
+.login .login-theme-toggle{
+  position:fixed !important;
+  top:18px !important;
+  right:18px !important;
+  z-index:100001 !important;
+  width:auto !important;
+  min-width:0 !important;
+  height:auto !important;
+  min-height:31px !important;
+  display:inline-flex !important;
+  flex-direction:row !important;
+  align-items:center !important;
+  justify-content:center !important;
+  gap:7px !important;
+  padding:6px 10px !important;
+  margin:0 !important;
+  overflow:visible !important;
+  border:1px solid var(--line) !important;
+  border-radius:999px !important;
+  background:var(--surface) !important;
+  color:var(--ink) !important;
+  box-shadow:none !important;
+  white-space:nowrap !important;
+  font-size:.66rem !important;
+  font-weight:800 !important;
+  opacity:1 !important;
+  visibility:visible !important;
+  transform:none !important;
+  transition:transform .18s var(--ease),background .18s var(--ease),border-color .18s var(--ease) !important;
+}
+.login .login-theme-toggle .theme-icon{
+  flex:0 0 auto !important;
+  width:auto !important;
+  min-width:0 !important;
+  height:auto !important;
+  display:inline !important;
+  place-items:initial !important;
+  font-size:.9rem !important;
+  line-height:1 !important;
+}
+.login .login-theme-toggle .top-action-label{
+  display:inline !important;
+  flex:0 0 auto !important;
+  width:auto !important;
+  min-width:0 !important;
+  max-width:none !important;
+  height:auto !important;
+  margin-left:0 !important;
+  padding:0 !important;
+  overflow:visible !important;
+  opacity:1 !important;
+  visibility:visible !important;
+  color:inherit !important;
+  white-space:nowrap !important;
+  font-size:.66rem !important;
+  font-weight:800 !important;
+  line-height:1.2 !important;
+}
+.login .login-theme-toggle:hover{
+  width:auto !important;
+  min-width:0 !important;
+  background:var(--orange-soft) !important;
+  border-color:#BFD8EC !important;
+  color:var(--ink) !important;
+  box-shadow:none !important;
+  transform:translateY(-1px) !important;
+}
+:root[data-theme="dark"] .login .login-theme-toggle{
+  background:var(--surface) !important;
+  color:var(--ink) !important;
+  border-color:var(--line) !important;
+}
+:root[data-theme="dark"] .login .login-theme-toggle:hover{
+  background:#1D3448 !important;
+  border-color:#49647A !important;
+  color:#fff !important;
+}
+@media(max-width:520px){
+  .login .login-theme-toggle{
+    top:10px !important;
+    right:10px !important;
+  }
+}
