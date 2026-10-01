@@ -18,6 +18,21 @@
     day:'2-digit', month:'2-digit', year:'numeric'
   }).format(new Date(v)) : '-';
 
+  const dayName = v => v ? new Intl.DateTimeFormat('id-ID', {
+    weekday:'long'
+  }).format(new Date(v)) : '-';
+
+  const dateWithDay = v => v ? `${dayName(v)}, ${dateText(v)}`` : '-';
+
+  const dateFormalBAST = v => {
+    if (!v) return '-';
+    const d = new Date(v);
+    const dayWords = terbilang(d.getDate());
+    const month = new Intl.DateTimeFormat('id-ID', {month:'long'}).format(d);
+    const yearWords = terbilang(d.getFullYear());
+    return 'Pada hari ini ' + dayName(v) + ' tanggal ' + dayWords + ' ' + month + ' ' + yearWords;
+  };
+
   const rupiah = v => new Intl.NumberFormat('id-ID', {
     style:'currency', currency:'IDR', maximumFractionDigits:0
   }).format(Number(v) || 0);
@@ -145,7 +160,7 @@
         <h3>BADAN PENDAPATAN DAERAH</h3>
         <h2>UPTD PENGELOLAAN PENDAPATAN DAERAH MALINGPING</h2>
         <div class="alamat">Jl. Baru Simpang - Beyeh KM.03 Kec. Malingping, Kabupaten Lebak, Banten 42391<br>
-        Telp. (0252) 5605213 &nbsp;|&nbsp; Email: samsat.malingping.official@gmail.com &nbsp;|&nbsp; Website: bapenda.bantenprov.go.id</div>
+        Telp. (0252) 5605213 &nbsp;|&nbsp; Email: samsat.malingping.official@gmail.com &nbsp;|&nbsp; Kode Pos 42391</div>
       </td>
     </tr></table><div class="line"></div>`;
   }
@@ -207,8 +222,8 @@
         <table class="meta meta-tight">
           <tr><td>Yth.</td><td>:</td><td>${esc(kepala?.jabatan||'Kepala UPTD PPD Malingping')}</td></tr>
           <tr><td>Dari</td><td>:</td><td>${esc(fromJob)}</td></tr>
-          <tr><td>Tembusan</td><td>:</td><td>-</td></tr>
-          <tr><td>Tanggal</td><td>:</td><td>${dateText(head.tanggal_keluar)}</td></tr>
+          <tr><td>Tembusan</td><td>:</td><td>Pengurus Barang Pembantu</td></tr>
+          <tr><td>Tanggal</td><td>:</td><td>${dateWithDay(head.tanggal_keluar)}</td></tr>
           <tr><td>Nomor</td><td>:</td><td>000.2.3.1/${no}/UPTD.PPD.MLP/${new Date(head.tanggal_keluar).getFullYear()}</td></tr>
           <tr><td>Sifat</td><td>:</td><td>Biasa</td></tr>
           <tr><td>Lampiran</td><td>:</td><td>1 (satu) lembar</td></tr>
@@ -229,15 +244,15 @@
         <div class="title">BERITA ACARA SERAH TERIMA BARANG</div>
         <div class="doc-number">NOMOR : 000.2.3.1/${no}/BAST/UPTD.PPD.MLP/${new Date(head.tanggal_keluar).getFullYear()}</div>
         ${statusMark}
-        <p>Pada hari ini, tanggal <b>${dateText(head.tanggal_keluar)}</b>, telah dilaksanakan serah terima barang habis pakai dari <b>${esc(from)}</b> selaku Pengurus Barang kepada <b>${esc(receiver)}</b> selaku penerima barang pada ${esc(head.tujuan_ruangan||'Unit Kerja/ Ruangan')}.</p>
+        <p><b>${dateFormalBAST(head.tanggal_keluar)}</b>, telah dilaksanakan serah terima barang habis pakai dari <b>${esc(from)}</b> selaku Pengurus Barang kepada <b>${esc(receiver)}</b> selaku penerima barang pada ${esc(head.tujuan_ruangan||'Unit Kerja/ Ruangan')}.</p>
         <p>Adapun barang yang diserahterimakan adalah sebagai berikut:</p>
         <table class="data"><thead><tr><th style="width:7%">NO</th><th>NAMA BARANG</th><th>MEREK / TIPE</th><th style="width:13%">JUMLAH</th><th style="width:13%">SATUAN</th><th>KETERANGAN</th></tr></thead>
         <tbody>${rows(regular)}</tbody></table>
         <p>Barang tersebut telah diterima dalam keadaan baik dan selanjutnya menjadi tanggung jawab penerima sesuai peruntukannya. Berita Acara Serah Terima Barang ini dibuat dengan sebenarnya untuk dipergunakan sebagaimana mestinya.</p>
         <table class="sign"><tr><td>Yang Menyerahkan,</td><td>Yang Menerima,</td></tr>
         <tr><td class="space"></td><td class="space"></td></tr>
-        <tr><td><span class="name">${esc(from.toUpperCase())}</span><br>NIP. ${esc(head.penyerah_nip||'-')}<br>${esc(fromJob)}</td>
-        <td><span class="name">${esc(receiver.toUpperCase())}</span><br>NIP. ${esc(head.penerima_nip||'-')}<br>${esc(receiverJob)}</td></tr></table>
+        <tr><td><span class="name">${esc(from.toUpperCase())}</span><br>NIP. ${esc(head.penyerah_nip||'-')}</td>
+        <td><span class="name">${esc(receiver.toUpperCase())}</span><br>NIP. ${esc(head.penerima_nip||'-')}</td></tr></table>
         <table class="sign" style="width:50%;margin:16px auto 0"><tr><td>Mengetahui/Mengesahkan,<br>${esc(kepala?.jabatan||'Kepala UPTD PPD Malingping')}</td></tr>
         <tr><td class="space-sm"></td></tr>
         <tr><td><span class="name">${esc((kepala?.nama_pegawai||'-').toUpperCase())}</span><br>NIP. ${esc(kepala?.nip||'-')}</td></tr></table>
@@ -249,15 +264,15 @@
         <div class="title no-underline" style="font-size:12pt;margin-top:-8px;margin-bottom:6px">BARANG BERSERI / KUASI</div>
         <div class="doc-number">NOMOR : 000.2.3.1/${no}/BAST-K/UPTD.PPD.MLP/${new Date(head.tanggal_keluar).getFullYear()}</div>
         ${statusMark}
-        <p>Pada hari ini, tanggal <b>${dateText(head.tanggal_keluar)}</b>, telah dilaksanakan serah terima barang berseri/kuasi dari <b>${esc(from)}</b> selaku Pengurus Barang kepada <b>${esc(receiver)}</b> selaku penerima barang pada ${esc(head.tujuan_ruangan||'Unit Kerja/ Ruangan')}.</p>
+        <p><b>${dateFormalBAST(head.tanggal_keluar)}</b>, telah dilaksanakan serah terima barang berseri/kuasi dari <b>${esc(from)}</b> selaku Pengurus Barang kepada <b>${esc(receiver)}</b> selaku penerima barang pada ${esc(head.tujuan_ruangan||'Unit Kerja/ Ruangan')}.</p>
         <p>Rincian barang berseri/kuasi yang diserahterimakan:</p>
         <table class="data"><thead><tr><th style="width:7%">NO</th><th>NAMA BARANG</th><th style="width:14%">JUMLAH</th><th style="width:14%">SATUAN</th><th>NOMOR SERI / DUS</th></tr></thead>
         <tbody>${kuasi.map((d,i)=>`<tr><td class="center">${i+1}</td><td>${esc(d.barang?.nama_barang||'-')}</td><td class="center">${d.jumlah}</td><td class="center">${esc(d.barang?.satuan||'-')}</td><td>${serial(d)}</td></tr>`).join('')}</tbody></table>
         <p>Barang berseri/kuasi tersebut telah diterima dalam keadaan baik dan dicatat sebagai bagian dari administrasi persediaan SIPB. Berita Acara ini dibuat dengan sebenarnya untuk dipergunakan sebagaimana mestinya.</p>
         <table class="sign"><tr><td>Yang Menyerahkan,</td><td>Yang Menerima,</td></tr>
         <tr><td class="space"></td><td class="space"></td></tr>
-        <tr><td><span class="name">${esc(from.toUpperCase())}</span><br>NIP. ${esc(head.penyerah_nip||'-')}<br>${esc(fromJob)}</td>
-        <td><span class="name">${esc(receiver.toUpperCase())}</span><br>NIP. ${esc(head.penerima_nip||'-')}<br>${esc(receiverJob)}</td></tr></table>
+        <tr><td><span class="name">${esc(from.toUpperCase())}</span><br>NIP. ${esc(head.penyerah_nip||'-')}</td>
+        <td><span class="name">${esc(receiver.toUpperCase())}</span><br>NIP. ${esc(head.penerima_nip||'-')}</td></tr></table>
         <table class="sign" style="width:50%;margin:16px auto 0"><tr><td>Mengetahui/Mengesahkan,<br>${esc(kepala?.jabatan||'Kepala UPTD PPD Malingping')}</td></tr>
         <tr><td class="space-sm"></td></tr>
         <tr><td><span class="name">${esc((kepala?.nama_pegawai||'-').toUpperCase())}</span><br>NIP. ${esc(kepala?.nip||'-')}</td></tr></table>
