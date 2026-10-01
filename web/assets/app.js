@@ -395,8 +395,18 @@ async function penggunaPage(){
   if(profile?.role!=='admin')return '<section class="card error-card"><h2>Akses ditolak</h2><p>Halaman ini hanya dapat diakses admin.</p></section>';
   const {data,error}=await client.from('user_profiles').select('id,legacy_user_id,username,nama_lengkap,role,is_active,created_at').order('nama_lengkap');
   if(error)throw error;
-  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">ADMINISTRASI</span><h2>Kelola Pengguna</h2><p>Atur peran dan status akun SIPB. Pembuatan akun Auth dilakukan melalui Supabase Auth.</p></div><span class="status-pill">'+(data?.length||0)+' pengguna</span></div><div class="alert-box"><strong>Catatan:</strong> perubahan di sini berlaku pada hak akses database. Jangan menonaktifkan akun admin terakhir.</div><div class="table-wrap"><table><thead><tr><th>Pengguna</th><th>Username</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead><tbody>'+(data||[]).map(u=>'<tr data-user="'+esc(u.id)+'"><td><strong>'+esc(u.nama_lengkap||'-')+'</strong><br><small>'+esc(u.id)+'</small></td><td>'+esc(u.username||'-')+'</td><td><select class="user-role" data-id="'+u.id+'"><option value="admin" '+(u.role==='admin'?'selected':'')+'>Admin</option><option value="user" '+(u.role==='user'?'selected':'')+'>User</option></select></td><td><button type="button" class="status-toggle '+(u.is_active?'on':'')+'" data-id="'+u.id+'" data-active="'+(u.is_active?'1':'0')+'"><span></span>'+(u.is_active?'Aktif':'Nonaktif')+'</button></td><td><button class="btn-sm user-save" data-id="'+u.id+'">Simpan</button></td></tr>').join('')||emptyRow(5)+'</tbody></table></div></section>';
+  const rows=data||[];
+  const active=rows.filter(u=>u.is_active).length;
+  const admins=rows.filter(u=>u.is_active&&u.role==='admin').length;
+  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">ADMINISTRASI</span><h2>Kelola Pengguna</h2><p>Kelola peran dan status akun dengan pemisahan yang jelas antara Admin dan User.</p></div><div class="kartu-head-actions"><span class="status-pill">'+rows.length+' pengguna</span></div></div>'+
+  '<div class="user-summary-grid"><div class="kartu-summary"><span class="kartu-summary-icon">'+navSvg('pengguna')+'</span><div><small>Total Pengguna</small><strong>'+rows.length+'</strong></div></div><div class="kartu-summary"><span class="kartu-summary-icon">'+navSvg('stock_opname')+'</span><div><small>Aktif</small><strong>'+active+'</strong></div></div><div class="kartu-summary"><span class="kartu-summary-icon">'+navSvg('dashboard')+'</span><div><small>Admin Aktif</small><strong>'+admins+'</strong></div></div></div>'+
+  '<div class="alert-box"><strong>Keamanan:</strong> akun admin yang sedang digunakan tidak dapat diturunkan atau dinonaktifkan dari halaman ini. Database juga harus menjaga agar selalu ada minimal satu admin aktif.</div>'+
+  '<div class="filter-bar"><div class="search-box">⌕<input id="userSearch" placeholder="Cari nama atau username..."></div><select id="userRoleFilter"><option value="">Semua role</option><option value="admin">Admin</option><option value="user">User</option></select><select id="userStatusFilter"><option value="">Semua status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select><span id="userCount" class="result-count">'+rows.length+' data</span></div>'+
+  '<div class="table-wrap"><table id="userTable"><thead><tr><th>Pengguna</th><th>Username</th><th>Dibuat</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead><tbody>'+
+  (rows.map(u=>'<tr data-search="'+esc([u.nama_lengkap,u.username,u.id].join(' ').toLowerCase())+'" data-role="'+esc(u.role||'user')+'" data-status="'+(u.is_active?'active':'inactive')+'"><td><strong>'+esc(u.nama_lengkap||'-')+'</strong><br><small>'+esc(u.id)+'</small></td><td>'+esc(u.username||'-')+'</td><td>'+fmtDate(u.created_at)+'</td><td><select class="user-role" data-id="'+u.id+'"><option value="admin" '+(u.role==='admin'?'selected':'')+'>Admin</option><option value="user" '+(u.role==='user'?'selected':'')+'>User</option></select></td><td><button type="button" class="status-toggle '+(u.is_active?'on':'')+'" data-id="'+u.id+'" data-active="'+(u.is_active?'1':'0')+'"><span></span>'+(u.is_active?'Aktif':'Nonaktif')+'</button></td><td><button class="btn-sm user-save" data-id="'+u.id+'">Simpan</button></td></tr>').join('')||emptyRow(6))+
+  '</tbody></table></div></section>';
 }
+
 async function pegawaiPage(){
   const {data,error}=await client.from('pegawai').select('*').order('nama_pegawai');
   if(error)throw error;
@@ -581,11 +591,33 @@ function renderDashboardCharts(){
 
 function bind(page){
   if(page==='pengguna'){
+    const apply=()=>{
+      const q=$('userSearch').value.toLowerCase().trim();
+      const role=$('userRoleFilter').value;
+      const status=$('userStatusFilter').value;
+      let shown=0;
+      document.querySelectorAll('#userTable tbody tr[data-search]').forEach(row=>{
+        const ok=(!q||row.dataset.search.includes(q))&&(!role||row.dataset.role===role)&&(!status||row.dataset.status===status);
+        row.style.display=ok?'':'none';
+        if(ok)shown++;
+      });
+      $('userCount').textContent=shown+' data';
+    };
+    $('userSearch').oninput=apply;
+    $('userRoleFilter').onchange=apply;
+    $('userStatusFilter').onchange=apply;
     document.querySelectorAll('.status-toggle').forEach(toggle=>toggle.onclick=()=>{
       const active=toggle.dataset.active==='1';
+      const row=toggle.closest('tr');
+      if(toggle.dataset.id===session.user.id){
+        toast('Akun yang sedang digunakan tidak boleh dinonaktifkan.','error');
+        return;
+      }
       toggle.dataset.active=active?'0':'1';
       toggle.classList.toggle('on',!active);
       toggle.innerHTML='<span></span>'+(!active?'Aktif':'Nonaktif');
+      row.dataset.status=!active?'active':'inactive';
+      apply();
     });
     document.querySelectorAll('.user-save').forEach(btn=>btn.onclick=async()=>{
       const id=btn.dataset.id;
@@ -609,11 +641,39 @@ function bind(page){
     });
   }
   if(page==='kartu'){
-    const search=$('kartuSearch'),select=$('kartuBarang');
-    const apply=()=>{const q=search.value.toLowerCase().trim();document.querySelectorAll('#kartuTable tbody tr[data-search]').forEach(r=>r.style.display=!q||r.dataset.search.includes(q)?'':'none')};
-    search.oninput=apply;
-    document.querySelectorAll('.view-kartu').forEach(btn=>btn.onclick=async()=>{select.value=btn.dataset.id;$('kartuDetail').innerHTML=loading('Memuat kartu persediaan...');try{await loadKartuDetail(Number(btn.dataset.id))}catch(e){fail(e);$('kartuDetail').innerHTML=''}});
-    select.onchange=async()=>{if(!select.value){$('kartuDetail').innerHTML='';return} $('kartuDetail').innerHTML=loading('Memuat kartu persediaan...');try{await loadKartuDetail(Number(select.value))}catch(e){fail(e);$('kartuDetail').innerHTML=''}};
+    const search=$('kartuSearch'),select=$('kartuBarang'),cat=$('kartuFilterKategori'),status=$('kartuFilterStatus');
+    const apply=()=>{
+      const q=search.value.toLowerCase().trim(),cv=cat.value,sv=status.value;
+      document.querySelectorAll('#kartuTable tbody tr[data-search]').forEach(r=>{
+        const ok=(!q||r.dataset.search.includes(q))&&(!cv||r.dataset.kategori===cv)&&(!sv||r.dataset.status===sv);
+        r.style.display=ok?'':'none';
+      });
+    };
+    search.oninput=apply;cat.onchange=apply;status.onchange=apply;
+    document.querySelectorAll('.view-kartu').forEach(btn=>btn.onclick=async()=>{
+      select.value=btn.dataset.id;$('kartuDetail').innerHTML=loading('Memuat kartu persediaan...');
+      try{await loadKartuDetail(Number(btn.dataset.id));$('kartuDetail')?.scrollIntoView({behavior:'smooth',block:'start'})}
+      catch(e){fail(e);$('kartuDetail').innerHTML=''}
+    });
+    select.onchange=async()=>{
+      if(!select.value){$('kartuDetail').innerHTML='';return}
+      $('kartuDetail').innerHTML=loading('Memuat kartu persediaan...');
+      try{await loadKartuDetail(Number(select.value));$('kartuDetail')?.scrollIntoView({behavior:'smooth',block:'start'})}
+      catch(e){fail(e);$('kartuDetail').innerHTML=''}
+    };
+  }
+  if(page==='kuasi'){
+    document.querySelectorAll('.view-kuasi').forEach(btn=>btn.onclick=async()=>{
+      btn.disabled=true;btn.textContent='Memuat...';
+      try{await showKuasiDetail(Number(btn.dataset.id))}
+      catch(e){fail(e)}
+      finally{btn.disabled=false;btn.textContent='Detail'}
+    });
+    const table=$('kuasiTable');
+    if(table)table.onclick=e=>{
+      const row=e.target.closest('.kuasi-batch-row'),detail=e.target.closest('.view-kuasi');
+      if(row&&detail?.dataset.id)showKuasiDetail(Number(detail.dataset.id)).catch(fail);
+    };
   }
   if(page==='riwayat'){
     const apply=()=>{const q=$('historySearch').value.toLowerCase().trim(),t=$('historyType').value;document.querySelectorAll('#historyTable tbody tr[data-search]').forEach(r=>{r.style.display=(!q||r.dataset.search.includes(q))&&(!t||r.dataset.type===t)?'':'none'})};
@@ -628,7 +688,7 @@ function bind(page){
     document.querySelectorAll('.history-cancel').forEach(btn=>btn.onclick=async()=>{
       const id=Number(btn.dataset.id); if(!id)return;
       if(!(await sipbConfirm('Batalkan transaksi barang keluar #'+id+'? Stok akan dikembalikan dan transaksi tetap tercatat sebagai DIBATALKAN.')))return;
-      btn.disabled=true; btn.textContent='Memproses...';
+      btn.disabled=true;btn.textContent='Memproses...';
       try{
         await cancelAndDeleteOutgoing(id);
         toast('Transaksi #'+id+' dibatalkan dan riwayatnya dihapus. Stok telah dikembalikan.');
@@ -677,6 +737,7 @@ function bind(page){
     bindKeluarForm().catch(fail);
   }  if(page==='stock_opname') $('addOpname').onclick=async()=>{$('content').innerHTML=await stockOpnameForm();bindOpnameForm()};
 }
+
 function bindForm(id){$('backBarang').onclick=()=>renderApp('barang');$('cancelBarang').onclick=()=>renderApp('barang');$('saveBarang').onclick=async()=>{const payload={nama_barang:$('b_nama').value.trim(),kategori_id:$('b_kat').value?+$('b_kat').value:null,tipe:$('b_tipe').value.trim()||'-',merk:$('b_merk').value.trim()||'-',satuan:$('b_satuan').value.trim(),stok_minimum:+$('b_min').value||0};if(!payload.nama_barang)return toast('Nama barang wajib diisi.','error');const btn=$('saveBarang');btn.disabled=true;btn.textContent='Menyimpan...';const q=id?client.from('barang').update(payload).eq('id',id):client.from('barang').insert(payload);const {error}=await q;if(error){btn.disabled=false;btn.textContent=id?'Simpan Perubahan':'Simpan Barang';return fail(error)}toast(id?'Barang diperbarui':'Barang ditambahkan');renderApp('barang')}}
 document.addEventListener('click',e=>{
   const target=e.target.closest('[data-page]');
