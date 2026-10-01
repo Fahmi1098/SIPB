@@ -260,8 +260,6 @@
 
 
       const total=details.reduce((sum,d)=>sum+Number(d.jumlah||0)*Number(d.barang?.harga_terakhir||0),0);
-      const bendRows=details.map((d,i)=>{const price=Number(d.barang?.harga_terakhir||0);const qty=Number(d.jumlah||0);return '<tr><td class="center">'+(i+1)+'</td><td>'+esc(d.barang?.nama_barang||'-')+'</td><td>'+esc(d.nomor_awal||'-')+'</td><td class="center">'+qty+'</td><td class="center">'+esc(d.barang?.satuan||'-')+'</td><td class="right">'+(price?rupiah(price):'-')+'</td><td class="right">'+(price?rupiah(price*qty):'-')+'</td></tr>'}).join('');
-      const total=details.reduce((sum,d)=>sum+Number(d.jumlah||0)*Number(d.barang?.harga_terakhir||0),0);
       const bendRows=details.map((d,i)=>{
         const price=Number(d.barang?.harga_terakhir||0);
         const qty=Number(d.jumlah||0);
