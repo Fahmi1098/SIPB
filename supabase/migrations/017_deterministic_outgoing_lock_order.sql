@@ -167,4 +167,4 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.record_barang_keluar(date,text,text,text,text,text,text,text,text,jsonb) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.record_barang_keluar(date,text,text,text,text,text,text,text,text,jsonb) TO authenticat
+GRANT EXECUTE ON FUNCTION public.record_barang_keluar(date,text,text,text,text,text,text,text,text,jsonb) TO authenticated
