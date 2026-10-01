@@ -5249,3 +5249,297 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
     right:10px !important;
   }
 }
+
+
+/* =========================================================
+   SIPB OPERATIONS CENTER — STOCK / KARTU / KUASI / USERS
+   ========================================================= */
+.stock-alert-center{
+  margin-top:14px;
+  padding:18px;
+  overflow:hidden;
+}
+.stock-alert-center .section-head{
+  margin-bottom:14px;
+}
+.stock-alert-counts{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex-wrap:wrap;
+}
+.alert-count{
+  min-width:72px;
+  padding:8px 10px;
+  border:1px solid var(--sipb-line,#DFE7EF);
+  border-radius:10px;
+  background:var(--sipb-surface-soft,#F8FAFC);
+  text-align:center;
+}
+.alert-count strong{
+  display:block;
+  font-size:1rem;
+  line-height:1.1;
+}
+.alert-count small{
+  display:block;
+  margin-top:3px;
+  color:var(--sipb-muted,#6B7D90);
+  font-size:.56rem;
+  font-weight:800;
+}
+.alert-count.danger strong{color:#C53648}
+.alert-count.warning strong{color:#A87314}
+.alert-count.kuasi strong{color:var(--sipb-blue,#0B5CAB)}
+.stock-alert-layout{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 220px;
+  gap:14px;
+}
+.stock-alert-list{
+  display:grid;
+  gap:7px;
+  min-width:0;
+}
+.stock-alert-row{
+  min-height:55px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:9px 11px;
+  border:1px solid var(--sipb-line,#DFE7EF);
+  border-radius:11px;
+  background:var(--sipb-surface-soft,#F8FAFC);
+}
+.stock-alert-row.danger{border-color:rgba(197,54,72,.20);background:rgba(197,54,72,.04)}
+.stock-alert-row.warning{border-color:rgba(168,115,20,.18);background:rgba(168,115,20,.035)}
+.stock-alert-icon{
+  width:34px;height:34px;min-width:34px;
+  display:grid;place-items:center;
+  border-radius:9px;
+  background:#EEF6FC;
+  color:var(--sipb-blue,#0B5CAB);
+}
+.stock-alert-icon svg{width:18px;height:18px}
+.stock-alert-row.danger .stock-alert-icon{background:#FFF0F2;color:#C53648}
+.stock-alert-row>div{min-width:0;flex:1}
+.stock-alert-row strong{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:.72rem;
+}
+.stock-alert-row small{
+  display:block;
+  margin-top:2px;
+  color:var(--sipb-muted,#6B7D90);
+  font-size:.58rem;
+}
+.stock-alert-value{
+  flex:0 0 auto;
+  font-size:.57rem;
+  font-weight:850;
+  letter-spacing:.03em;
+}
+.stock-alert-row.danger .stock-alert-value{color:#C53648}
+.stock-alert-row.warning .stock-alert-value{color:#A87314}
+.stock-alert-side{
+  padding:12px;
+  border:1px solid var(--sipb-line,#DFE7EF);
+  border-radius:11px;
+  background:var(--sipb-surface-soft,#F8FAFC);
+}
+.stock-alert-side-title{
+  margin-bottom:9px;
+  color:var(--sipb-muted,#6B7D90);
+  font-size:.58rem;
+  font-weight:850;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+}
+.stock-alert-metric{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:7px 0;
+  border-bottom:1px solid var(--sipb-line,#DFE7EF);
+  font-size:.62rem;
+}
+.stock-alert-metric strong{font-size:.82rem}
+.stock-alert-side .ghost{
+  width:100%;
+  margin-top:10px;
+}
+.stock-alert-empty{
+  min-height:70px;
+  display:flex;
+  align-items:center;
+  gap:11px;
+  padding:12px;
+  border:1px dashed #BFD8EC;
+  border-radius:11px;
+  background:#F5FAFE;
+}
+.stock-alert-empty>span{
+  width:32px;height:32px;display:grid;place-items:center;
+  border-radius:50%;
+  background:#EAF6EE;
+  color:#16834B;
+  font-weight:900;
+}
+.stock-alert-empty strong{display:block;font-size:.70rem}
+.stock-alert-empty small{display:block;margin-top:2px;color:var(--sipb-muted,#6B7D90);font-size:.58rem}
+
+/* Kartu Persediaan summaries */
+.kartu-summary-grid,
+.kuasi-summary-grid,
+.user-summary-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+  margin:0 0 14px;
+}
+.kartu-summary{
+  min-height:74px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:11px 12px;
+  border:1px solid var(--sipb-line,#DFE7EF);
+  border-radius:11px;
+  background:var(--sipb-surface-soft,#F8FAFC);
+}
+.kartu-summary.attention{
+  border-color:rgba(197,54,72,.22);
+  background:rgba(197,54,72,.04);
+}
+.kartu-summary-icon{
+  width:36px;height:36px;min-width:36px;
+  display:grid;place-items:center;
+  border-radius:9px;
+  background:#EEF6FC;
+  color:var(--sipb-blue,#0B5CAB);
+}
+.kartu-summary-icon svg{width:18px;height:18px}
+.kartu-summary small{
+  display:block;
+  color:var(--sipb-muted,#6B7D90);
+  font-size:.55rem;
+  font-weight:800;
+}
+.kartu-summary strong{
+  display:block;
+  margin-top:3px;
+  font-size:.92rem;
+}
+.kartu-detail-summary{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:8px;
+  margin:0 0 12px;
+}
+.kartu-detail-summary>div{
+  padding:10px 11px;
+  border:1px solid var(--sipb-line,#DFE7EF);
+  border-radius:10px;
+  background:var(--sipb-surface-soft,#F8FAFC);
+}
+.kartu-detail-summary small,
+.kuasi-detail-summary small{
+  display:block;
+  color:var(--sipb-muted,#6B7D90);
+  font-size:.55rem;
+  font-weight:800;
+}
+.kartu-detail-summary strong,
+.kuasi-detail-summary strong{
+  display:block;
+  margin-top:3px;
+  font-size:.78rem;
+}
+.kartu-legend{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+  margin:0 0 10px;
+  color:var(--sipb-muted,#6B7D90);
+  font-size:.58rem;
+  font-weight:800;
+}
+.kartu-legend span{display:inline-flex;align-items:center;gap:5px}
+.kartu-legend i{width:7px;height:7px;border-radius:50%;display:inline-block}
+.kartu-legend i.in{background:#16834B}
+.kartu-legend i.out{background:#C53648}
+.kartu-legend i.adj{background:#0B5CAB}
+
+/* Detailed Kuasi */
+.kuasi-fifo-banner{margin-bottom:13px}
+.kuasi-batch-row{cursor:pointer}
+.kuasi-batch-row:hover{background:rgba(11,92,171,.045)!important}
+.kuasi-detail-modal{width:min(1020px,calc(100vw - 40px))!important}
+.kuasi-detail-summary{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:8px;
+  margin-bottom:13px;
+}
+.kuasi-detail-summary>div{
+  padding:10px 11px;
+  border:1px solid var(--sipb-line,#DFE7EF);
+  border-radius:10px;
+  background:var(--sipb-surface-soft,#F8FAFC);
+}
+
+/* User administration */
+.user-summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.user-role{
+  min-height:34px!important;
+  margin:0!important;
+  padding:5px 27px 5px 8px!important;
+  border-radius:8px!important;
+  font-size:.62rem!important;
+}
+.status-toggle{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+}
+.status-toggle span{
+  width:8px;height:8px;min-width:8px;border-radius:50%;
+  background:#9AA9B7;
+}
+.status-toggle.on span{background:#28A65F;box-shadow:0 0 0 3px rgba(40,166,95,.10)}
+@media(max-width:1100px){
+  .stock-alert-layout{grid-template-columns:1fr}
+  .kartu-summary-grid,.kuasi-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kartu-detail-summary{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .kuasi-detail-summary{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:760px){
+  .stock-alert-counts{width:100%}
+  .alert-count{flex:1;min-width:0}
+  .kartu-summary-grid,.kuasi-summary-grid,.user-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kartu-detail-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kuasi-detail-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:520px){
+  .stock-alert-center{padding:14px}
+  .stock-alert-counts{display:grid;grid-template-columns:repeat(3,1fr)}
+  .alert-count{padding:7px 5px}
+  .kartu-summary-grid,.kuasi-summary-grid,.user-summary-grid{grid-template-columns:1fr}
+  .kartu-detail-summary,.kuasi-detail-summary{grid-template-columns:1fr}
+}
+:root[data-theme="dark"] .stock-alert-row,
+:root[data-theme="dark"] .stock-alert-side,
+:root[data-theme="dark"] .kartu-summary,
+:root[data-theme="dark"] .kartu-detail-summary>div,
+:root[data-theme="dark"] .kuasi-detail-summary>div{
+  background:#162330;
+  border-color:#34495B;
+}
+:root[data-theme="dark"] .stock-alert-row.danger{background:rgba(255,102,122,.06)}
+:root[data-theme="dark"] .stock-alert-row.warning{background:rgba(240,180,75,.055)}
+:root[data-theme="dark"] .stock-alert-empty{background:#142A22;border-color:#355C49}
