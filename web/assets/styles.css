@@ -5543,3 +5543,129 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
 :root[data-theme="dark"] .stock-alert-row.danger{background:rgba(255,102,122,.06)}
 :root[data-theme="dark"] .stock-alert-row.warning{background:rgba(240,180,75,.055)}
 :root[data-theme="dark"] .stock-alert-empty{background:#142A22;border-color:#355C49}
+
+
+/* Table export & pagination */
+.table-tools{
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.table-export-actions{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  margin-left:auto;
+}
+.table-export-excel,
+.table-export-csv{
+  min-width:58px;
+}
+.table-pagination{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-top:10px;
+  padding:8px 2px 2px;
+  color:var(--muted,#64748b);
+  font-size:12px;
+  flex-wrap:wrap;
+}
+.pagination-info{
+  white-space:nowrap;
+}
+.pagination-controls{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  flex-wrap:wrap;
+}
+.pagination-controls>button,
+.pagination-page{
+  min-width:32px;
+  height:32px;
+  padding:0 9px;
+  border:1px solid var(--border,#dbe3ec);
+  border-radius:9px;
+  background:var(--card,#fff);
+  color:var(--text,#19324d);
+  cursor:pointer;
+  font:inherit;
+  font-weight:600;
+  transition:transform .18s ease,background .18s ease,border-color .18s ease,box-shadow .18s ease;
+}
+.pagination-controls>button:hover:not(:disabled),
+.pagination-page:hover{
+  transform:translateY(-1px);
+  border-color:#5b8fd2;
+  box-shadow:0 4px 12px rgba(16,56,96,.09);
+}
+.pagination-controls>button:disabled{
+  opacity:.4;
+  cursor:not-allowed;
+  transform:none;
+  box-shadow:none;
+}
+.pagination-page.active{
+  background:#0b4f97;
+  border-color:#0b4f97;
+  color:#fff;
+}
+.pagination-dots{
+  min-width:20px;
+  text-align:center;
+}
+.pagination-size{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-left:6px;
+  white-space:nowrap;
+}
+.pagination-size select{
+  min-width:72px;
+}
+.table-pagination-hidden{
+  display:none !important;
+}
+:root[data-theme="dark"] .pagination-controls>button,
+:root[data-theme="dark"] .pagination-page{
+  background:#162330;
+  border-color:#34495b;
+  color:#e7eef7;
+}
+:root[data-theme="dark"] .pagination-page.active{
+  background:#1d67b1;
+  border-color:#1d67b1;
+  color:#fff;
+}
+@media(max-width:760px){
+  .table-export-actions{
+    width:100%;
+    margin-left:0;
+  }
+  .table-export-actions .btn-sm{
+    flex:1;
+  }
+  .table-pagination{
+    align-items:flex-start;
+  }
+  .pagination-controls{
+    width:100%;
+  }
+  .pagination-size{
+    margin-left:auto;
+  }
+}
+@media(max-width:520px){
+  .pagination-info{
+    width:100%;
+  }
+  .pagination-controls{
+    justify-content:flex-start;
+  }
+  .pagination-size{
+    margin-left:0;
+  }
+}
