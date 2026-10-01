@@ -4608,3 +4608,63 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
   display:none !important;
   content:none !important;
 }
+
+/* FINAL FIX 20261002-08 — force inline hover label to render */
+.top-nav-layout .top-nav-icon-link{
+  display:flex !important;
+  flex-direction:row !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:0 !important;
+  overflow:hidden !important;
+}
+.top-nav-layout .top-nav-icon-link .nav-icon{
+  flex:0 0 20px !important;
+  width:20px !important;
+  min-width:20px !important;
+  height:20px !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+}
+.top-nav-layout .top-nav-icon-link .nav-label{
+  display:block !important;
+  flex:0 0 auto !important;
+  position:static !important;
+  width:auto !important;
+  min-width:0 !important;
+  max-width:0 !important;
+  height:auto !important;
+  margin:0 !important;
+  padding:0 !important;
+  overflow:hidden !important;
+  color:#fff !important;
+  background:transparent !important;
+  border:0 !important;
+  box-shadow:none !important;
+  opacity:0 !important;
+  visibility:hidden !important;
+  transform:none !important;
+  white-space:nowrap !important;
+  line-height:1.1 !important;
+  transition:max-width .24s cubic-bezier(.2,.7,.2,1),margin-left .16s ease,opacity .14s ease !important;
+}
+.top-nav-layout .top-nav-icon-link:hover .nav-label,
+.top-nav-layout .top-nav-icon-link:focus-visible .nav-label{
+  max-width:108px !important;
+  margin-left:9px !important;
+  opacity:1 !important;
+  visibility:visible !important;
+}
+@media(max-width:1100px){
+  .top-nav-layout .top-nav-icon-link:hover .nav-label,
+  .top-nav-layout .top-nav-icon-link:focus-visible .nav-label{
+    max-width:98px !important;
+  }
+}
+@media(max-width:900px){
+  .top-nav-layout .top-nav-icon-link:hover .nav-label,
+  .top-nav-layout .top-nav-icon-link:focus-visible .nav-label{
+    max-width:100px !important;
+  }
+}
