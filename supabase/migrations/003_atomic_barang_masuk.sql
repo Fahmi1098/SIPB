@@ -64,16 +64,20 @@ BEGIN
 
   -- Existing item: lock it so two simultaneous receipts cannot corrupt stock.
   IF v_barang_id IS NOT NULL THEN
-    SELECT b.id,k.nama_kategori
-      INTO v_barang_id,v_kategori_nama
+    SELECT b.id,b.kategori_id
+      INTO v_barang_id,p_kategori_id
     FROM public.barang b
-    LEFT JOIN public.kategori k ON k.id=b.kategori_id
     WHERE b.id=v_barang_id
     FOR UPDATE;
 
     IF NOT FOUND THEN
       RAISE EXCEPTION 'Barang ID % tidak ditemukan',p_barang_id;
     END IF;
+
+    SELECT nama_kategori
+      INTO v_kategori_nama
+    FROM public.kategori
+    WHERE id=p_kategori_id;
   ELSE
     IF COALESCE(trim(p_nama_barang),'') = '' THEN
       RAISE EXCEPTION 'Nama barang baru wajib diisi';
