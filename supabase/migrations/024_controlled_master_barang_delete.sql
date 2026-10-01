@@ -32,16 +32,36 @@ BEGIN
     RAISE EXCEPTION 'Barang ID % tidak ditemukan', p_barang_id;
   END IF;
 
+  -- Active outgoing history blocks deletion.
   SELECT COUNT(*)
     INTO v_outgoing_count
-  FROM public.detail_barang_keluar
-  WHERE barang_id = p_barang_id;
+  FROM public.detail_barang_keluar d
+  JOIN public.transaksi_keluar t ON t.id = d.transaksi_keluar_id
+  WHERE d.barang_id = p_barang_id
+    AND COALESCE(t.status, 'AKTIF') = 'AKTIF';
 
   IF v_outgoing_count > 0 THEN
     RAISE EXCEPTION
-      'Barang "%s" masih memiliki %s riwayat pengeluaran. Hapus riwayat Barang Keluar terlebih dahulu.',
+      'Barang "%s" masih memiliki %s pengeluaran AKTIF. Batalkan pengeluaran tersebut terlebih dahulu.',
       v_name, v_outgoing_count;
   END IF;
+
+  -- Cancelled outgoing history for this item is no longer operational
+  -- history. Remove its detail rows before deleting the master item.
+  -- If a cancelled transaction becomes empty, remove its header as well.
+  DELETE FROM public.detail_barang_keluar d
+  USING public.transaksi_keluar t
+  WHERE d.transaksi_keluar_id = t.id
+    AND d.barang_id = p_barang_id
+    AND COALESCE(t.status, 'AKTIF') = 'DIBATALKAN';
+
+  DELETE FROM public.transaksi_keluar t
+  WHERE COALESCE(t.status, 'AKTIF') = 'DIBATALKAN'
+    AND NOT EXISTS (
+      SELECT 1
+      FROM public.detail_barang_keluar d
+      WHERE d.transaksi_keluar_id = t.id
+    );
 
   DELETE FROM public.barang
   WHERE id = p_barang_id;
