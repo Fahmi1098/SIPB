@@ -170,7 +170,7 @@
     return (v===0?'nol':terbilang(v))+' rupiah';
   }
 
-  function serial(d) {  function serial(d) {
+  function serial(d) {
     if (d.nomor_awal && d.nomor_akhir) return esc(d.nomor_awal)+' → '+esc(d.nomor_akhir);
     return d.nomor_dus ? 'Dus '+esc(d.nomor_dus) : '-';
   }
