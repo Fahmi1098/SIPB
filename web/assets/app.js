@@ -91,7 +91,7 @@ async function penggunaPage(){
   if(profile?.role!=='admin')return '<section class="card error-card"><h2>Akses ditolak</h2><p>Halaman ini hanya dapat diakses admin.</p></section>';
   const {data,error}=await client.from('user_profiles').select('id,legacy_user_id,username,nama_lengkap,role,is_active,created_at').order('nama_lengkap');
   if(error)throw error;
-  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">ADMINISTRASI</span><h2>Kelola Pengguna</h2><p>Atur peran dan status akun SIPB. Pembuatan akun Auth dilakukan melalui Supabase Auth.</p></div><span class="status-pill">'+(data?.length||0)+' pengguna</span></div><div class="alert-box"><strong>Catatan:</strong> perubahan di sini berlaku pada hak akses database. Jangan menonaktifkan akun admin terakhir.</div><div class="table-wrap"><table><thead><tr><th>Pengguna</th><th>Username</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead><tbody>'+(data||[]).map(u=>'<tr data-user="'+esc(u.id)+'"><td><strong>'+esc(u.nama_lengkap||'-')+'</strong><br><small>'+esc(u.id)+'</small></td><td>'+esc(u.username||'-')+'</td><td><select class="user-role" data-id="'+u.id+'"><option value="admin" '+(u.role==='admin'?'selected':'')+'>Admin</option><option value="user" '+(u.role==='user'?'selected':'')+'>User</option></select></td><td><span class="badge-soft '+(u.is_active?'success':'')+'">'+(u.is_active?'AKTIF':'NONAKTIF')+'</span></td><td><button class="btn-sm user-save" data-id="'+u.id+'" data-active="'+(u.is_active?'1':'0')+'">Simpan</button></td></tr>').join('')||emptyRow(5)+'</tbody></table></div></section>';
+  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">ADMINISTRASI</span><h2>Kelola Pengguna</h2><p>Atur peran dan status akun SIPB. Pembuatan akun Auth dilakukan melalui Supabase Auth.</p></div><span class="status-pill">'+(data?.length||0)+' pengguna</span></div><div class="alert-box"><strong>Catatan:</strong> perubahan di sini berlaku pada hak akses database. Jangan menonaktifkan akun admin terakhir.</div><div class="table-wrap"><table><thead><tr><th>Pengguna</th><th>Username</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead><tbody>'+(data||[]).map(u=>'<tr data-user="'+esc(u.id)+'"><td><strong>'+esc(u.nama_lengkap||'-')+'</strong><br><small>'+esc(u.id)+'</small></td><td>'+esc(u.username||'-')+'</td><td><select class="user-role" data-id="'+u.id+'"><option value="admin" '+(u.role==='admin'?'selected':'')+'>Admin</option><option value="user" '+(u.role==='user'?'selected':'')+'>User</option></select></td><td><button type="button" class="status-toggle '+(u.is_active?'on':'')+'" data-id="'+u.id+'" data-active="'+(u.is_active?'1':'0')+'"><span></span>'+(u.is_active?'Aktif':'Nonaktif')+'</button></td><td><button class="btn-sm user-save" data-id="'+u.id+'">Simpan</button></td></tr>').join('')||emptyRow(5)+'</tbody></table></div></section>';
 }
 async function pegawaiPage(){return simple('Pegawai','pegawai',[['id','ID'],['nama_pegawai','Nama'],['nip','NIP'],['status_pegawai','Status'],['jabatan','Jabatan']])}
 async function riwayatPage(){
@@ -119,15 +119,14 @@ async function renderApp(page='dashboard'){const r=await client.auth.getSession(
 function navItem(m,page){return `<a href="#${m[0]}" data-page="${m[0]}" class="${page===m[0]?'active':''}"><span class="nav-icon">${m[2]}</span><span>${m[1]}</span></a>`}
 function bind(page){
   if(page==='pengguna'){
-    document.querySelectorAll('.user-save').forEach(btn=>btn.onclick=async()=>{
-      const id=btn.dataset.id, role=document.querySelector('.user-role[data-id="'+id+'"]')?.value;
-      const active=btn.dataset.active==='1';
-      if(id===session.user.id && role!=='admin')return toast('Akun admin yang sedang digunakan tidak boleh diturunkan menjadi User dari halaman ini.','error');
-      btn.disabled=true;btn.textContent='Menyimpan...';
-      const {error}=await client.from('user_profiles').update({role,is_active:active}).eq('id',id);
-      if(error){btn.disabled=false;btn.textContent='Simpan';return fail(error)}
-      toast('Profil pengguna diperbarui.');renderApp('pengguna');
+    document.querySelectorAll('.status-toggle').forEach(toggle=>toggle.onclick=()=>{
+      const active=toggle.dataset.active==='1';
+      toggle.dataset.active=active?'0':'1';
+      toggle.classList.toggle('on',!active);
+      toggle.innerHTML='<span></span>'+(!active?'Aktif':'Nonaktif');
     });
+  }
+;
   }
   if(page==='kartu'){
     const search=$('kartuSearch'),select=$('kartuBarang');
