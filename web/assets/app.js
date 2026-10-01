@@ -77,7 +77,12 @@ async function loadKartuDetail(id){
     ...(masuk||[]).map(r=>({date:r.tanggal_masuk,type:'MASUK',qtyIn:Number(r.jumlah)||0,qtyOut:0,price:Number(r.harga_satuan)||0,desc:'Penerimaan dari '+(r.nama_penyerah||'-')+(r.nomor_awal?' [Seri: '+r.nomor_awal+' - '+(r.nomor_akhir||'-')+']':'')+(r.nomor_dus?' [Dus: '+r.nomor_dus+']':''),id:r.id})),
     ...(keluar||[]).filter(r=>(r.transaksi?.status||'AKTIF')==='AKTIF').map(r=>({date:r.transaksi?.tanggal_keluar,type:'KELUAR',qtyIn:0,qtyOut:Number(r.jumlah)||0,price:0,desc:'Distribusi ke '+(r.transaksi?.penerima_nama||'-')+' ('+(r.transaksi?.tujuan_ruangan||'Umum')+')'+(r.nomor_awal?' [Seri: '+r.nomor_awal+(r.nomor_akhir?' - '+r.nomor_akhir:'')+']':'')+(r.nomor_dus?' [Dus: '+r.nomor_dus+']':''),id:r.id})),
     ...(opname||[]).map(r=>({date:r.tanggal_opname,type:r.selisih>0?'OPNAME IN':'OPNAME OUT',qtyIn:r.selisih>0?Number(r.selisih):0,qtyOut:r.selisih<0?Math.abs(Number(r.selisih)):0,price:0,desc:'Penyesuaian opname fisik: '+(r.keterangan||'-'),id:r.id}))
-  ].filter(r=>r.date).sort((x,y)=>String(x.date).localeCompare(String(y.date))||Number(x.id)-Number(y.id));
+  ].filter(r=>r.date).sort((x,y)=>{
+    const byDate=String(x.date).localeCompare(String(y.date));
+    if(byDate!==0)return byDate;
+    const rank={MASUK:1,'OPNAME IN':2,'OPNAME OUT':3,KELUAR:4};
+    return (rank[x.type]||9)-(rank[y.type]||9)||Number(x.id)-Number(y.id);
+  });
   let saldo=0;
   rows.forEach(r=>{saldo+=r.qtyIn-r.qtyOut;r.saldo=saldo});
   const nilai=(Number(item.sisa)||0)*(Number(item.harga_terakhir)||0);
