@@ -11,6 +11,38 @@ let sidebarOpen=false;
 let uiTheme=localStorage.getItem('sipb-theme')||'light';
 document.documentElement.dataset.theme=uiTheme;
 const toast=(message,type='success')=>{let box=$('toastBox');if(!box){box=document.createElement('div');box.id='toastBox';box.className='toast-box';document.body.appendChild(box)}const el=document.createElement('div');el.className='toast '+type;el.textContent=message;box.appendChild(el);setTimeout(()=>el.remove(),3500)};
+const sipbDialog=(type,message,options={})=>new Promise(resolve=>{
+  const old=document.getElementById('sipbDialog');
+  if(old)old.remove();
+  const title=options.title||(type==='confirm'?'Konfirmasi':type==='prompt'?'Input':'Informasi');
+  const okText=options.okText||(type==='confirm'?'Ya':'OK');
+  const cancelText=options.cancelText||'Batal';
+  const wrap=document.createElement('div');
+  wrap.id='sipbDialog';
+  wrap.className='sipb-dialog-backdrop';
+  wrap.innerHTML='<div class="sipb-dialog" role="dialog" aria-modal="true" aria-labelledby="sipbDialogTitle">'+
+    '<div class="sipb-dialog-icon">'+(type==='confirm'?'?':type==='prompt'?'✎':'i')+'</div>'+
+    '<div class="sipb-dialog-body"><h3 id="sipbDialogTitle">'+esc(title)+'</h3><p>'+esc(message)+'</p>'+
+    (type==='prompt'?'<input class="sipb-dialog-input" id="sipbDialogInput" type="text" value="'+esc(options.value||'')+'" autocomplete="off">':'')+
+    '</div><div class="sipb-dialog-actions">'+
+    (type==='confirm'||type==='prompt'?'<button type="button" class="ghost sipb-dialog-cancel">'+esc(cancelText)+'</button>':'')+
+    '<button type="button" class="primary sipb-dialog-ok">'+esc(okText)+'</button></div></div>';
+  document.body.appendChild(wrap);
+  const ok=wrap.querySelector('.sipb-dialog-ok'), cancel=wrap.querySelector('.sipb-dialog-cancel'), input=wrap.querySelector('.sipb-dialog-input');
+  const finish=value=>{wrap.remove();resolve(value)};
+  ok.onclick=()=>finish(type==='prompt'?(input?.value??''):true);
+  cancel&&(cancel.onclick=()=>finish(type==='prompt'?null:false));
+  wrap.addEventListener('click',e=>{if(e.target===wrap&&type!=='prompt')finish(type==='confirm'?false:undefined)});
+  if(input){
+    input.focus();
+    input.select();
+    input.addEventListener('keydown',e=>{if(e.key==='Enter')finish(input.value);if(e.key==='Escape')finish(null)});
+  }else ok.focus();
+});
+const sipbAlert=message=>sipbDialog('alert',message,{title:'Pemberitahuan'});
+const sipbConfirm=message=>sipbDialog('confirm',message);
+const sipbPrompt=(message,value='')=>sipbDialog('prompt',message,{value});
+window.SIPBDialog={alert:sipbAlert,confirm:sipbConfirm,prompt:sipbPrompt};
 const fail=e=>{console.error(e);toast(e?.message||'Terjadi kesalahan.','error')};
 const loading=label=>'<div class="loading-state"><div class="spinner"></div><span>'+esc(label||'Memuat...')+'</span></div>';
 
@@ -469,7 +501,7 @@ function bind(page){
     document.querySelectorAll('.history-detail').forEach(b=>b.onclick=()=>showHistoryDetail(b.dataset.key));
     document.querySelectorAll('.history-cancel').forEach(btn=>btn.onclick=async()=>{
       const id=Number(btn.dataset.id); if(!id)return;
-      if(!confirm('Batalkan transaksi barang keluar #'+id+'? Stok akan dikembalikan dan transaksi tetap tercatat sebagai DIBATALKAN.'))return;
+      if(!(await sipbConfirm('Batalkan transaksi barang keluar #'+id+'? Stok akan dikembalikan dan transaksi tetap tercatat sebagai DIBATALKAN.')))return;
       btn.disabled=true; btn.textContent='Memproses...';
       try{
         await cancelAndDeleteOutgoing(id);
@@ -486,7 +518,7 @@ function bind(page){
     document.querySelectorAll('.delete-barang').forEach(btn=>btn.onclick=async()=>{
       const id=Number(btn.dataset.id);
       if(!id)return;
-      if(!confirm('Hapus barang ini dari Master Barang? Penghapusan hanya diizinkan jika barang sudah tidak memiliki riwayat Barang Keluar. Data terkait barang yang memang masih tersimpan akan ikut mengikuti aturan database.'))return;
+      if(!(await sipbConfirm('Hapus barang ini dari Master Barang? Penghapusan hanya diizinkan jika barang sudah tidak memiliki riwayat Barang Keluar. Data terkait barang yang memang masih tersimpan akan ikut mengikuti aturan database.')))return;
       btn.disabled=true;
       try{
         const {data,error}=await client.rpc('delete_barang_if_no_outgoing',{p_barang_id:id});
@@ -505,12 +537,12 @@ function bind(page){
     const apply=()=>{const q=$('pegawaiSearch').value.toLowerCase().trim();let shown=0;document.querySelectorAll('#pegawaiTable tbody tr[data-search]').forEach(r=>{const ok=!q||r.dataset.search.includes(q);r.style.display=ok?'':'none';if(ok)shown++});$('pegawaiCount').textContent=shown+' data'};
     $('pegawaiSearch').oninput=apply;
     document.querySelectorAll('.edit-pegawai').forEach(btn=>btn.onclick=async()=>{try{$('content').innerHTML=loading('Memuat pegawai...');$('content').innerHTML=await pegawaiForm(Number(btn.dataset.id));bindPegawaiForm(Number(btn.dataset.id))}catch(e){fail(e)}});
-    document.querySelectorAll('.delete-pegawai').forEach(btn=>btn.onclick=async()=>{if(!confirm('Hapus data pegawai ini? Data historis transaksi tetap tersimpan.'))return;btn.disabled=true;const {error}=await client.from('pegawai').delete().eq('id',Number(btn.dataset.id));if(error){btn.disabled=false;return fail(error)}toast('Pegawai berhasil dihapus.');renderApp('pegawai')});
+    document.querySelectorAll('.delete-pegawai').forEach(btn=>btn.onclick=async()=>{if(!(await sipbConfirm('Hapus data pegawai ini? Data historis transaksi tetap tersimpan.')))return;btn.disabled=true;const {error}=await client.from('pegawai').delete().eq('id',Number(btn.dataset.id));if(error){btn.disabled=false;return fail(error)}toast('Pegawai berhasil dihapus.');renderApp('pegawai')});
   }
   if(page==='kategori'){
-    const addKategori=$('addKategori'); if(addKategori) addKategori.onclick=async()=>{const n=prompt('Nama kategori baru:');if(!n?.trim())return;const {error}=await client.from('kategori').insert({nama_kategori:n.trim()});if(error)return fail(error);toast('Kategori ditambahkan');renderApp('kategori')};
-    document.querySelectorAll('.edit-kat').forEach(btn=>btn.onclick=async()=>{const {data,error}=await client.from('kategori').select('*').eq('id',+btn.dataset.id).single();if(error)return fail(error);const n=prompt('Nama kategori:',data.nama_kategori);if(!n?.trim())return;const {error:e}=await client.from('kategori').update({nama_kategori:n.trim()}).eq('id',+btn.dataset.id);if(e)return fail(e);toast('Kategori diperbarui');renderApp('kategori')});
-    document.querySelectorAll('.delete-kat').forEach(btn=>btn.onclick=async()=>{if(!confirm('Hapus kategori ini? Barang yang masih memakai kategori ini dapat mencegah penghapusan.'))return;const {error}=await client.from('kategori').delete().eq('id',+btn.dataset.id);if(error)return fail(error);toast('Kategori dihapus');renderApp('kategori')});
+    const addKategori=$('addKategori'); if(addKategori) addKategori.onclick=async()=>{const n=await sipbPrompt('Nama kategori baru:');if(!n?.trim())return;const {error}=await client.from('kategori').insert({nama_kategori:n.trim()});if(error)return fail(error);toast('Kategori ditambahkan');renderApp('kategori')};
+    document.querySelectorAll('.edit-kat').forEach(btn=>btn.onclick=async()=>{const {data,error}=await client.from('kategori').select('*').eq('id',+btn.dataset.id).single();if(error)return fail(error);const n=await sipbPrompt('Nama kategori:',data.nama_kategori);if(!n?.trim())return;const {error:e}=await client.from('kategori').update({nama_kategori:n.trim()}).eq('id',+btn.dataset.id);if(e)return fail(e);toast('Kategori diperbarui');renderApp('kategori')});
+    document.querySelectorAll('.delete-kat').forEach(btn=>btn.onclick=async()=>{if(!(await sipbConfirm('Hapus kategori ini? Barang yang masih memakai kategori ini dapat mencegah penghapusan.')))return;const {error}=await client.from('kategori').delete().eq('id',+btn.dataset.id);if(error)return fail(error);toast('Kategori dihapus');renderApp('kategori')});
   }
   if(page==='barang_masuk'){
     bindMasukForm().catch(fail);
