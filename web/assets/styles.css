@@ -4132,3 +4132,42 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
   background:var(--sipb-blue-mid) !important;
   border-color:var(--sipb-blue-mid) !important;
 }
+
+/* FINAL dashboard presentation: make welcome card clearly blue and remove thin accent lines. */
+.top-nav-layout #content .welcome{
+  background:linear-gradient(135deg,#0B5CAB 0%,#176FAF 58%,#1B71B8 100%) !important;
+  color:#fff !important;
+  border:0 !important;
+  box-shadow:0 18px 42px rgba(7,59,111,.16) !important;
+}
+.top-nav-layout #content .welcome h2,
+.top-nav-layout #content .welcome p,
+.top-nav-layout #content .welcome .eyebrow,
+.top-nav-layout #content .welcome .welcome-meta{
+  color:#fff !important;
+}
+.top-nav-layout #content .welcome .eyebrow,
+.top-nav-layout #content .welcome .welcome-meta{
+  color:#D9ECFA !important;
+}
+.top-nav-layout #content .welcome-emblem{
+  border-left-color:rgba(255,255,255,.16) !important;
+}
+.top-nav-layout #content .welcome:before,
+.top-nav-layout #content .stat-card:before{
+  display:none !important;
+  content:none !important;
+}
+.top-nav-layout #content .stat-card{
+  border-top:0 !important;
+}
+.top-nav-layout #content .card:before,
+.top-nav-layout #content .card:after{
+  display:none !important;
+  content:none !important;
+}
+.top-nav-layout .top:after,
+.top-nav-layout .top:before{
+  display:none !important;
+  content:none !important;
+}
