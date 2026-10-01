@@ -242,18 +242,24 @@
 
 
       const bastRegular=regular.length?`<section class="sheet">${kop()}
-        <div class="title">BERITA ACARA SERAH TERIMA BARANG</div>
-        <div class="doc-number">NOMOR : 000.2.3.1/${no}/BAST/UPTD.PPD.MLP/${new Date(head.tanggal_keluar).getFullYear()}</div>
+        <div class="title">BERITA ACARA</div>
+        <div class="title no-underline" style="font-size:12pt;margin-top:-8px;margin-bottom:4px">SERAH TERIMA BARANG</div>
+        <div class="doc-number">NOMOR : ${no}/BAST/UPTD.PPD.MLP/${new Date(head.tanggal_keluar).getFullYear()}</div>
         ${statusMark}
-        <p><b>${dateFormalBAST(head.tanggal_keluar)}</b>, telah dilaksanakan serah terima barang habis pakai dari <b>${esc(from)}</b> selaku Pengurus Barang kepada <b>${esc(receiver)}</b> selaku penerima barang pada ${esc(head.tujuan_ruangan||'Unit Kerja/ Ruangan')}.</p>
+        <p><b>${dateFormalBAST(head.tanggal_keluar)}</b>, telah dilaksanakan serah terima barang habis pakai untuk <b>${esc(head.tujuan_ruangan||'Umum')}</b>. Para pihak yang melaksanakan serah terima adalah sebagai berikut:</p>
+        <ol style="font-size:12pt;line-height:1.5;margin:0 0 12px 22px;padding:0">
+          <li style="padding-left:5px;margin-bottom:6px"><b>${esc(from)}</b>, selaku Pengurus Barang, selanjutnya disebut <b>Yang Menyerahkan</b>.</li>
+          <li style="padding-left:5px;margin-bottom:6px"><b>${esc(receiver)}</b>, selaku penerima barang, selanjutnya disebut <b>Yang Menerima</b>.</li>
+        </ol>
         <p>Adapun barang yang diserahterimakan adalah sebagai berikut:</p>
         <table class="data"><thead><tr><th style="width:7%">NO</th><th>NAMA BARANG</th><th>MEREK / TIPE</th><th style="width:13%">JUMLAH</th><th style="width:13%">SATUAN</th><th>KETERANGAN</th></tr></thead>
         <tbody>${rows(regular)}</tbody></table>
         <p>Barang tersebut telah diterima dalam keadaan baik dan selanjutnya menjadi tanggung jawab penerima sesuai peruntukannya. Berita Acara Serah Terima Barang ini dibuat dengan sebenarnya untuk dipergunakan sebagaimana mestinya.</p>
-        <table class="sign"><tr><td>Yang Menyerahkan,</td><td>Yang Menerima,</td></tr>
+        <p class="made">Dibuat di Malingping<br>Tanggal ${dateWithDay(head.tanggal_keluar)}</p>
+        <table class="sign"><tr><td>Yang Menerima,</td><td>Yang Menyerahkan,</td></tr>
         <tr><td class="space"></td><td class="space"></td></tr>
-        <tr><td><span class="name">${esc(from.toUpperCase())}</span><br>NIP. ${esc(head.penyerah_nip||'-')}</td>
-        <td><span class="name">${esc(receiver.toUpperCase())}</span><br>NIP. ${esc(head.penerima_nip||'-')}</td></tr></table>
+        <tr><td><span class="name">${esc(receiver.toUpperCase())}</span><br>NIP. ${esc(head.penerima_nip||'-')}</td>
+        <td><span class="name">${esc(from.toUpperCase())}</span><br>NIP. ${esc(head.penyerah_nip||'-')}</td></tr></table>
         <table class="sign" style="width:50%;margin:16px auto 0"><tr><td>Mengetahui/Mengesahkan,<br>${esc(kepala?.jabatan||'Kepala UPTD PPD Malingping')}</td></tr>
         <tr><td class="space-sm"></td></tr>
         <tr><td><span class="name">${esc((kepala?.nama_pegawai||'-').toUpperCase())}</span><br>NIP. ${esc(kepala?.nip||'-')}</td></tr></table>
@@ -261,19 +267,26 @@
 
 
       const bastKuasi=kuasi.length?`<section class="sheet">${kop()}
-        <div class="title">BERITA ACARA SERAH TERIMA BARANG</div>
+        <div class="title">BERITA ACARA</div>
+        <div class="title no-underline" style="font-size:12pt;margin-top:-8px;margin-bottom:3px">SERAH TERIMA BARANG</div>
+        <div class="title no-underline" style="font-size:11pt;margin-top:-4px;margin-bottom:4px">BARANG BERSERI / KUASI</div>
         <div class="title no-underline" style="font-size:12pt;margin-top:-8px;margin-bottom:6px">BARANG BERSERI / KUASI</div>
-        <div class="doc-number">NOMOR : 000.2.3.1/${no}/BAST-K/UPTD.PPD.MLP/${new Date(head.tanggal_keluar).getFullYear()}</div>
+        <div class="doc-number">NOMOR : ${no}/BAST-K/UPTD.PPD.MLP/${new Date(head.tanggal_keluar).getFullYear()}</div>
         ${statusMark}
-        <p><b>${dateFormalBAST(head.tanggal_keluar)}</b>, telah dilaksanakan serah terima barang berseri/kuasi dari <b>${esc(from)}</b> selaku Pengurus Barang kepada <b>${esc(receiver)}</b> selaku penerima barang pada ${esc(head.tujuan_ruangan||'Unit Kerja/ Ruangan')}.</p>
+        <p><b>${dateFormalBAST(head.tanggal_keluar)}</b>, telah dilaksanakan serah terima barang berseri/kuasi untuk <b>${esc(head.tujuan_ruangan||'Umum')}</b>. Para pihak yang melaksanakan serah terima adalah sebagai berikut:</p>
+        <ol style="font-size:12pt;line-height:1.5;margin:0 0 12px 22px;padding:0">
+          <li style="padding-left:5px;margin-bottom:6px"><b>${esc(from)}</b>, selaku Pengurus Barang, selanjutnya disebut <b>Yang Menyerahkan</b>.</li>
+          <li style="padding-left:5px;margin-bottom:6px"><b>${esc(receiver)}</b>, selaku penerima barang, selanjutnya disebut <b>Yang Menerima</b>.</li>
+        </ol>
         <p>Rincian barang berseri/kuasi yang diserahterimakan:</p>
         <table class="data"><thead><tr><th style="width:7%">NO</th><th>NAMA BARANG</th><th style="width:14%">JUMLAH</th><th style="width:14%">SATUAN</th><th>NOMOR SERI / DUS</th></tr></thead>
         <tbody>${kuasi.map((d,i)=>`<tr><td class="center">${i+1}</td><td>${esc(d.barang?.nama_barang||'-')}</td><td class="center">${d.jumlah}</td><td class="center">${esc(d.barang?.satuan||'-')}</td><td>${serial(d)}</td></tr>`).join('')}</tbody></table>
         <p>Barang berseri/kuasi tersebut telah diterima dalam keadaan baik dan dicatat sebagai bagian dari administrasi persediaan SIPB. Berita Acara ini dibuat dengan sebenarnya untuk dipergunakan sebagaimana mestinya.</p>
-        <table class="sign"><tr><td>Yang Menyerahkan,</td><td>Yang Menerima,</td></tr>
+        <p class="made">Dibuat di Malingping<br>Tanggal ${dateWithDay(head.tanggal_keluar)}</p>
+        <table class="sign"><tr><td>Yang Menerima,</td><td>Yang Menyerahkan,</td></tr>
         <tr><td class="space"></td><td class="space"></td></tr>
-        <tr><td><span class="name">${esc(from.toUpperCase())}</span><br>NIP. ${esc(head.penyerah_nip||'-')}</td>
-        <td><span class="name">${esc(receiver.toUpperCase())}</span><br>NIP. ${esc(head.penerima_nip||'-')}</td></tr></table>
+        <tr><td><span class="name">${esc(receiver.toUpperCase())}</span><br>NIP. ${esc(head.penerima_nip||'-')}</td>
+        <td><span class="name">${esc(from.toUpperCase())}</span><br>NIP. ${esc(head.penyerah_nip||'-')}</td></tr></table>
         <table class="sign" style="width:50%;margin:16px auto 0"><tr><td>Mengetahui/Mengesahkan,<br>${esc(kepala?.jabatan||'Kepala UPTD PPD Malingping')}</td></tr>
         <tr><td class="space-sm"></td></tr>
         <tr><td><span class="name">${esc((kepala?.nama_pegawai||'-').toUpperCase())}</span><br>NIP. ${esc(kepala?.nip||'-')}</td></tr></table>
