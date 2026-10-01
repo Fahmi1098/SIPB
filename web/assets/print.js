@@ -31,11 +31,11 @@
     w.document.write(`<!doctype html><html lang="id"><head><meta charset="utf-8">
       <title>${esc(title)}</title>
       <style>
-        @page{size:A4 ${orientation};margin:0}
+        @page{size:A4 ${orientation};margin:0}\n        @page landscape{size:A4 landscape;margin:0}
         *{box-sizing:border-box}
         body{margin:0;background:#eee;font-family:"Times New Roman",serif;color:#111}
         .sheet{width:21cm;min-height:29.7cm;margin:12px auto;background:#fff;padding:1.35cm 1.6cm}
-        .sheet.landscape{width:29.7cm;min-height:21cm}
+        .sheet.landscape{width:29.7cm;min-height:21cm;page:landscape}\n        .sheet + .sheet{break-before:page}
         .toolbar{position:fixed;right:18px;bottom:18px;z-index:10}
         .toolbar button{border:0;border-radius:8px;padding:10px 16px;background:#0b5cab;color:#fff;font-weight:700;cursor:pointer}
         .kop{width:100%;border-collapse:collapse;margin-bottom:5px}
@@ -201,7 +201,7 @@
       ].sort((a,b)=>String(a.date).localeCompare(String(b.date))||Number(a.id)-Number(b.id));
       let saldo=0;
       const body=rows.map((r,i)=>{saldo+=Number(r.in||0)-Number(r.out||0);return `<tr><td class="center">${i+1}</td><td class="center">${shortDate(r.date)}</td><td class="center">${esc(r.type)}</td><td class="right">${r.in?r.in:'-'}</td><td class="right">${r.out?r.out:'-'}</td><td class="right">${saldo}</td><td class="right">${r.price?rupiah(r.price):'-'}</td><td>${esc(r.desc)}</td></tr>`}).join('');
-      const html=`<section class="sheet landscape">${kop()}
+      const html=`<section class="sheet landscape page-landscape">${kop()}
         <div class="title">KARTU PERSEDIAAN BARANG</div>
         <table class="meta"><tr><td>Nama Barang</td><td>:</td><td><b>${esc(item.nama_barang)}</b></td><td style="width:13%">Satuan</td><td>:</td><td>${esc(item.satuan||'-')}</td></tr>
         <tr><td>Merk / Tipe</td><td>:</td><td>${esc([item.merk,item.tipe].filter(Boolean).join(' ')||'-')}</td><td>Saldo Saat Ini</td><td>:</td><td><b>${item.sisa??0}</b></td></tr></table>
