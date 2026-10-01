@@ -38,10 +38,20 @@
     style:'currency', currency:'IDR', maximumFractionDigits:0
   }).format(Number(v) || 0);
 
+  function printNotice(message) {
+    const w=window.opener;
+    if(w?.SIPBDialog?.alert){ w.SIPBDialog.alert(message); return; }
+    const box=document.createElement('div');
+    box.style.cssText='position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.35);z-index:99999;font-family:Arial,sans-serif';
+    box.innerHTML='<div style="width:min(420px,calc(100vw - 32px));background:#fff;border-radius:14px;padding:22px;box-shadow:0 18px 50px rgba(0,0,0,.25)"><strong style="display:block;font-size:16px;margin-bottom:8px">Pemberitahuan</strong><div style="font-size:14px;line-height:1.5;color:#394b5d">'+esc(message)+'</div><button style="margin-top:16px;border:0;border-radius:9px;padding:9px 16px;background:#0b5cab;color:#fff;font-weight:700;cursor:pointer">OK</button></div>';
+    document.body.appendChild(box);
+    box.querySelector('button').onclick=()=>box.remove();
+  }
+
   function openPrint(title, body, orientation='portrait', existingWindow=null) {
     const w = existingWindow || window.open('about:blank', '_blank');
     if (!w || w.closed) {
-      window.alert('Popup diblokir browser. Izinkan popup untuk mencetak dokumen SIPB.');
+      printNotice('Popup diblokir browser. Izinkan popup untuk mencetak dokumen SIPB.');
       return;
     }
 
@@ -51,6 +61,7 @@
       <style>
         @page{size:A4 ${orientation};margin:0}
         @page landscape{size:A4 landscape;margin:0}
+        @page bend29{size:A4 landscape;margin:0}
         @page folio{size:21.5cm 33cm;margin:0}
         *{box-sizing:border-box}
         html,body{margin:0;padding:0}
@@ -99,6 +110,9 @@
         .note{font-size:9.5pt;color:#444;margin-top:8px;text-align:left}
         .status{display:inline-block;padding:2px 7px;border:1px solid #777;border-radius:3px;font-size:10pt;font-weight:700;margin-bottom:6px}
         .form-label{font-weight:700}
+        .sheet p.made{text-align:left;margin-left:0;margin-right:auto}
+        .sheet.bend29-landscape{width:29.7cm;min-height:21cm;padding:1.2cm 2cm 2cm 2cm;page:bend29}
+        .sheet.bend29-landscape .bend-head{width:100%}
         .bend-head{width:100%;border-collapse:collapse;margin-bottom:8px}
         .bend-head td{vertical-align:top;font-size:11pt}
         .bend-title{font-size:13pt;font-weight:700;line-height:1.2}
@@ -306,7 +320,7 @@
         const totalRow=price*qty;
         return '<tr><td class="center">'+(i+1)+'</td><td>'+esc(d.barang?.nama_barang||'-')+'</td><td class="center">'+esc(d.barang?.satuan||'-')+'</td><td class="right">'+qty+'</td><td class="center terbilang">'+esc(terbilang(qty))+'</td><td class="right">'+(price?rupiah(price):'-')+'</td><td class="right">'+(totalRow?rupiah(totalRow):'-')+'</td></tr>'
       }).join('');
-      const bend29=`<section class='sheet folio'>${kop()}
+      const bend29=`<section class='sheet bend29-landscape'>${kop()}
         <table class='bend-head'>
           <tr>
             <td style='width:67%'>
@@ -342,7 +356,7 @@
         <p class='small'>Terbilang nilai barang: <b class='terbilang'>${esc(terbilangRupiah(total))}</b>.</p>
         <table style='width:100%;border-collapse:collapse;margin-top:12px'><tr>
           <td style='width:50%;font-size:11pt;vertical-align:top'>Daerah/Unit : <b>${esc(head.tujuan_ruangan||'-')}</b><br>Tanggal : ${dateWithDay(head.tanggal_keluar)}</td>
-          <td style='width:50%;font-size:11pt;text-align:right;vertical-align:top'>Dibuat di Malingping<br>Tanggal : ${dateWithDay(head.tanggal_keluar)}</td>
+          <td style='width:50%;font-size:11pt;text-align:left;vertical-align:top'>Dibuat di Malingping<br>Tanggal : ${dateWithDay(head.tanggal_keluar)}</td>
         </tr></table>
         <table class='sign'><tr><td>Yang Menerima,</td><td>PENGURUS BARANG</td></tr>
           <tr><td class='space-sm'></td><td class='space-sm'></td></tr>
@@ -356,7 +370,7 @@
       openPrint('Dokumen Barang Keluar #'+id,nota+bastRegular+bastKuasi+bend29,'portrait',printWindow);
     } catch(e) {
       try { printWindow.close(); } catch (_) {}
-      window.alert('Gagal menyiapkan dokumen: '+(e?.message||e));
+      printNotice('Gagal menyiapkan dokumen: '+(e?.message||e));
     }
   }
 
@@ -391,7 +405,7 @@
         <p class="note">Saldo akhir kartu: ${saldo}. Saldo master barang saat ini: ${item.sisa??0}.</p>
       </section>`;
       openPrint('Kartu Persediaan - '+item.nama_barang,html,'landscape',printWindow);
-    }catch(e){try { printWindow.close(); } catch (_) {} window.alert('Gagal menyiapkan kartu persediaan: '+(e?.message||e))}
+    }catch(e){try { printWindow.close(); } catch (_) {} printNotice('Gagal menyiapkan kartu persediaan: '+(e?.message||e))}
   }
 
   function addButton(target, text, handler, cls='ghost') {
