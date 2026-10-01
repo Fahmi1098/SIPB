@@ -3019,3 +3019,157 @@ tbody tr:hover{
     width:100%;
   }
 }
+
+
+/* =========================================================
+   UI FIXES — LOGO CLEARANCE + UNIVERSAL TABLE TOOLS
+   ========================================================= */
+
+/* The collapsed desktop rail keeps its logo completely clear. */
+@media(min-width:1024px){
+  .menu-toggle{
+    left:112px;
+    top:27px;
+  }
+}
+
+/* Universal filter/sort toolbar */
+.table-tools{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  flex-wrap:wrap;
+  margin-bottom:12px;
+}
+.table-tools .search-box{
+  flex:1 1 280px;
+  min-width:220px;
+}
+.table-sort-control{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  min-height:42px;
+  padding:0 8px 0 10px;
+  border:1px solid var(--sipb-line,#DFE7EF);
+  border-radius:10px;
+  background:var(--surface,#fff);
+  color:var(--sipb-muted,#6B7D90);
+  font-size:.62rem;
+  font-weight:800;
+}
+.table-sort-control span{
+  white-space:nowrap;
+}
+.table-sort-control select{
+  width:auto;
+  min-width:105px;
+  min-height:34px !important;
+  margin:0 !important;
+  padding:5px 26px 5px 7px !important;
+  border:0 !important;
+  box-shadow:none !important;
+  background:transparent !important;
+  color:var(--sipb-text,#182B42);
+  font-size:.66rem !important;
+  font-weight:750;
+}
+.sortable-th{
+  position:relative;
+  cursor:pointer;
+  user-select:none;
+}
+.sortable-th:hover{
+  background:#EEF5FA !important;
+  color:var(--sipb-blue,#0B5CAB) !important;
+}
+.sort-indicator{
+  display:inline-block;
+  min-width:14px;
+  margin-left:5px;
+  color:#9BACBC;
+  font-size:.58rem;
+  font-weight:900;
+}
+.sortable-th:hover .sort-indicator{
+  color:var(--sipb-orange,#E59A16);
+}
+.table-filter-search-box{
+  margin:0;
+}
+.table-filter-search{
+  min-height:39px !important;
+  margin:0 !important;
+  padding:0 2px !important;
+}
+
+/* Compact dashboard keeps the first screen focused on live data */
+@media(min-width:1024px){
+  .welcome{
+    min-height:136px;
+    padding:18px 22px;
+  }
+  .welcome h2{
+    font-size:1.32rem;
+    margin-bottom:4px;
+  }
+  .welcome p{
+    margin-bottom:8px;
+    font-size:.74rem;
+  }
+  .welcome-emblem{
+    width:205px;
+    min-width:205px;
+    padding-left:14px;
+  }
+  .welcome-emblem img{
+    width:62px;
+    height:62px;
+  }
+}
+
+/* Pastel semantic icon wrappers */
+.stat-card.green .stat-icon{
+  background:rgba(42,169,112,.12);
+  border-color:rgba(42,169,112,.18);
+  color:#4FA982;
+}
+.stat-card.red .stat-icon{
+  background:rgba(216,86,107,.11);
+  border-color:rgba(216,86,107,.17);
+  color:#D77584;
+}
+.stat-card.orange .stat-icon{
+  background:rgba(229,154,22,.12);
+  border-color:rgba(229,154,22,.18);
+  color:#C99639;
+}
+:root[data-theme="dark"] .table-sort-control{
+  background:#17232E;
+  border-color:#34495B;
+  color:#A6B4C2;
+}
+:root[data-theme="dark"] .table-sort-control select{
+  color:#EDF3F8;
+}
+:root[data-theme="dark"] .sortable-th:hover{
+  background:#1D3448 !important;
+  color:#8CC4F2 !important;
+}
+
+@media(max-width:760px){
+  .table-tools{
+    align-items:stretch;
+  }
+  .table-tools .search-box{
+    min-width:100%;
+    flex-basis:100%;
+  }
+  .table-sort-control{
+    flex:1 1 calc(50% - 5px);
+    justify-content:space-between;
+  }
+  .table-sort-control select{
+    max-width:58%;
+  }
+}
