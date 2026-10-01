@@ -259,7 +259,25 @@ BEGIN
       p_transaksi_id;
   END IF;
 
-  -- Lock all affected batch rows before changing the transaction status.
+  -- Lock affected barang first, matching the lock order used by record_barang_keluar.
+  -- This keeps concurrent outgoing/cancellation operations from taking locks in opposite order.
+  FOR v_detail IN
+    SELECT DISTINCT barang_id
+    FROM public.detail_barang_keluar
+    WHERE transaksi_keluar_id = p_transaksi_id
+    ORDER BY barang_id
+  LOOP
+    PERFORM 1
+    FROM public.barang
+    WHERE id = v_detail.barang_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Barang ID % tidak ditemukan saat pembatalan', v_detail.barang_id;
+    END IF;
+  END LOOP;
+
+  -- Lock all affected Kuasi batch rows before changing the transaction status.
   FOR v_batch_id IN
     SELECT DISTINCT a.stok_kuasi_id
     FROM public.transaksi_kuasi_alokasi a
