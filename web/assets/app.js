@@ -727,7 +727,7 @@ function showHistoryDetail(k){
   box.innerHTML=`<div class="modal-card"><div class="modal-head"><div><span class="eyebrow">${r.type==='MASUK'?'PENERIMAAN':r.type==='OPNAME'?'STOCK OPNAME':'PENGELUARAN'}</span><h2>Detail Transaksi #${r.id}</h2></div><button class="modal-close" aria-label="Tutup">×</button></div><div class="detail-grid"><div><small>Tanggal</small><strong>${fmtDate(r.date)}</strong></div><div><small>Pihak</small><strong>${esc(r.party)}</strong></div><div><small>Tujuan/Penerima</small><strong>${esc(r.target)}</strong></div><div><small>Status</small><strong><span class="badge-soft ${r.status==='AKTIF'?'success':''}">${r.status}</span></strong></div></div><div class="table-wrap"><table><thead><tr><th>Barang</th><th>Satuan</th><th>Jumlah</th><th>Nomor Seri</th></tr></thead><tbody>${r.items.map(i=>'<tr><td><strong>'+esc(i.name)+'</strong></td><td>'+esc(i.unit||'-')+'</td><td>'+i.qty+'</td><td>'+esc(i.serial||'-')+'</td></tr>').join('')}</tbody></table></div></div>`;
   document.body.appendChild(box);enhanceTables(box);const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.onclick=e=>{if(e.target===box)close()};
 }
-const menu=[['dashboard','Dashboard'],['barang_masuk','Barang Masuk'],['barang_keluar','Barang Keluar'],['stock_opname','Stock Opname'],['barang','Master Barang'],['kategori','Kategori'],['pegawai','Pegawai'],['kartu','Kartu Persediaan'],['kuasi','Stok Kuasi'],['riwayat','Riwayat Transaksi'],['pengguna','Kelola Pengguna']];
+const menu=[['dashboard','Dashboard'],['barang_masuk','Barang Masuk'],['barang_keluar','Barang Keluar'],['stock_opname','Stock Opname'],['barang','Master Barang'],['kategori','Kategori'],['pegawai','Pegawai'],['kartu','Kartu Persediaan'],['kuasi','Stok Kuasi'],['riwayat','Riwayat Transaksi'],['laporan','Laporan Persediaan'],['backup','Backup & Restore'],['pengguna','Kelola Pengguna']];
 const topNavItems=[
   ['dashboard','Dashboard','dashboard'],
   ['barang_masuk','Barang Masuk','barang_masuk'],
@@ -739,6 +739,8 @@ const topNavItems=[
   ['kartu','Kartu Persediaan','kartu'],
   ['kuasi','Stok Kuasi','kuasi'],
   ['riwayat','Riwayat Transaksi','riwayat'],
+  ['laporan','Laporan Persediaan','laporan'],
+  ['backup','Backup & Restore','backup'],
   ['pengguna','Kelola Pengguna','pengguna']
 ];
 async function renderApp(page='dashboard', restoreScrollY=null){
@@ -749,7 +751,7 @@ async function renderApp(page='dashboard', restoreScrollY=null){
   document.documentElement.dataset.theme=uiTheme;
   root.innerHTML=`<div class="dashboard top-nav-layout"><main class="main"><header class="top">
     <div class="top-brand"><div class="top-brand-mark"><img src="${BANTEN_LOGO}" alt="Lambang Provinsi Banten"></div><div class="top-brand-copy"><strong>SIPB</strong><span>UPTD PPD Malingping</span></div></div>
-    <nav class="top-nav" aria-label="Navigasi utama">${topNavItems.filter(item=>item[0]!=='pengguna'||profile?.role==='admin').map(([key,label,icon])=>`<a href="#${key}" data-page="${key}" data-label="${label}" aria-label="${label}" class="top-nav-icon-link ${page===key?'active':''}"><span class="nav-icon">${navSvg(icon)}</span><span class="nav-label">${label}</span></a>`).join('')}</nav>
+    <nav class="top-nav" aria-label="Navigasi utama">${topNavItems.filter(item=>!['pengguna','backup'].includes(item[0])||profile?.role==='admin').map(([key,label,icon])=>`<a href="#${key}" data-page="${key}" data-label="${label}" aria-label="${label}" class="top-nav-icon-link ${page===key?'active':''}"><span class="nav-icon">${navSvg(icon)}</span><span class="nav-label">${label}</span></a>`).join('')}</nav>
     <div class="top-title"><span>Administrasi Persediaan</span><h1>${menu.find(x=>x[0]===page)?.[1]||'Dashboard'}</h1></div>
     <div class="top-actions"><button class="theme-toggle top-action-icon" id="themeToggle" type="button" aria-label="${uiTheme==='dark'?'Mode terang':'Mode gelap'}"><span class="theme-icon">${uiTheme==='dark'?'☀':'☾'}</span><span class="top-action-label">${uiTheme==='dark'?'Mode terang':'Mode gelap'}</span></button><span class="top-separator" aria-hidden="true"></span><button class="top-logout top-action-icon" id="logout" type="button" aria-label="Keluar"><span class="logout-icon">↪</span><span class="top-action-label">Keluar</span></button></div>
   </header><div id="content">${loading('Memuat data...')}</div></main></div>`;
@@ -757,7 +759,7 @@ async function renderApp(page='dashboard', restoreScrollY=null){
   $('themeToggle').onclick=()=>{changeSipbTheme(page)};
   $('logout').onclick=async()=>{await client.auth.signOut();sidebarOpen=false;showLogin()};
   try{
-    let html=page==='dashboard'?await dashboard():page==='barang'?await barangPage():page==='kategori'?await kategoriPage():page==='pegawai'?await pegawaiPage():page==='barang_masuk'?await barangMasukForm():page==='barang_keluar'?await barangKeluarForm():page==='stock_opname'?await stockOpnamePage():page==='kartu'?await kartuPage():page==='kuasi'?await kuasiPage():page==='riwayat'?await riwayatPage():page==='pengguna'?await penggunaPage():await dashboard();
+    let html=page==='dashboard'?await dashboard():page==='barang'?await barangPage():page==='kategori'?await kategoriPage():page==='pegawai'?await pegawaiPage():page==='barang_masuk'?await barangMasukForm():page==='barang_keluar'?await barangKeluarForm():page==='stock_opname'?await stockOpnamePage():page==='kartu'?await kartuPage():page==='kuasi'?await kuasiPage():page==='riwayat'?await riwayatPage():page==='laporan'?await laporanPage():page==='backup'?await backupPage():page==='pengguna'?await penggunaPage():await dashboard();
     $('content').innerHTML=html;
     bind(page);
     enhanceTables(document.getElementById('content'));
@@ -806,7 +808,7 @@ function changeSipbTheme(page=null,loginMessage=''){
   window.setTimeout(()=>scene.classList.add('is-leaving'),720);
   window.setTimeout(()=>scene.remove(),1080);
 }
-function navSvg(key){const p={dashboard:'<path d="m3 10 9-7 9 7"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-7h6v7"/>',barang_masuk:'<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',barang_keluar:'<path d="M12 21V9"/><path d="m7 14 5-5 5 5"/><path d="M5 3h14"/>',stock_opname:'<path d="m5 12 4 4L19 6"/><rect x="3" y="3" width="18" height="18" rx="3"/>',barang:'<path d="M4 6h16v14H4z"/><path d="M8 6V4h8v2"/><path d="M8 11h8"/><path d="M8 15h5"/>',kategori:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/>',pegawai:'<circle cx="12" cy="8" r="3.5"/><path d="M5 21c.8-3.7 3-5.5 7-5.5s6.2 1.8 7 5.5"/><path d="M19 6v4M17 8h4"/>',kartu:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/><path d="M9 18h6"/>',kuasi:'<path d="M4 7.5 12 4l8 3.5-8 3.5z"/><path d="m4 12 8 3.5 8-3.5"/><path d="m4 16.5 8 3.5 8-3.5"/>',riwayat:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',pengguna:'<circle cx="9" cy="8" r="3"/><path d="M3.5 21c.8-3.3 2.7-5 5.5-5s4.7 1.7 5.5 5"/><path d="M16 5.5a3 3 0 0 1 0 5.8"/><path d="M18 15.5c1.8.7 2.9 2.1 3.5 4.5"/>'};return '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+(p[key]||p.dashboard)+'</svg>'}
+function navSvg(key){const p={dashboard:'<path d="m3 10 9-7 9 7"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-7h6v7"/>',barang_masuk:'<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',barang_keluar:'<path d="M12 21V9"/><path d="m7 14 5-5 5 5"/><path d="M5 3h14"/>',stock_opname:'<path d="m5 12 4 4L19 6"/><rect x="3" y="3" width="18" height="18" rx="3"/>',barang:'<path d="M4 6h16v14H4z"/><path d="M8 6V4h8v2"/><path d="M8 11h8"/><path d="M8 15h5"/>',kategori:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/>',pegawai:'<circle cx="12" cy="8" r="3.5"/><path d="M5 21c.8-3.7 3-5.5 7-5.5s6.2 1.8 7 5.5"/><path d="M19 6v4M17 8h4"/>',kartu:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/><path d="M9 18h6"/>',kuasi:'<path d="M4 7.5 12 4l8 3.5-8 3.5z"/><path d="m4 12 8 3.5 8-3.5"/><path d="m4 16.5 8 3.5 8-3.5"/>',riwayat:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',laporan:'<path d="M4 19V9M10 19V5M16 19v-8M22 19V3"/>',backup:'<path d="M4 7V4h16v3"/><path d="M6 4v16h12V4"/><path d="M9 10h6M9 14h6"/>',pengguna:'<circle cx="9" cy="8" r="3"/><path d="M3.5 21c.8-3.3 2.7-5 5.5-5s4.7 1.7 5.5 5"/><path d="M16 5.5a3 3 0 0 1 0 5.8"/><path d="M18 15.5c1.8.7 2.9 2.1 3.5 4.5"/>'};return '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+(p[key]||p.dashboard)+'</svg>'}
 function navItem(m,page){return '<a href="#'+m[0]+'" data-page="'+m[0]+'" class="'+(page===m[0]?'active':'')+'"><span class="nav-icon">'+navSvg(m[0])+'</span><span>'+m[1]+'</span></a>'}
 
 function renderDashboardCharts(){
@@ -830,6 +832,20 @@ function renderDashboardCharts(){
 }
 
 function bind(page){
+  if(page==='laporan'){
+    ['reportFrom','reportTo','reportType','reportCategory'].forEach(id=>$(id)?.addEventListener('change',applyLaporanFilter));
+    applyLaporanFilter();
+  }
+  if(page==='backup'){
+    $('downloadBackup')?.addEventListener('click',createSipbBackup);
+    const input=$('restoreBackupFile'),button=$('restoreBackup');
+    button?.addEventListener('click',()=>input?.click());
+    input?.addEventListener('change',async e=>{
+      const file=e.target.files?.[0];
+      if(file)await restoreSipbBackup(file);
+      e.target.value='';
+    });
+  }
   if(page==='pengguna'){
     const apply=()=>{
       const q=$('userSearch').value.toLowerCase().trim();
