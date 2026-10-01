@@ -4236,3 +4236,31 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
   background:#1E2C39;
   color:#AEBCCA;
 }
+
+/* FINAL: keep grouped navigation responsive and easy to hit without hover flicker. */
+.top-nav-group{
+  min-width:max-content;
+}
+.top-nav-group .top-nav-trigger{
+  min-height:40px;
+  padding-left:11px;
+  padding-right:11px;
+}
+.top-nav-group .top-submenu{
+  margin-top:0 !important;
+  padding:8px !important;
+}
+.top-nav-group .top-submenu a{
+  min-height:40px !important;
+  padding:9px 11px !important;
+}
+@media(max-width:900px){
+  .top-nav-group .top-submenu{
+    position:fixed;
+    left:auto;
+    top:calc(100px + 1rem);
+  }
+  .top-nav-group:first-of-type .top-submenu{
+    left:10px;
+  }
+}
