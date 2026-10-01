@@ -4192,3 +4192,47 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
   border:0 !important;
   box-shadow:none !important;
 }
+
+/* FINAL: history detail modal must sit above the app and be visually interactive. */
+.modal-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:grid;
+  place-items:center;
+  padding:20px;
+  background:rgba(5,24,42,.48);
+  backdrop-filter:blur(4px);
+  animation:sipbModalFade .14s ease both;
+}
+.modal-backdrop .modal-card{
+  width:min(920px,calc(100vw - 40px));
+  max-height:min(86vh,860px);
+  overflow:auto;
+  padding:22px;
+  background:var(--sipb-white,#fff);
+  color:var(--sipb-text,#182B42);
+}
+@keyframes sipbModalFade{from{opacity:0}to{opacity:1}}
+:root[data-theme="dark"] .modal-backdrop .modal-card{
+  background:#17232E;
+  color:#E7EEF5;
+  border-color:#34495B;
+}
+#m_nama:disabled,
+#m_kat:disabled,
+#m_satuan:disabled,
+#m_tipe[readonly],
+#m_merk[readonly]{
+  opacity:.68;
+  cursor:not-allowed;
+  background:#F1F5F8;
+}
+:root[data-theme="dark"] #m_nama:disabled,
+:root[data-theme="dark"] #m_kat:disabled,
+:root[data-theme="dark"] #m_satuan:disabled,
+:root[data-theme="dark"] #m_tipe[readonly],
+:root[data-theme="dark"] #m_merk[readonly]{
+  background:#1E2C39;
+  color:#AEBCCA;
+}
