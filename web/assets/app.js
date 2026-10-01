@@ -1,6 +1,8 @@
 const root=document.getElementById('app');
 const cfg=window.SIPB_CONFIG;
 let client=null,session=null,profile=null;
+let currentPage='dashboard';
+let renderVersion=0;
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const rupiah=v=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Number(v)||0);
 const fmtDate=v=>v?new Intl.DateTimeFormat('id-ID',{dateStyle:'medium'}).format(new Date(v)):'-';
@@ -743,11 +745,15 @@ const topNavItems=[
   ['backup','Backup & Restore','backup'],
   ['pengguna','Kelola Pengguna','pengguna']
 ];
-async function renderApp(page='dashboard', restoreScrollY=null){
+async function renderApp(page=currentPage, restoreScrollY=null){
+  const renderToken=++renderVersion;
+  currentPage=page||'dashboard';
+  page=currentPage;
   const r=await client.auth.getSession();
   session=r.data.session;
   if(!session)return showLogin();
   await loadProfile();
+  if(renderToken!==renderVersion)return;
   document.documentElement.dataset.theme=uiTheme;
   root.innerHTML=`<div class="dashboard top-nav-layout"><main class="main"><header class="top">
     <div class="top-brand"><div class="top-brand-mark"><img src="${BANTEN_LOGO}" alt="Lambang Provinsi Banten"></div><div class="top-brand-copy"><strong>SIPB</strong><span>UPTD PPD Malingping</span></div></div>
@@ -760,6 +766,7 @@ async function renderApp(page='dashboard', restoreScrollY=null){
   $('logout').onclick=async()=>{await client.auth.signOut();sidebarOpen=false;showLogin()};
   try{
     let html=page==='dashboard'?await dashboard():page==='barang'?await barangPage():page==='kategori'?await kategoriPage():page==='pegawai'?await pegawaiPage():page==='barang_masuk'?await barangMasukForm():page==='barang_keluar'?await barangKeluarForm():page==='stock_opname'?await stockOpnamePage():page==='kartu'?await kartuPage():page==='kuasi'?await kuasiPage():page==='riwayat'?await riwayatPage():page==='laporan'?await laporanPage():page==='backup'?await backupPage():page==='pengguna'?await penggunaPage():await dashboard();
+    if(renderToken!==renderVersion)return;
     $('content').innerHTML=html;
     bind(page);
     enhanceTables(document.getElementById('content'));
@@ -770,7 +777,8 @@ async function renderApp(page='dashboard', restoreScrollY=null){
       }));
     }
   }catch(e){
-    $('content').innerHTML=`<section class="card error-card"><h2>Gagal memuat data</h2><p>${esc(e.message)}</p><button class="primary retry" data-page="${page}">Coba lagi</button></section>`;
+    if(renderToken!==renderVersion)return;
+    $('content').innerHTML=`<section class="card error-card"><h2>Gagal memuat data</h2><p>${esc(e.message)}</p><button type="button" class="primary retry" data-page="${page}">Coba lagi</button></section>`;
     if(Number.isFinite(restoreScrollY)){
       requestAnimationFrame(()=>window.scrollTo(0,restoreScrollY));
     }
@@ -875,7 +883,7 @@ function bind(page){
       row.dataset.status=!active?'active':'inactive';
       apply();
     });
-    document.querySelectorAll('.user-save').forEach(btn=>btn.onclick=async()=>{
+    document.querySelectorAll('.user-save').forEach(btn=>btn.onclick=async e=>{e.preventDefault();e.stopPropagation();
       const id=btn.dataset.id;
       const role=document.querySelector('.user-role[data-id="'+id+'"]')?.value;
       const active=document.querySelector('.status-toggle[data-id="'+id+'"]')?.dataset.active==='1';
@@ -906,7 +914,7 @@ function bind(page){
       });
     };
     search.oninput=apply;cat.onchange=apply;status.onchange=apply;
-    document.querySelectorAll('.view-kartu').forEach(btn=>btn.onclick=async()=>{
+    document.querySelectorAll('.view-kartu').forEach(btn=>btn.onclick=async e=>{e.preventDefault();e.stopPropagation();
       select.value=btn.dataset.id;$('kartuDetail').innerHTML=loading('Memuat kartu persediaan...');
       try{await loadKartuDetail(Number(btn.dataset.id));$('kartuDetail')?.scrollIntoView({behavior:'smooth',block:'start'})}
       catch(e){fail(e);$('kartuDetail').innerHTML=''}
@@ -919,7 +927,7 @@ function bind(page){
     };
   }
   if(page==='kuasi'){
-    document.querySelectorAll('.view-kuasi').forEach(btn=>btn.onclick=async()=>{
+    document.querySelectorAll('.view-kuasi').forEach(btn=>btn.onclick=async e=>{e.preventDefault();e.stopPropagation();
       btn.disabled=true;btn.textContent='Memuat...';
       try{await showKuasiDetail(Number(btn.dataset.id))}
       catch(e){fail(e)}
@@ -933,7 +941,10 @@ function bind(page){
     if(historyTable){
       historyTable.onclick=e=>{
         const detail=e.target.closest('.history-detail');
-        if(detail)showHistoryDetail(detail.dataset.key);
+        if(!detail)return;
+        e.preventDefault();
+        e.stopPropagation();
+        showHistoryDetail(detail.dataset.key);
       };
     }
     document.querySelectorAll('.history-cancel').forEach(btn=>btn.onclick=async()=>{
@@ -987,7 +998,7 @@ function bind(page){
         btn.disabled=false;
       }
     });
-    document.querySelectorAll('.delete-barang').forEach(btn=>btn.onclick=async()=>{
+    document.querySelectorAll('.delete-barang').forEach(btn=>btn.onclick=async e=>{e.preventDefault();e.stopPropagation();
       const id=Number(btn.dataset.id);
       if(!id)return;
       if(!(await sipbConfirm('Hapus barang ini dari Master Barang? Penghapusan hanya diizinkan jika barang sudah tidak memiliki riwayat Barang Keluar. Data terkait barang yang memang masih tersimpan akan ikut mengikuti aturan database.')))return;
@@ -1008,13 +1019,13 @@ function bind(page){
     if(add) add.onclick=async()=>{try{$('content').innerHTML=await pegawaiForm();bindPegawaiForm()}catch(e){fail(e)}};
     const apply=()=>{const q=$('pegawaiSearch').value.toLowerCase().trim();let shown=0;document.querySelectorAll('#pegawaiTable tbody tr[data-search]').forEach(r=>{const ok=!q||r.dataset.search.includes(q);r.style.display=ok?'':'none';if(ok)shown++});$('pegawaiCount').textContent=shown+' data'};
     $('pegawaiSearch').oninput=apply;
-    document.querySelectorAll('.edit-pegawai').forEach(btn=>btn.onclick=async()=>{try{$('content').innerHTML=loading('Memuat pegawai...');$('content').innerHTML=await pegawaiForm(Number(btn.dataset.id));bindPegawaiForm(Number(btn.dataset.id))}catch(e){fail(e)}});
-    document.querySelectorAll('.delete-pegawai').forEach(btn=>btn.onclick=async()=>{if(!(await sipbConfirm('Hapus data pegawai ini? Data historis transaksi tetap tersimpan.')))return;btn.disabled=true;const {error}=await client.from('pegawai').delete().eq('id',Number(btn.dataset.id));if(error){btn.disabled=false;return fail(error)}toast('Pegawai berhasil dihapus.');renderApp('pegawai')});
+    document.querySelectorAll('.edit-pegawai').forEach(btn=>btn.onclick=async e=>{e.preventDefault();e.stopPropagation();try{$('content').innerHTML=loading('Memuat pegawai...');$('content').innerHTML=await pegawaiForm(Number(btn.dataset.id));bindPegawaiForm(Number(btn.dataset.id))}catch(e){fail(e)}});
+    document.querySelectorAll('.delete-pegawai').forEach(btn=>btn.onclick=async e=>{e.preventDefault();e.stopPropagation();if(!(await sipbConfirm('Hapus data pegawai ini? Data historis transaksi tetap tersimpan.')))return;btn.disabled=true;const {error}=await client.from('pegawai').delete().eq('id',Number(btn.dataset.id));if(error){btn.disabled=false;return fail(error)}toast('Pegawai berhasil dihapus.');renderApp('pegawai')});
   }
   if(page==='kategori'){
-    const addKategori=$('addKategori'); if(addKategori) addKategori.onclick=async()=>{const n=await sipbPrompt('Nama kategori baru:');if(!n?.trim())return;const {error}=await client.from('kategori').insert({nama_kategori:n.trim()});if(error)return fail(error);toast('Kategori ditambahkan');renderApp('kategori')};
-    document.querySelectorAll('.edit-kat').forEach(btn=>btn.onclick=async()=>{const {data,error}=await client.from('kategori').select('*').eq('id',+btn.dataset.id).single();if(error)return fail(error);const n=await sipbPrompt('Nama kategori:',data.nama_kategori);if(!n?.trim())return;const {error:e}=await client.from('kategori').update({nama_kategori:n.trim()}).eq('id',+btn.dataset.id);if(e)return fail(e);toast('Kategori diperbarui');renderApp('kategori')});
-    document.querySelectorAll('.delete-kat').forEach(btn=>btn.onclick=async()=>{if(!(await sipbConfirm('Hapus kategori ini? Barang yang masih memakai kategori ini dapat mencegah penghapusan.')))return;const {error}=await client.from('kategori').delete().eq('id',+btn.dataset.id);if(error)return fail(error);toast('Kategori dihapus');renderApp('kategori')});
+    const addKategori=$('addKategori'); if(addKategori) addKategori.onclick=async e=>{e.preventDefault();e.stopPropagation();const n=await sipbPrompt('Nama kategori baru:');if(!n?.trim())return;const {error}=await client.from('kategori').insert({nama_kategori:n.trim()});if(error)return fail(error);toast('Kategori ditambahkan');renderApp('kategori')};
+    document.querySelectorAll('.edit-kat').forEach(btn=>btn.onclick=async e=>{e.preventDefault();e.stopPropagation();const {data,error}=await client.from('kategori').select('*').eq('id',+btn.dataset.id).single();if(error)return fail(error);const n=await sipbPrompt('Nama kategori:',data.nama_kategori);if(!n?.trim())return;const {error:e}=await client.from('kategori').update({nama_kategori:n.trim()}).eq('id',+btn.dataset.id);if(e)return fail(e);toast('Kategori diperbarui');renderApp('kategori')});
+    document.querySelectorAll('.delete-kat').forEach(btn=>btn.onclick=async e=>{e.preventDefault();e.stopPropagation();if(!(await sipbConfirm('Hapus kategori ini? Barang yang masih memakai kategori ini dapat mencegah penghapusan.')))return;const {error}=await client.from('kategori').delete().eq('id',+btn.dataset.id);if(error)return fail(error);toast('Kategori dihapus');renderApp('kategori')});
   }
   if(page==='barang_masuk'){
     bindMasukForm().catch(fail);
@@ -1057,7 +1068,7 @@ function bindForm(id){
 }
 document.addEventListener('click',e=>{
   const target=e.target.closest('[data-page]');
-  if(!target)return;
+  if(!target||!target.closest('.top-nav, #content'))return;
   e.preventDefault();
   const page=target.dataset.page;
   if(page){
