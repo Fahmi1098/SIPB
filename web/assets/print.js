@@ -113,6 +113,7 @@
         .sheet p.made{text-align:left;margin-left:0;margin-right:auto}
         .sheet.bend29-landscape{width:29.7cm;min-height:21cm;padding:1.2cm 2cm 2cm 2cm;page:bend29}
         .sheet.bend29-landscape .bend-head{width:100%}
+        .bend-made{width:max-content;max-width:100%;margin-left:auto;text-align:left}
         .bend-head{width:100%;border-collapse:collapse;margin-bottom:8px}
         .bend-head td{vertical-align:top;font-size:11pt}
         .bend-title{font-size:13pt;font-weight:700;line-height:1.2}
@@ -356,7 +357,7 @@
         <p class='small'>Terbilang nilai barang: <b class='terbilang'>${esc(terbilangRupiah(total))}</b>.</p>
         <table style='width:100%;border-collapse:collapse;margin-top:12px'><tr>
           <td style='width:50%;font-size:11pt;vertical-align:top'>Daerah/Unit : <b>${esc(head.tujuan_ruangan||'-')}</b><br>Tanggal : ${dateWithDay(head.tanggal_keluar)}</td>
-          <td style='width:50%;font-size:11pt;text-align:left;vertical-align:top'>Dibuat di Malingping<br>Tanggal : ${dateWithDay(head.tanggal_keluar)}</td>
+          <td style='width:50%;font-size:11pt;vertical-align:top'><div class='bend-made'>Dibuat di Malingping<br>Tanggal : ${dateWithDay(head.tanggal_keluar)}</div></td>
         </tr></table>
         <table class='sign'><tr><td>Yang Menerima,</td><td>PENGURUS BARANG</td></tr>
           <tr><td class='space-sm'></td><td class='space-sm'></td></tr>
