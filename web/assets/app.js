@@ -125,8 +125,26 @@ function bind(page){
       toggle.classList.toggle('on',!active);
       toggle.innerHTML='<span></span>'+(!active?'Aktif':'Nonaktif');
     });
-  }
-;
+    document.querySelectorAll('.user-save').forEach(btn=>btn.onclick=async()=>{
+      const id=btn.dataset.id;
+      const role=document.querySelector('.user-role[data-id="'+id+'"]')?.value;
+      const active=document.querySelector('.status-toggle[data-id="'+id+'"]')?.dataset.active==='1';
+      if(!id||!role)return toast('Data pengguna tidak lengkap.','error');
+      if(id===session.user.id&&(role!=='admin'||!active))
+        return toast('Akun admin yang sedang digunakan tidak boleh diturunkan atau dinonaktifkan.','error');
+      btn.disabled=true;
+      btn.textContent='Menyimpan...';
+      try{
+        const {error}=await client.rpc('manage_user_profile',{p_user_id:id,p_role:role,p_is_active:active});
+        if(error)throw error;
+        toast('Profil pengguna diperbarui.');
+        renderApp('pengguna');
+      }catch(e){
+        btn.disabled=false;
+        btn.textContent='Simpan';
+        fail(e);
+      }
+    });
   }
   if(page==='kartu'){
     const search=$('kartuSearch'),select=$('kartuBarang');
