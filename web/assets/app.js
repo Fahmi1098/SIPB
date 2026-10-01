@@ -6,7 +6,7 @@ const rupiah=v=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',m
 const fmtDate=v=>v?new Intl.DateTimeFormat('id-ID',{dateStyle:'medium'}).format(new Date(v)):'-';
 const localDate=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const $=id=>document.getElementById(id);
-const BANTEN_LOGO='https://banten.bantenprov.go.id/storage/photos/1124/ArtiLambang.png';
+const BANTEN_LOGO='inventory/logo_banten.png';
 let sidebarOpen=false;
 let uiTheme=localStorage.getItem('sipb-theme')||'light';
 document.documentElement.dataset.theme=uiTheme;
@@ -14,8 +14,9 @@ const toast=(message,type='success')=>{let box=$('toastBox');if(!box){box=docume
 const fail=e=>{console.error(e);toast(e?.message||'Terjadi kesalahan.','error')};
 const loading=label=>'<div class="loading-state"><div class="spinner"></div><span>'+esc(label||'Memuat...')+'</span></div>';
 function showLogin(message=''){
- root.innerHTML=`<main class="login"><section class="login-shell"><aside class="login-aside"><div class="login-emblem"><img src="${BANTEN_LOGO}" alt="Lambang Provinsi Banten"></div><div class="login-org">PEMERINTAH PROVINSI BANTEN</div><h1>UPTD PENGELOLAAN PENDAPATAN DAERAH MALINGPING</h1><p>Sistem Informasi Pengurus Barang</p><div class="login-rule"></div><small>Portal internal pengelolaan persediaan barang.</small></aside><section class="login-card"><div class="brand"><div class="brand-mark"><img src="${BANTEN_LOGO}" alt="Lambang Banten"></div><div><h2>Sistem Informasi Pengurus Barang</h2><p>UPTD PPD Malingping</p></div></div><div class="login-title">Masuk ke sistem</div><p class="login-desc">Gunakan akun yang terdaftar untuk melanjutkan.</p><form id="loginForm"><label for="email">Email</label><input id="email" type="email" required autocomplete="username" placeholder="akun@instansi.go.id"><label for="password">Password</label><div class="password-wrap"><input id="password" type="password" required autocomplete="current-password" placeholder="••••••••"><button type="button" class="password-toggle" id="togglePassword">Lihat</button></div><button class="primary login-btn" type="submit"><span>Masuk</span><span aria-hidden="true">→</span></button>${message?`<div class="alert">${esc(message)}</div>`:''}</form><div class="login-footer">© ${new Date().getFullYear()} UPTD PPD Malingping</div></section></section></main>`;
+ root.innerHTML=`<main class="login"><button class="login-theme-toggle theme-toggle" id="loginThemeToggle" type="button"><span class="theme-icon">${uiTheme==='dark'?'☀':'☾'}</span><span>${uiTheme==='dark'?'Mode terang':'Mode gelap'}</span></button><section class="login-shell"><aside class="login-aside"><div class="login-emblem"><img src="${BANTEN_LOGO}" alt="Lambang Provinsi Banten"></div><div class="login-org">PEMERINTAH PROVINSI BANTEN</div><h1>UPTD PENGELOLAAN PENDAPATAN DAERAH MALINGPING</h1><p>Sistem Informasi Pengurus Barang</p><div class="login-rule"></div><small>Portal internal pengelolaan persediaan barang.</small></aside><section class="login-card"><div class="brand"><div class="brand-mark"><img src="${BANTEN_LOGO}" alt="Lambang Banten"></div><div><h2>Sistem Informasi Pengurus Barang</h2><p>UPTD PPD Malingping</p></div></div><div class="login-title">Masuk ke sistem</div><p class="login-desc">Gunakan akun yang terdaftar untuk melanjutkan.</p><form id="loginForm"><label for="email">Email</label><input id="email" type="email" required autocomplete="username" placeholder="akun@instansi.go.id"><label for="password">Password</label><div class="password-wrap"><input id="password" type="password" required autocomplete="current-password" placeholder="••••••••"><button type="button" class="password-toggle" id="togglePassword">Lihat</button></div><button class="primary login-btn" type="submit"><span>Masuk</span><span aria-hidden="true">→</span></button>${message?`<div class="alert">${esc(message)}</div>`:''}</form><div class="login-footer">© ${new Date().getFullYear()} UPTD PPD Malingping</div></section></section></main>`;
  $('togglePassword').onclick=()=>{const p=$('password');p.type=p.type==='password'?'text':'password';$('togglePassword').textContent=p.type==='password'?'Lihat':'Sembunyikan'};
+ $('loginThemeToggle').onclick=()=>{uiTheme=uiTheme==='dark'?'light':'dark';localStorage.setItem('sipb-theme',uiTheme);document.documentElement.dataset.theme=uiTheme;showLogin(message)};
  $('loginForm').addEventListener('submit',async e=>{e.preventDefault();const email=$('email').value.trim(),password=$('password').value,btn=e.submitter;btn.disabled=true;btn.textContent='Memproses...';const {error}=await client.auth.signInWithPassword({email,password});if(error)return showLogin(error.message);sidebarOpen=false;renderApp('dashboard')});
 }
 
@@ -331,7 +332,6 @@ function bind(page){
       }catch(e){btn.disabled=false;btn.textContent='Hapus Riwayat';fail(e)}
     });
   }
-  if(page==='dashboard') document.querySelectorAll('[data-page="barang_keluar"]').forEach(b=>b.onclick=()=>renderApp('barang_keluar'));
   if(page==='barang'){
     const addBarang=$('addBarang'); if(addBarang) addBarang.onclick=async()=>{$('content').innerHTML=await barangForm();bindForm()};
     const apply=()=>{const q=$('barangSearch').value.toLowerCase().trim(),cat=$('barangFilter').value;let shown=0;document.querySelectorAll('#barangTable tbody tr[data-search]').forEach(r=>{const ok=(!q||r.dataset.search.includes(q))&&(!cat||r.dataset.kategori===cat);r.style.display=ok?'':'none';if(ok)shown++});$('barangCount').textContent=shown+' data'};
@@ -368,9 +368,15 @@ function bind(page){
   }
   if(page==='barang_masuk') $('addMasuk').onclick=async()=>{$('content').innerHTML=await barangMasukForm();bindMasukForm()};
   if(page==='barang_keluar') { const add=$('addKeluar'); if(add) add.onclick=async()=>{$('content').innerHTML=await barangKeluarForm();bindKeluarForm()}; document.querySelectorAll('.cancel-keluar').forEach(btn=>btn.onclick=async()=>{const id=Number(btn.dataset.id);if(!id)return;if(!confirm('Batalkan transaksi barang keluar #'+id+'? Stok akan dikembalikan dan transaksi tetap tercatat sebagai DIBATALKAN.'))return;btn.disabled=true;btn.textContent='Membatalkan...';try{const result=await client.rpc('cancel_barang_keluar',{p_transaksi_id:id});if(result.error)throw result.error;toast('Transaksi #'+id+' dibatalkan. Stok telah dikembalikan.');renderApp('barang_keluar')}catch(e){btn.disabled=false;btn.textContent='Batalkan';fail(e)}}); }  if(page==='stock_opname') $('addOpname').onclick=async()=>{$('content').innerHTML=await stockOpnameForm();bindOpnameForm()};
-  document.querySelectorAll('.retry').forEach(btn=>btn.onclick=()=>renderApp(btn.dataset.page));
 }
 function bindForm(id){$('backBarang').onclick=()=>renderApp('barang');$('cancelBarang').onclick=()=>renderApp('barang');$('saveBarang').onclick=async()=>{const payload={nama_barang:$('b_nama').value.trim(),kategori_id:$('b_kat').value?+$('b_kat').value:null,tipe:$('b_tipe').value.trim()||'-',merk:$('b_merk').value.trim()||'-',satuan:$('b_satuan').value.trim(),stok_minimum:+$('b_min').value||0};if(!payload.nama_barang)return toast('Nama barang wajib diisi.','error');const btn=$('saveBarang');btn.disabled=true;btn.textContent='Menyimpan...';const q=id?client.from('barang').update(payload).eq('id',id):client.from('barang').insert(payload);const {error}=await q;if(error){btn.disabled=false;btn.textContent=id?'Simpan Perubahan':'Simpan Barang';return fail(error)}toast(id?'Barang diperbarui':'Barang ditambahkan');renderApp('barang')}}
+document.addEventListener('click',e=>{
+  const target=e.target.closest('[data-page]');
+  if(!target)return;
+  e.preventDefault();
+  const page=target.dataset.page;
+  if(page)renderApp(page);
+});
 async function init(){if(!cfg||!cfg.supabaseUrl||!cfg.supabaseAnonKey||cfg.supabaseUrl.includes('YOUR-PROJECT'))return showLogin('Konfigurasi Supabase belum tersedia.');client=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});client.auth.onAuthStateChange(e=>{if(e==='SIGNED_OUT')showLogin()});const r=await client.auth.getSession();session=r.data.session;if(session)renderApp();else showLogin()}
 init()
 async function stockOpnameForm(){
