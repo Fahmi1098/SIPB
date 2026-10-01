@@ -815,3 +815,146 @@ tbody tr:hover{background:rgba(229,154,22,.045)}
   .mobile-brand span{color:#c1d3e4}
   .top:after{left:16px;right:16px}
 }
+
+
+/* ===== SIPB UI POLISH 2026-10-01 ===== */
+:root{
+  --sidebar-w:278px;
+  --content-max:1560px;
+  --ui-gap:14px;
+}
+body{overflow-x:hidden}
+.dashboard{min-height:100vh;background:var(--bg)}
+.main{
+  min-width:0;
+  max-width:none;
+  padding:0 30px 36px;
+}
+.dashboard.menu-open .main{
+  width:calc(100% - var(--sidebar-w));
+  margin-left:var(--sidebar-w);
+}
+.top{
+  min-height:76px;
+  margin:0 -30px 22px;
+  padding:13px 30px 13px 82px;
+}
+.top-title h1{font-size:1.25rem}
+.top-actions{flex-shrink:0}
+.menu-toggle{
+  width:44px;height:44px;
+  border-radius:11px;
+}
+.sidebar{
+  width:var(--sidebar-w);
+  padding:17px 13px 13px;
+  box-shadow:14px 0 36px rgba(6,35,67,.20);
+}
+.brand-side{padding-bottom:14px}
+.brand-side-mark{width:48px;height:48px}
+.nav{margin-top:7px}
+.nav-label{padding-top:15px}
+.nav a{min-height:42px;border:1px solid transparent}
+.nav a:hover{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.05)}
+.nav a.active{background:#fff;color:var(--blue-950);border-color:rgba(255,255,255,.7)}
+.nav a.active:before{width:4px}
+.welcome{
+  min-height:174px;
+  padding:25px 28px;
+  border-radius:15px;
+}
+.welcome h2{font-size:1.48rem}
+.welcome p{font-size:.82rem}
+.welcome-emblem{width:260px;min-width:260px}
+.welcome-emblem img{width:86px;height:86px}
+.stats-grid{
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:14px;
+}
+.stat-card{
+  min-height:112px;
+  padding:16px;
+  border-radius:13px;
+  position:relative;
+  overflow:hidden;
+}
+.stat-card:after{
+  content:"";
+  position:absolute;
+  right:-24px;bottom:-34px;
+  width:92px;height:92px;
+  border-radius:50%;
+  background:currentColor;
+  opacity:.035;
+  pointer-events:none;
+}
+.stat-card>div{min-width:0}
+.stat-card strong{
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:1.08rem;
+}
+.stat-card small{font-size:.64rem}
+.stat-card em{font-size:.61rem}
+.stat-icon{
+  width:45px;height:45px;min-width:45px;
+  border-radius:12px;
+}
+.charts-grid{
+  grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);
+  gap:14px;
+}
+.chart-card,.recent{border-radius:14px}
+.chart-wrap{height:300px}
+.page-card{border-radius:14px}
+.table-wrap{
+  border-radius:10px;
+  overflow:auto;
+}
+.table-wrap table{min-width:760px}
+.section-head h2{font-size:1.08rem}
+.section-head h3{font-size:1rem}
+.primary,.ghost,.btn-sm{border-radius:9px}
+.primary{min-height:40px}
+.filter-bar{
+  background:var(--surface-soft);
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:9px;
+}
+.search-box{
+  background:var(--surface);
+  border-radius:8px;
+}
+#content>.card,#content>section{animation:pageIn .24s var(--ease) both}
+.sidebar,.main,.top,.stat-card,.card{will-change:auto}
+@media(min-width:1201px){
+  .dashboard.menu-open .main{
+    min-height:100vh;
+  }
+}
+@media(max-width:1200px){
+  .stats-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:900px){
+  .dashboard.menu-open .main{width:100%;margin-left:0}
+  .welcome-emblem{width:230px;min-width:230px}
+}
+@media(max-width:760px){
+  .main{padding:0 16px 26px}
+  .dashboard.menu-open .main{width:100%;margin-left:0}
+  .top{margin:0 -16px 17px;padding:11px 16px 11px 68px;min-height:68px}
+  .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .stat-card{min-height:100px;padding:13px}
+  .stat-card strong{font-size:1rem}
+  .welcome{min-height:auto}
+  .welcome h2{font-size:1.3rem}
+}
+@media(max-width:520px){
+  .stats-grid{grid-template-columns:1fr}
+  .stat-card{min-height:88px}
+  .welcome-emblem{display:none}
+  .top-title h1{font-size:1.02rem}
+}
