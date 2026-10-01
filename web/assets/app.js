@@ -512,6 +512,124 @@ async function loadKartuDetail(id){
   enhanceTables($('kartuDetail'));
 }
 
+
+async function fetchAllSipbRows(table,select='*'){
+  const all=[],pageSize=1000;
+  let offset=0;
+  while(true){
+    const q=await client.from(table).select(select).range(offset,offset+pageSize-1);
+    if(q.error)throw q.error;
+    const rows=q.data||[];
+    all.push(...rows);
+    if(rows.length<pageSize)break;
+    offset+=pageSize;
+  }
+  return all;
+}
+function sipbBackupTables(){
+  return ['kategori','pegawai','barang','barang_masuk','stok_kuasi','transaksi_keluar','detail_barang_keluar','transaksi_kuasi_alokasi','riwayat_opname'];
+}
+async function createSipbBackup(){
+  if(profile?.role!=='admin')return toast('Hanya admin yang dapat membuat backup.','error');
+  try{
+    toast('Membuat backup SIPB...');
+    const payload={format:'SIPB_BACKUP',format_version:'1',application:'SIPB · UPTD PPD Malingping',created_at:new Date().toISOString(),scope:'data persediaan; akun Supabase Auth tidak termasuk',tables:{}};
+    for(const table of sipbBackupTables())payload.tables[table]=await fetchAllSipbRows(table);
+    const stamp=new Date().toISOString().replace(/[:.]/g,'-');
+    downloadTableBlob(new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'}),'SIPB-backup-'+stamp+'.json');
+    toast('Backup berhasil dibuat.');
+  }catch(e){fail(e)}
+}
+async function restoreSipbBackup(file){
+  if(profile?.role!=='admin')return toast('Hanya admin yang dapat melakukan restore.','error');
+  if(!file)return;
+  try{
+    const payload=JSON.parse(await file.text());
+    const required=sipbBackupTables();
+    if(payload?.format!=='SIPB_BACKUP'||payload?.format_version!=='1'||!payload?.tables)throw new Error('File backup SIPB tidak valid.');
+    const missing=required.filter(t=>!Array.isArray(payload.tables[t]));
+    if(missing.length)throw new Error('Backup tidak lengkap: '+missing.join(', '));
+    const total=required.reduce((n,t)=>n+(payload.tables[t]?.length||0),0);
+    if(!(await sipbConfirm('Restore akan mengganti seluruh data persediaan SIPB dengan isi backup. Data yang ada saat ini akan diganti. Akun login Supabase Auth tidak diubah. Lanjutkan dengan '+total.toLocaleString('id-ID')+' baris?')))return;
+    const btn=$('restoreBackup');
+    if(btn){btn.disabled=true;btn.textContent='Memulihkan...';}
+    const result=await client.rpc('restore_sipb_backup',{p_backup:payload});
+    if(result.error)throw result.error;
+    toast('Restore berhasil.');
+    renderApp('dashboard');
+  }catch(e){fail(e)}
+  finally{
+    const btn=$('restoreBackup');
+    if(btn){btn.disabled=false;btn.textContent='Restore dari File';}
+  }
+}
+function reportTypeLabel(type){
+  return type==='MASUK'?'Barang Masuk':type==='KELUAR'?'Barang Keluar':'Stock Opname';
+}
+async function laporanPage(){
+  const [barang,masuk,keluar,opname,details]=await Promise.all([
+    fetchAllSipbRows('barang','id,nama_barang,satuan,harga_terakhir,kategori:kategori_id(id,nama_kategori)'),
+    fetchAllSipbRows('barang_masuk','id,barang_id,jumlah,harga_satuan,tanggal_masuk,nama_penyerah,nama_penerima,sumber_dana,nomor_awal,nomor_akhir,nomor_dus'),
+    fetchAllSipbRows('transaksi_keluar','id,tanggal_keluar,penerima_nama,tujuan_ruangan,jenis_dokumen,status'),
+    fetchAllSipbRows('riwayat_opname','id,tanggal_opname,barang_id,stok_sistem,stok_fisik,selisih,keterangan,petugas'),
+    fetchAllSipbRows('detail_barang_keluar','id,transaksi_keluar_id,barang_id,jumlah,nomor_awal,nomor_akhir,nomor_dus')
+  ]);
+  const bmap=Object.fromEntries((barang||[]).map(x=>[x.id,x]));
+  const txmap=Object.fromEntries((keluar||[]).map(x=>[x.id,x]));
+  const rows=[
+    ...(masuk||[]).map(r=>{
+      const b=bmap[r.barang_id]||{};
+      return {id:'M'+r.id,type:'MASUK',date:r.tanggal_masuk,barang:b.nama_barang||'-',category:b.kategori?.nama_kategori||'Tanpa Kategori',unit:b.satuan||'-',qty:Number(r.jumlah)||0,value:(Number(r.jumlah)||0)*(Number(r.harga_satuan)||0),party:r.nama_penyerah||'-',target:r.nama_penerima||'-',note:(r.sumber_dana||'-')+(r.nomor_dus?' · Dus '+r.nomor_dus:'')+(r.nomor_awal?' · '+r.nomor_awal+' → '+(r.nomor_akhir||'-'):'')};
+    }),
+    ...(details||[]).filter(d=>(txmap[d.transaksi_keluar_id]?.status||'AKTIF')==='AKTIF').map(d=>{
+      const b=bmap[d.barang_id]||{},t=txmap[d.transaksi_keluar_id]||{};
+      return {id:'K'+d.id,type:'KELUAR',date:t.tanggal_keluar,barang:b.nama_barang||'-',category:b.kategori?.nama_kategori||'Tanpa Kategori',unit:b.satuan||'-',qty:Number(d.jumlah)||0,value:0,party:t.penerima_nama||'-',target:t.tujuan_ruangan||'-',note:(t.jenis_dokumen||'Nota Dinas')+(d.nomor_dus?' · Dus '+d.nomor_dus:'')+(d.nomor_awal?' · '+d.nomor_awal+' → '+(d.nomor_akhir||'-'):'')};
+    }),
+    ...(opname||[]).map(r=>{
+      const b=bmap[r.barang_id]||{};
+      return {id:'O'+r.id,type:'OPNAME',date:r.tanggal_opname,barang:b.nama_barang||'-',category:b.kategori?.nama_kategori||'Tanpa Kategori',unit:b.satuan||'-',qty:Number(r.selisih)||0,value:0,party:r.petugas||'-',target:'Stok Fisik',note:'Sistem '+(r.stok_sistem??0)+' → Fisik '+(r.stok_fisik??0)+(r.keterangan?' · '+r.keterangan:'')};
+    })
+  ].filter(r=>r.date).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.id).localeCompare(String(a.id)));
+  window.__sipbReportRows=rows;
+  const categories=[...new Set(rows.map(r=>r.category))].sort((a,b)=>a.localeCompare(b,'id'));
+  const d=new Date(),first=new Date(d.getFullYear(),d.getMonth(),1),last=new Date(d.getFullYear(),d.getMonth()+1,0);
+  const iso=x=>x.toISOString().slice(0,10);
+  return '<section class="card page-card report-page"><div class="section-head"><div><span class="eyebrow">PELAPORAN</span><h2>Laporan Persediaan</h2><p>Rekap penerimaan, pengeluaran, dan penyesuaian stok berdasarkan periode.</p></div><span class="status-pill">'+rows.length+' mutasi</span></div>'+
+    '<div class="report-filter-bar"><label>Tanggal Awal<input id="reportFrom" type="date" value="'+iso(first)+'"></label><label>Tanggal Akhir<input id="reportTo" type="date" value="'+iso(last)+'"></label><label>Jenis<select id="reportType"><option value="">Semua jenis</option><option value="MASUK">Barang Masuk</option><option value="KELUAR">Barang Keluar</option><option value="OPNAME">Stock Opname</option></select></label><label>Kategori<select id="reportCategory"><option value="">Semua kategori</option>'+categories.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join('')+'</select></label></div>'+
+    '<div class="report-summary-grid"><div class="kartu-summary"><small>Total Mutasi</small><strong id="reportTotal">0</strong></div><div class="kartu-summary"><small>Total Masuk</small><strong id="reportIn">0</strong></div><div class="kartu-summary"><small>Total Keluar</small><strong id="reportOut">0</strong></div><div class="kartu-summary"><small>Selisih Opname</small><strong id="reportAdj">0</strong></div><div class="kartu-summary"><small>Nilai Penerimaan</small><strong id="reportValue">Rp0</strong></div></div>'+
+    '<div class="table-wrap"><table id="laporanTable"><thead><tr><th>Tanggal</th><th>Jenis</th><th>Barang</th><th>Kategori</th><th>Jumlah</th><th>Satuan</th><th>Nilai Penerimaan</th><th>Pihak</th><th>Tujuan</th><th>Keterangan</th></tr></thead><tbody></tbody></table></div></section>';
+}
+function applyLaporanFilter(){
+  const from=$('reportFrom')?.value||'',to=$('reportTo')?.value||'',type=$('reportType')?.value||'',category=$('reportCategory')?.value||'';
+  const rows=(window.__sipbReportRows||[]).filter(r=>(!from||String(r.date)>=from)&&(!to||String(r.date)<=to)&&(!type||r.type===type)&&(!category||r.category===category));
+  const body=$('laporanTable')?.tBodies?.[0];
+  if(body)body.innerHTML=rows.length?rows.map(r=>'<tr><td>'+fmtDate(r.date)+'</td><td><span class="badge-soft '+(r.type==='MASUK'?'success':'')+'">'+reportTypeLabel(r.type)+'</span></td><td><strong>'+esc(r.barang)+'</strong></td><td>'+esc(r.category)+'</td><td class="'+(r.type==='OPNAME'&&r.qty<0?'stock low':'')+'">'+(r.type==='OPNAME'&&r.qty>0?'+':'')+r.qty+'</td><td>'+esc(r.unit)+'</td><td>'+(r.value?rupiah(r.value):'-')+'</td><td>'+esc(r.party)+'</td><td>'+esc(r.target)+'</td><td>'+esc(r.note)+'</td></tr>').join(''):emptyRow(10);
+  const totalIn=rows.filter(r=>r.type==='MASUK').reduce((n,r)=>n+r.qty,0);
+  const totalOut=rows.filter(r=>r.type==='KELUAR').reduce((n,r)=>n+r.qty,0);
+  const adj=rows.filter(r=>r.type==='OPNAME').reduce((n,r)=>n+r.qty,0);
+  const value=rows.reduce((n,r)=>n+r.value,0);
+  $('reportTotal').textContent=rows.length.toLocaleString('id-ID');
+  $('reportIn').textContent=totalIn.toLocaleString('id-ID');
+  $('reportOut').textContent=totalOut.toLocaleString('id-ID');
+  $('reportAdj').textContent=(adj>0?'+':'')+adj.toLocaleString('id-ID');
+  $('reportValue').textContent=rupiah(value);
+  $('content')?.querySelector('.report-page .status-pill')?.replaceChildren(document.createTextNode(rows.length+' mutasi'));
+  const table=$('laporanTable');
+  table?.refreshPagination?.();
+}
+
+async function backupPage(){
+  if(profile?.role!=='admin')return '<section class="card error-card"><h2>Akses ditolak</h2><p>Halaman Backup & Restore hanya dapat diakses admin.</p></section>';
+  const names=sipbBackupTables();
+  const counts=await Promise.all(names.map(t=>count(t)));
+  const total=counts.reduce((n,x)=>n+x,0);
+  return '<section class="card page-card backup-page"><div class="section-head"><div><span class="eyebrow">ADMINISTRASI DATA</span><h2>Backup & Restore</h2><p>Simpan dan pulihkan data persediaan SIPB melalui file JSON.</p></div><span class="status-pill">'+total.toLocaleString('id-ID')+' baris data</span></div>'+
+    '<div class="backup-summary"><div class="kartu-summary"><small>Total Baris Data</small><strong>'+total.toLocaleString('id-ID')+'</strong></div><div class="kartu-summary"><small>Tabel</small><strong>'+names.length+'</strong></div><div class="kartu-summary"><small>Akses</small><strong>Admin</strong></div></div>'+
+    '<div class="backup-actions"><button class="primary" id="downloadBackup">↓ Buat Backup</button><button class="ghost" id="restoreBackup">Restore dari File</button><input id="restoreBackupFile" type="file" accept=".json,application/json" hidden></div>'+
+    '<div class="alert-box"><strong>Penting:</strong> Restore mengganti data persediaan pada tabel SIPB berdasarkan file backup. Akun login Supabase Auth tidak termasuk dan tidak diubah.</div>'+
+    '<div class="table-wrap"><table><thead><tr><th>Tabel</th><th>Data</th></tr></thead><tbody>'+names.map((n,i)=>'<tr><td><strong>'+n+'</strong></td><td>'+counts[i].toLocaleString('id-ID')+'</td></tr>').join('')+'</tbody></table></div></section>';
+}
+
 async function kategoriPage(){const {data,error}=await client.from('kategori').select('*').order('id');if(error)throw error;return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DATA REFERENSI</span><h2>Kategori</h2><p>Kelola klasifikasi barang.</p></div>${profile?.role==='admin'?'<button class="primary" id="addKategori">＋ Tambah Kategori</button>':''}</div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Nama Kategori</th><th>Aksi</th></tr></thead><tbody>${data.map(r=>`<tr><td>#${r.id}</td><td><strong>${esc(r.nama_kategori)}</strong></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-kat" data-id="'+r.id+'">Edit</button><button class="btn-sm danger delete-kat" data-id="'+r.id+'">Hapus</button></div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`).join('')||emptyRow(3)}</tbody></table></div></section>`}
 async function penggunaPage(){
   if(profile?.role!=='admin')return '<section class="card error-card"><h2>Akses ditolak</h2><p>Halaman ini hanya dapat diakses admin.</p></section>';
