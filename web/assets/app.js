@@ -132,9 +132,11 @@ function enhanceTables(scope=document){
   });
 }
 async function cancelAndDeleteOutgoing(id){
-  const result=await client.rpc('cancel_and_delete_barang_keluar',{p_transaksi_id:Number(id)});
-  if(result.error)throw result.error;
-  return result.data;
+  const cancel=await client.rpc('cancel_barang_keluar',{p_transaksi_id:Number(id)});
+  if(cancel.error)throw cancel.error;
+  const cleanup=await client.rpc('delete_cancelled_barang_keluar',{p_transaksi_id:Number(id)});
+  if(cleanup.error)throw cleanup.error;
+  return cleanup.data;
 }
 function showLogin(message=''){
  root.innerHTML=`<main class="login"><button class="login-theme-toggle theme-toggle" id="loginThemeToggle" type="button"><span class="theme-icon">${uiTheme==='dark'?'☀':'☾'}</span><span>${uiTheme==='dark'?'Mode terang':'Mode gelap'}</span></button><section class="login-shell"><aside class="login-aside"><div class="login-emblem"><img src="${BANTEN_LOGO}" alt="Lambang Provinsi Banten"></div><div class="login-org">PEMERINTAH PROVINSI BANTEN</div><h1>UPTD PENGELOLAAN PENDAPATAN DAERAH MALINGPING</h1><p>Sistem Informasi Pengurus Barang</p><div class="login-rule"></div><small>Portal internal pengelolaan persediaan barang.</small></aside><section class="login-card"><div class="brand"><div><h2>Sistem Informasi Pengurus Barang</h2><p>UPTD PPD Malingping</p></div></div><div class="login-title">Masuk ke sistem</div><p class="login-desc">Gunakan akun yang terdaftar untuk melanjutkan.</p><form id="loginForm"><label for="email">Email</label><input id="email" type="email" required autocomplete="username" placeholder="akun@instansi.go.id"><label for="password">Password</label><div class="password-wrap"><input id="password" type="password" required autocomplete="current-password" placeholder="••••••••"><button type="button" class="password-toggle" id="togglePassword">Lihat</button></div><button class="primary login-btn" type="submit"><span>Masuk</span><span aria-hidden="true">→</span></button>${message?`<div class="alert">${esc(message)}</div>`:''}</form><div class="login-footer">© ${new Date().getFullYear()} UPTD PPD Malingping</div></section></section></main>`;
@@ -350,31 +352,16 @@ async function renderApp(page='dashboard', restoreScrollY=null){
   if(!session)return showLogin();
   await loadProfile();
   document.documentElement.dataset.theme=uiTheme;
-  root.innerHTML=`<div class="dashboard ${sidebarOpen?'menu-open':''}"><div class="sidebar-backdrop ${sidebarOpen?'show':''}" id="sidebarBackdrop"></div><aside class="sidebar ${sidebarOpen?'open':''}" id="sidebar"><div class="brand-side"><div class="brand-side-mark"><img src="${BANTEN_LOGO}" alt="Lambang Provinsi Banten"></div><div><strong>Sistem Informasi Pengurus Barang</strong><span>UPTD PPD Malingping</span></div><button class="sidebar-close" id="sidebarClose" type="button" aria-label="Tutup menu">×</button></div><nav class="nav"><div class="nav-label">UTAMA</div>${menu.slice(0,1).map(m=>navItem(m,page)).join('')}<div class="nav-label">TRANSAKSI</div>${menu.slice(1,4).map(m=>navItem(m,page)).join('')}<div class="nav-label">DATA REFERENSI</div><div class="nav-group">${menu.slice(4,7).map(m=>navItem(m,page)).join('')}${profile?.role==='admin'?navItem(menu[10],page):''}</div><div class="nav-label">PERSEDIAAN</div>${menu.slice(7,10).map(m=>navItem(m,page)).join('')}</nav><div class="side-bottom"><div class="side-user"><div class="avatar">${esc((profile.nama_lengkap||'A').charAt(0).toUpperCase())}</div><div><strong>${esc(profile.nama_lengkap||session.user.email)}</strong><small>${esc(profile.role||'user')}</small></div></div><button class="logout" id="logout">↪ Keluar</button></div></aside><button class="menu-toggle ${sidebarOpen?'hidden':''}" id="menuToggle" type="button" aria-label="Buka menu"><span></span><span></span><span></span></button><main class="main"><header class="top"><div class="mobile-brand"><img src="${BANTEN_LOGO}" alt="Lambang Banten"><div><strong>Sistem Informasi Pengurus Barang</strong><span>UPTD PPD Malingping</span></div></div><div class="top-title"><span>Administrasi Persediaan</span><h1>${menu.find(x=>x[0]===page)?.[1]||'Dashboard'}</h1></div><div class="top-actions"><button class="theme-toggle" id="themeToggle" type="button" aria-label="Ubah tema"><span class="theme-icon">${uiTheme==='dark'?'☀':'☾'}</span><span>${uiTheme==='dark'?'Mode terang':'Mode gelap'}</span></button><span class="status-pill"><i></i> Sistem Online</span></div></header><div id="content">${loading('Memuat data...')}</div></main></div>`;
+  root.innerHTML=`<div class="dashboard top-nav-layout"><main class="main"><header class="top">
+    <div class="top-brand"><div class="top-brand-mark"><img src="${BANTEN_LOGO}" alt="Lambang Provinsi Banten"></div><div class="top-brand-copy"><strong>SIPB</strong><span>UPTD PPD Malingping</span></div></div>
+    <nav class="top-nav" aria-label="Navigasi utama">${menu.map(m=>navItem(m,page)).join('')}</nav>
+    <div class="top-title"><span>Administrasi Persediaan</span><h1>${menu.find(x=>x[0]===page)?.[1]||'Dashboard'}</h1></div>
+    <div class="top-actions"><button class="theme-toggle" id="themeToggle" type="button" aria-label="Ubah tema"><span class="theme-icon">${uiTheme==='dark'?'☀':'☾'}</span><span>${uiTheme==='dark'?'Mode terang':'Mode gelap'}</span></button><span class="status-pill"><i></i> Sistem Online</span><button class="top-logout" id="logout" type="button" aria-label="Keluar">↪</button></div>
+  </header><div id="content">${loading('Memuat data...')}</div></main></div>`;
   document.documentElement.dataset.theme=uiTheme;
-  const toggleSidebar=()=>{
-    sidebarOpen=!sidebarOpen;
-    $('sidebar')?.classList.toggle('open',sidebarOpen);
-    $('sidebarBackdrop')?.classList.toggle('show',sidebarOpen);
-    $('menuToggle')?.classList.toggle('hidden',sidebarOpen);
-    document.querySelector('.dashboard')?.classList.toggle('menu-open',sidebarOpen);
-  };
-  $('menuToggle')?.addEventListener('click',toggleSidebar);
-  $('sidebarClose')?.addEventListener('click',toggleSidebar);
-  $('sidebarBackdrop')?.addEventListener('click',toggleSidebar);
-  $('themeToggle')?.addEventListener('click',()=>{
-    uiTheme=uiTheme==='dark'?'light':'dark';
-    localStorage.setItem('sipb-theme',uiTheme);
-    document.documentElement.dataset.theme=uiTheme;
-    const icon=$('themeToggle')?.querySelector('.theme-icon');
-    if(icon)icon.textContent=uiTheme==='dark'?'☀':'☾';
-    const label=$('themeToggle')?.querySelector('span:last-child');
-    if(label)label.textContent=uiTheme==='dark'?'Mode terang':'Mode gelap';
-    if(page==='dashboard')renderDashboardCharts();
-  });
   $('logout').onclick=async()=>{await client.auth.signOut();sidebarOpen=false;showLogin()};
   try{
-    let html=page==='dashboard'?await dashboard():page==='barang'?await barangPage():page==='kategori'?await kategoriPage():page==='pegawai'?await pegawaiPage():page==='barang_masuk'?await barangMasukPage():page==='barang_keluar'?await barangKeluarPage():page==='stock_opname'?await stockOpnamePage():page==='kartu'?await kartuPage():page==='kuasi'?await kuasiPage():page==='riwayat'?await riwayatPage():page==='pengguna'?await penggunaPage():await dashboard();
+    let html=page==='dashboard'?await dashboard():page==='barang'?await barangPage():page==='kategori'?await kategoriPage():page==='pegawai'?await pegawaiPage():page==='barang_masuk'?await barangMasukForm():page==='barang_keluar'?await barangKeluarForm():page==='stock_opname'?await stockOpnamePage():page==='kartu'?await kartuPage():page==='kuasi'?await kuasiPage():page==='riwayat'?await riwayatPage():page==='pengguna'?await penggunaPage():await dashboard();
     $('content').innerHTML=html;
     bind(page);
     enhanceTables(document.getElementById('content'));
@@ -562,8 +549,8 @@ async function bindKeluarForm(){
   const pegawaiQ=await client.from('pegawai').select('id,nama_pegawai,nip,status_pegawai,jabatan').order('nama_pegawai');
   if(pegawaiQ.error)throw pegawaiQ.error;
   const pegawai=pegawaiQ.data||[];
-  $('backKeluar').onclick=()=>renderApp('barang_keluar');
-  $('cancelKeluar').onclick=()=>renderApp('barang_keluar');
+  $('backKeluar').onclick=()=>renderApp('dashboard');
+  $('cancelKeluar').onclick=()=>renderApp('dashboard');
 
   const fillPegawai=(selectId,jabatanId,nipId)=>{
     const select=$(selectId), jabatan=$(jabatanId), nip=$(nipId);
@@ -624,8 +611,8 @@ async function bindKeluarForm(){
   };
 }
 async function bindMasukForm(){
-  $('backMasuk').onclick=()=>renderApp('barang_masuk');
-  $('cancelMasuk').onclick=()=>renderApp('barang_masuk');
+  $('backMasuk').onclick=()=>renderApp('dashboard');
+  $('cancelMasuk').onclick=()=>renderApp('dashboard');
   const toggle=()=>{
     const sel=$('m_barang'), opt=sel.selectedOptions[0];
     const isNew=!sel.value, kat=$('m_kat').selectedOptions[0];
