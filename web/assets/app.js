@@ -62,7 +62,7 @@ function enhanceTables(scope=document){
           table.dataset.sortCol=String(col);
           table.dataset.sortDir=String(nextDir);
           sortTable(table,col,nextDir);
-          const card=table.closest('.page-card');
+          const card=table.closest('.page-card,.recent');
           const sel=card?.querySelector('.table-sort-select');
           const dir=card?.querySelector('.table-sort-direction');
           if(sel)sel.value=String(col);
