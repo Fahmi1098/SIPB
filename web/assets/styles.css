@@ -3524,8 +3524,7 @@ tbody tr:hover{
   line-height:1;
   transition:transform .18s ease;
 }
-.top-nav-group:hover .nav-caret,
-.top-nav-group:focus-within .nav-caret{
+.top-nav-group:hover .nav-caret{
   transform:rotate(180deg);
 }
 .top-submenu{
@@ -3545,8 +3544,7 @@ tbody tr:hover{
   transform:translateY(-6px);
   transition:opacity .16s ease,transform .16s ease,visibility .16s ease;
 }
-.top-nav-group:hover .top-submenu,
-.top-nav-group:focus-within .top-submenu{
+.top-nav-group:hover .top-submenu{
   opacity:1;
   visibility:visible;
   pointer-events:auto;
@@ -3711,8 +3709,7 @@ tbody tr:hover{
 .top-nav-group .top-submenu{
   top:calc(100% + 6px);
 }
-.top-nav-group:hover::after,
-.top-nav-group:focus-within::after{
+.top-nav-group:hover::after{
   pointer-events:auto;
 }
 .transaction-row .remove-item:disabled{
@@ -3756,8 +3753,7 @@ tbody tr:hover{
   margin-top:0 !important;
   z-index:512;
 }
-.top-nav-group:hover::before,
-.top-nav-group:focus-within::before{
+.top-nav-group:hover::before{
   display:block;
 }
 
@@ -4017,8 +4013,7 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
   pointer-events:auto !important;
   transform:translateY(0) !important;
 }
-.top-nav-group:hover .top-submenu,
-.top-nav-group:focus-within .top-submenu{
+.top-nav-group:hover .top-submenu{
   opacity:0 !important;
   visibility:hidden !important;
   pointer-events:none !important;
@@ -4170,4 +4165,30 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
 .top-nav-layout .top:before{
   display:none !important;
   content:none !important;
+}
+
+/* FINAL TOPBAR CLEANUP: grouped menus open on pointer hover only. */
+.top-nav-layout .top-nav-group:focus-within .top-submenu{
+  opacity:0 !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+  transform:translateY(-6px) !important;
+}
+.top-nav-layout .top-nav-group:focus-within .nav-caret{
+  transform:none !important;
+}
+.top-nav-layout .top-nav-group:focus-within .top-nav-trigger{
+  background:transparent !important;
+  color:rgba(255,255,255,.80) !important;
+}
+.top-nav-layout .top{
+  border-bottom:0 !important;
+  box-shadow:0 14px 34px rgba(7,59,111,.18) !important;
+}
+.top-nav-layout .top:before,
+.top-nav-layout .top:after{
+  display:none !important;
+  background:none !important;
+  border:0 !important;
+  box-shadow:none !important;
 }
