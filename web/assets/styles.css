@@ -5669,3 +5669,71 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
     margin-left:0;
   }
 }
+
+
+/* Laporan & Backup */
+.report-filter-bar{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+  margin:16px 0;
+}
+.report-filter-bar label{
+  display:grid;
+  gap:6px;
+  font-size:12px;
+  font-weight:700;
+  color:var(--muted,#64748b);
+}
+.report-filter-bar input,
+.report-filter-bar select{
+  width:100%;
+}
+.report-summary-grid{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:12px;
+  margin:14px 0 18px;
+}
+.report-summary-grid .kartu-summary{
+  min-height:82px;
+}
+.report-summary-grid .kartu-summary small,
+.backup-summary .kartu-summary small{
+  display:block;
+  margin-bottom:5px;
+}
+.report-summary-grid .kartu-summary strong,
+.backup-summary .kartu-summary strong{
+  font-size:21px;
+}
+.backup-summary{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+  margin:16px 0;
+}
+.backup-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin:16px 0;
+}
+.backup-actions button{
+  min-width:170px;
+}
+.kuasi-legacy-warning{
+  margin-top:12px;
+}
+:root[data-theme="dark"] .report-filter-bar label{
+  color:#9fb0c3;
+}
+@media(max-width:900px){
+  .report-filter-bar{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .report-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .backup-summary{grid-template-columns:1fr}
+}
+@media(max-width:520px){
+  .report-filter-bar,.report-summary-grid{grid-template-columns:1fr}
+  .backup-actions button{width:100%}
+}
