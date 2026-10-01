@@ -23,19 +23,23 @@
   }).format(Number(v) || 0);
 
   function openPrint(title, body, orientation='portrait', existingWindow=null) {
-    const w = existingWindow || window.open('', '_blank', 'noopener,noreferrer');
-    if (!w) {
+    const w = existingWindow || window.open('about:blank', '_blank');
+    if (!w || w.closed) {
       window.alert('Popup diblokir browser. Izinkan popup untuk mencetak dokumen SIPB.');
       return;
     }
-    w.document.write(`<!doctype html><html lang="id"><head><meta charset="utf-8">
+
+    const html = `<!doctype html><html lang="id"><head><meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
       <title>${esc(title)}</title>
       <style>
-        @page{size:A4 ${orientation};margin:0}\n        @page landscape{size:A4 landscape;margin:0}
+        @page{size:A4 ${orientation};margin:0}
+        @page landscape{size:A4 landscape;margin:0}
         *{box-sizing:border-box}
         body{margin:0;background:#eee;font-family:"Times New Roman",serif;color:#111}
         .sheet{width:21cm;min-height:29.7cm;margin:12px auto;background:#fff;padding:1.35cm 1.6cm}
-        .sheet.landscape{width:29.7cm;min-height:21cm;page:landscape}\n        .sheet + .sheet{break-before:page}
+        .sheet.landscape{width:29.7cm;min-height:21cm;page:landscape}
+        .sheet + .sheet{break-before:page}
         .toolbar{position:fixed;right:18px;bottom:18px;z-index:10}
         .toolbar button{border:0;border-radius:8px;padding:10px 16px;background:#0b5cab;color:#fff;font-weight:700;cursor:pointer}
         .kop{width:100%;border-collapse:collapse;margin-bottom:5px}
@@ -65,8 +69,12 @@
       <div class="toolbar"><button onclick="window.print()">Cetak Dokumen</button></div>
       ${body}
       <script>window.onload=()=>setTimeout(()=>window.print(),350)<\/script>
-    </body></html>`);
-    w.document.close();
+    </body></html>`;
+
+    const blob = new Blob([html], { type:'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    w.location.replace(url);
+    w.addEventListener('load', () => setTimeout(() => URL.revokeObjectURL(url), 1000), { once:true });
   }
 
   async function getTransaction(id) {
