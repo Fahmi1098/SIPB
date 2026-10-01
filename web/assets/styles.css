@@ -958,3 +958,15 @@ body{overflow-x:hidden}
   .welcome-emblem{display:none}
   .top-title h1{font-size:1.02rem}
 }
+
+
+/* ===== NAVIGATION STABILITY FIX 2026-10-01 ===== */
+.main{
+  /* Jangan animasikan perubahan lebar saat sidebar dibuka/ditutup.
+     Chart dan isi halaman tetap stabil sehingga tidak berkedip. */
+  transition:none;
+}
+html{
+  /* Navigasi SIPB tidak melakukan perpindahan scroll otomatis. */
+  scroll-behavior:auto;
+}
