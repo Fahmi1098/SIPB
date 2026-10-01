@@ -180,41 +180,85 @@ function showLogin(message=''){
 async function loadProfile(){const {data,error}=await client.from('user_profiles').select('*').eq('id',session.user.id).maybeSingle();if(error)throw error;profile=data||{nama_lengkap:session.user.email,role:'user',is_active:true};if(profile.is_active===false){await client.auth.signOut();throw new Error('Akun tidak aktif.')}}
 async function count(t){const {count,error}=await client.from(t).select('*',{count:'exact',head:true});if(error)throw error;return count||0}
 async function dashboard(){
-  const names=['barang','barang_masuk','transaksi_keluar'];
   const now=new Date();
   const since=new Date(now.getFullYear(),now.getMonth()-5,1).toISOString();
-  const [barangQ,masukQ,keluarQ,recentQ,catQ,outQ]=await Promise.all([
-    client.from('barang').select('id,sisa'),
+  const [barangQ,masukQ,keluarQ,recentQ,catQ,outQ,kuasiQ]=await Promise.all([
+    client.from('barang').select('id,nama_barang,satuan,sisa,stok_minimum,harga_terakhir'),
     client.from('barang_masuk').select('jumlah,harga_satuan'),
     client.from('transaksi_keluar').select('id,status'),
     client.from('transaksi_keluar').select('*').order('id',{ascending:false}).limit(6),
     client.from('barang').select('id,kategori:kategori_id(nama_kategori)'),
-    client.from('transaksi_keluar').select('tanggal_keluar,status').gte('tanggal_keluar',since).order('tanggal_keluar')
+    client.from('transaksi_keluar').select('tanggal_keluar,status').gte('tanggal_keluar',since).order('tanggal_keluar'),
+    client.from('stok_kuasi').select('id,barang_id,sisa_lembar,barang:barang_id(nama_barang,satuan)').gt('sisa_lembar',0)
   ]);
-  if(barangQ.error||masukQ.error||keluarQ.error||recentQ.error||catQ.error||outQ.error)throw(barangQ.error||masukQ.error||keluarQ.error||recentQ.error||catQ.error||outQ.error);
+  const err=barangQ.error||masukQ.error||keluarQ.error||recentQ.error||catQ.error||outQ.error||kuasiQ.error;
+  if(err)throw err;
 
   const barangData=barangQ.data||[];
   const masukData=masukQ.data||[];
   const keluarData=(keluarQ.data||[]).filter(x=>(x.status||'AKTIF')!=='DIBATALKAN');
+  const recentData=(recentQ.data||[]).filter(r=>(r.status||'AKTIF')==='AKTIF');
   const totalBarang=barangData.length;
   const totalSisa=barangData.reduce((n,r)=>n+(Number(r.sisa)||0),0);
   const totalMasuk=masukData.reduce((n,r)=>n+(Number(r.jumlah)||0),0);
   const nominalMasuk=masukData.reduce((n,r)=>n+((Number(r.jumlah)||0)*(Number(r.harga_satuan)||0)),0);
   const totalKeluar=keluarData.length;
-  const recentData=(recentQ.data||[]).filter(r=>(r.status||'AKTIF')==='AKTIF');
+
+  const stockAlerts=barangData
+    .filter(r=>Number(r.sisa||0)<=Number(r.stok_minimum||0))
+    .sort((a,b)=>(Number(a.sisa)||0)-(Number(b.sisa)||0));
+  const outOfStock=stockAlerts.filter(r=>Number(r.sisa||0)<=0);
+  const lowStock=stockAlerts.filter(r=>Number(r.sisa||0)>0);
+  const kuasiMap={};
+  (kuasiQ.data||[]).forEach(r=>{
+    const id=r.barang_id;
+    if(!kuasiMap[id])kuasiMap[id]={nama:r.barang?.nama_barang||'-',satuan:r.barang?.satuan||'',sisa:0};
+    kuasiMap[id].sisa+=Number(r.sisa_lembar)||0;
+  });
+  const kuasiLow=Object.values(kuasiMap).filter(r=>r.sisa<=20).sort((a,b)=>a.sisa-b.sisa);
 
   const catMap={};
   (catQ.data||[]).forEach(x=>{const n=x.kategori?.nama_kategori||'Tanpa Kategori';catMap[n]=(catMap[n]||0)+1});
   const catEntries=Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
 
   const monthMap={};
-  for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');monthMap[key]=0}
-  (outQ.data||[]).filter(x=>(x.status||'AKTIF')!=='DIBATALKAN').forEach(x=>{const d=new Date(x.tanggal_keluar);const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');if(key in monthMap)monthMap[key]++});
-  const monthLabels=Object.keys(monthMap).map(k=>{const [y,m]=k.split('-');return new Intl.DateTimeFormat('id-ID',{month:'short'}).format(new Date(Number(y),Number(m)-1,1))});
+  for(let i=5;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    monthMap[key]=0;
+  }
+  (outQ.data||[]).filter(x=>(x.status||'AKTIF')!=='DIBATALKAN').forEach(x=>{
+    const d=new Date(x.tanggal_keluar);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    if(key in monthMap)monthMap[key]++;
+  });
+  const monthLabels=Object.keys(monthMap).map(k=>{
+    const [y,m]=k.split('-');
+    return new Intl.DateTimeFormat('id-ID',{month:'short'}).format(new Date(Number(y),Number(m)-1,1));
+  });
 
-  window.SIPB_DASHBOARD_CHARTS={categoryLabels:catEntries.map(x=>x[0]),categoryData:catEntries.map(x=>x[1]),monthLabels,monthData:Object.values(monthMap)};
+  window.SIPB_DASHBOARD_CHARTS={
+    categoryLabels:catEntries.map(x=>x[0]),
+    categoryData:catEntries.map(x=>x[1]),
+    monthLabels,
+    monthData:Object.values(monthMap)
+  };
 
-  return `<section class="welcome card"><div class="welcome-copy"><span class="eyebrow">DASHBOARD</span><h2>Selamat Datang</h2><p>Sistem Informasi Pengurus Barang untuk administrasi persediaan UPTD PPD Malingping.</p><div class="welcome-meta"><span class="top-separator" aria-hidden="true"></span><span>•</span><span>${new Intl.DateTimeFormat('id-ID',{dateStyle:'full'}).format(now)}</span></div></div><div class="welcome-emblem"><img src="${BANTEN_LOGO}" alt="Lambang Provinsi Banten"><div><strong>PEMERINTAH PROVINSI BANTEN</strong><span>UPTD PPD MALINGPING</span></div></div></section><section class="stats-grid"><div class="stat-card blue"><span class="stat-icon">${navSvg('barang')}</span><div><small>Total Barang</small><strong>${totalBarang}</strong><em>Master barang</em></div></div><div class="stat-card blue"><span class="stat-icon">${navSvg('barang_masuk')}</span><div><small>Nilai Barang Masuk</small><strong>${rupiah(nominalMasuk)}</strong><em>Total nilai penerimaan</em></div></div><div class="stat-card green"><span class="stat-icon">${navSvg('barang_masuk')}</span><div><small>Jumlah Barang Masuk</small><strong>${totalMasuk.toLocaleString('id-ID')}</strong><em>Total kuantitas masuk</em></div></div><div class="stat-card red"><span class="stat-icon">${navSvg('barang_keluar')}</span><div><small>Barang Keluar</small><strong>${totalKeluar}</strong><em>Transaksi aktif</em></div></div><div class="stat-card purple"><span class="stat-icon">${navSvg('stock_opname')}</span><div><small>Sisa Stok</small><strong>${totalSisa.toLocaleString('id-ID')}</strong><em>Total stok saat ini</em></div></div></section><section class="charts-grid"><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h3>Barang berdasarkan kategori</h3><p>Delapan kategori dengan jumlah barang terbanyak.</p></div></div><div class="chart-wrap"><canvas id="categoryChart"></canvas></div></article><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">AKTIVITAS</span><h3>Barang keluar per bulan</h3><p>Enam bulan terakhir, transaksi aktif.</p></div></div><div class="chart-wrap"><canvas id="outgoingChart"></canvas></div></article></section><section class="card recent"><div class="section-head"><div><span class="eyebrow">AKTIVITAS TERKINI</span><h3>Transaksi terbaru</h3><p>Enam transaksi barang keluar terakhir.</p></div><button class="ghost" data-page="barang_keluar">Lihat semua <span aria-hidden="true">→</span></button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Penerima</th><th>Tujuan</th></tr></thead><tbody>${recentData.map(r=>`<tr><td>${fmtDate(r.tanggal_keluar)}</td><td><strong>${esc(r.penerima_nama||'-')}</strong></td><td>${esc(r.tujuan_ruangan||'-')}</td></tr>`).join('')||'<tr><td colspan="3" class="empty">Belum ada transaksi.</td></tr>'}</tbody></table></div></section>`}
+  const alertList=stockAlerts.slice(0,6).map(r=>{
+    const zero=Number(r.sisa||0)<=0;
+    return '<div class="stock-alert-row '+(zero?'danger':'warning')+'">'+
+      '<span class="stock-alert-icon">'+navSvg(zero?'barang_keluar':'barang')+'</span>'+
+      '<div><strong>'+esc(r.nama_barang)+'</strong><small>Stok '+(Number(r.sisa)||0)+' '+esc(r.satuan||'')+' · Minimum '+(Number(r.stok_minimum)||0)+'</small></div>'+
+      '<span class="stock-alert-value">'+(zero?'Habis':'Menipis')+'</span></div>';
+  }).join('');
+
+  return '<section class="welcome card"><div class="welcome-copy"><span class="eyebrow">DASHBOARD</span><h2>Selamat Datang</h2><p>Sistem Informasi Pengurus Barang untuk administrasi persediaan UPTD PPD Malingping.</p><div class="welcome-meta"><span class="top-separator" aria-hidden="true"></span><span>•</span><span>'+new Intl.DateTimeFormat('id-ID',{dateStyle:'full'}).format(now)+'</span></div></div><div class="welcome-emblem"><img src="'+BANTEN_LOGO+'" alt="Lambang Provinsi Banten"><div><strong>PEMERINTAH PROVINSI BANTEN</strong><span>UPTD PPD MALINGPING</span></div></div></section>'+
+  '<section class="stats-grid"><div class="stat-card blue"><span class="stat-icon">'+navSvg('barang')+'</span><div><small>Total Barang</small><strong>'+totalBarang+'</strong><em>Master barang</em></div></div><div class="stat-card blue"><span class="stat-icon">'+navSvg('barang_masuk')+'</span><div><small>Nilai Barang Masuk</small><strong>'+rupiah(nominalMasuk)+'</strong><em>Total nilai penerimaan</em></div></div><div class="stat-card green"><span class="stat-icon">'+navSvg('barang_masuk')+'</span><div><small>Jumlah Barang Masuk</small><strong>'+totalMasuk.toLocaleString('id-ID')+'</strong><em>Total kuantitas masuk</em></div></div><div class="stat-card red"><span class="stat-icon">'+navSvg('barang_keluar')+'</span><div><small>Barang Keluar</small><strong>'+totalKeluar+'</strong><em>Transaksi aktif</em></div></div><div class="stat-card purple"><span class="stat-icon">'+navSvg('stock_opname')+'</span><div><small>Sisa Stok</small><strong>'+totalSisa.toLocaleString('id-ID')+'</strong><em>Total stok saat ini</em></div></div></section>'+
+  '<section class="stock-alert-center card"><div class="section-head"><div><span class="eyebrow">PERINGATAN PERSEDIAAN</span><h3>Pusat Peringatan Stok</h3><p>Barang yang sudah habis atau berada di bawah batas stok minimum.</p></div><div class="stock-alert-counts"><span class="alert-count danger"><strong>'+outOfStock.length+'</strong><small>Habis</small></span><span class="alert-count warning"><strong>'+lowStock.length+'</strong><small>Menipis</small></span><span class="alert-count kuasi"><strong>'+kuasiLow.length+'</strong><small>Kuasi ≤ 20</small></span></div></div>'+
+  '<div class="stock-alert-layout"><div class="stock-alert-list">'+(alertList||'<div class="stock-alert-empty"><span>✓</span><div><strong>Stok aman</strong><small>Tidak ada barang yang berada di bawah batas minimum.</small></div></div>')+'</div><div class="stock-alert-side"><div class="stock-alert-side-title">Ringkasan cepat</div><div class="stock-alert-metric"><span>Barang perlu perhatian</span><strong>'+stockAlerts.length+'</strong></div><div class="stock-alert-metric"><span>Batch Kuasi menipis</span><strong>'+kuasiLow.length+'</strong></div><button class="ghost" data-page="barang">Buka Master Barang <span aria-hidden="true">→</span></button></div></div></section>'+
+  '<section class="charts-grid"><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h3>Barang berdasarkan kategori</h3><p>Delapan kategori dengan jumlah barang terbanyak.</p></div></div><div class="chart-wrap"><canvas id="categoryChart"></canvas></div></article><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">AKTIVITAS</span><h3>Barang keluar per bulan</h3><p>Enam bulan terakhir, transaksi aktif.</p></div></div><div class="chart-wrap"><canvas id="outgoingChart"></canvas></div></article></section>'+
+  '<section class="card recent"><div class="section-head"><div><span class="eyebrow">AKTIVITAS TERKINI</span><h3>Transaksi terbaru</h3><p>Enam transaksi barang keluar terakhir.</p></div><button class="ghost" data-page="barang_keluar">Lihat semua <span aria-hidden="true">→</span></button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Penerima</th><th>Tujuan</th></tr></thead><tbody>'+(recentData.map(r=>'<tr><td>'+fmtDate(r.tanggal_keluar)+'</td><td><strong>'+esc(r.penerima_nama||'-')+'</strong></td><td>'+esc(r.tujuan_ruangan||'-')+'</td></tr>').join('')||'<tr><td colspan="3" class="empty">Belum ada transaksi.</td></tr>')+'</tbody></table></div></section>';
+}
 
 async function barangPage(){const [{data,error},{data:k,error:ke}]=await Promise.all([client.from('barang').select('*, kategori:kategori_id(nama_kategori)').order('id'),client.from('kategori').select('*').order('nama_kategori')]);if(error)throw error;if(ke)throw ke;return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER DATA</span><h2>Master Barang</h2><p>Kelola data barang dan informasi stok tanpa field LKI.</p></div>${profile?.role==='admin'?'<button class="primary" id="addBarang">＋ Tambah Barang</button>':''}</div><div class="filter-bar"><div class="search-box">⌕<input id="barangSearch" placeholder="Cari nama, tipe, merk, atau satuan..."></div><select id="barangFilter"><option value="">Semua kategori</option>${(k||[]).map(x=>`<option value="${x.id}">${esc(x.nama_kategori)}</option>`).join('')}</select><span id="barangCount" class="result-count">${data?.length||0} data</span></div><div class="table-wrap"><table id="barangTable"><thead><tr><th>ID</th><th>Nama Barang</th><th>Kategori</th><th>Tipe</th><th>Merk</th><th>Satuan</th><th>Harga Terakhir</th><th>Stok</th><th>Aksi</th></tr></thead><tbody>${(data||[]).map(barangRow).join('')||emptyRow(9)}</tbody></table></div></section>`}
 function barangRow(r){const low=Number(r.sisa??0)<=Number(r.stok_minimum??0);return `<tr data-search="${esc([r.nama_barang,r.tipe,r.merk,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())}" data-kategori="${r.kategori_id||''}"><td class="id-cell">#${r.id}</td><td><strong>${esc(r.nama_barang)}</strong></td><td>${esc(r.kategori?.nama_kategori||'-')}</td><td>${esc(r.tipe||'-')}</td><td>${esc(r.merk||'-')}</td><td>${esc(r.satuan||'-')}</td><td>${rupiah(r.harga_terakhir)}</td><td><span class="stock ${low?'low':''}">${r.sisa??0}</span></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-barang" data-id="'+r.id+'">Edit</button><button class="btn-sm danger delete-barang" data-id="'+r.id+'">Hapus</button></div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`}
