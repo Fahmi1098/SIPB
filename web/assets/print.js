@@ -98,7 +98,7 @@
   }
 
   function kop() {
-    const logo = new URL('../inventory/logo_banten.png', location.href).href;
+    const logo = new URL('assets/logo_banten.png', location.href).href;
     return `<table class="kop"><tr>
       <td style="width:15%;text-align:center"><img class="logo" src="${logo}" alt="Logo Banten"></td>
       <td style="width:70%" class="kop-text">
