@@ -8,6 +8,7 @@ const localDate=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getM
 const $=id=>document.getElementById(id);
 const BANTEN_LOGO='assets/logo_banten.png';
 let sidebarOpen=false;
+let topNavPinned=null;
 let uiTheme=localStorage.getItem('sipb-theme')||'light';
 document.documentElement.dataset.theme=uiTheme;
 const toast=(message,type='success')=>{let box=$('toastBox');if(!box){box=document.createElement('div');box.id='toastBox';box.className='toast-box';document.body.appendChild(box)}const el=document.createElement('div');el.className='toast '+type;el.textContent=message;box.appendChild(el);setTimeout(()=>el.remove(),3500)};
@@ -214,7 +215,7 @@ async function dashboard(){
 
   window.SIPB_DASHBOARD_CHARTS={categoryLabels:catEntries.map(x=>x[0]),categoryData:catEntries.map(x=>x[1]),monthLabels,monthData:Object.values(monthMap)};
 
-  return `<section class="welcome card"><div class="welcome-copy"><span class="eyebrow">DASHBOARD</span><h2>Selamat Datang</h2><p>Sistem Informasi Pengurus Barang untuk administrasi persediaan UPTD PPD Malingping.</p><div class="welcome-meta"><span class="status-pill"><i></i> Sistem Online</span><span>•</span><span>${new Intl.DateTimeFormat('id-ID',{dateStyle:'full'}).format(now)}</span></div></div><div class="welcome-emblem"><img src="${BANTEN_LOGO}" alt="Lambang Provinsi Banten"><div><strong>PEMERINTAH PROVINSI BANTEN</strong><span>UPTD PPD MALINGPING</span></div></div></section><section class="stats-grid"><div class="stat-card blue"><span class="stat-icon">${navSvg('barang')}</span><div><small>Total Barang</small><strong>${totalBarang}</strong><em>Master barang</em></div></div><div class="stat-card orange"><span class="stat-icon">${navSvg('barang_masuk')}</span><div><small>Nilai Barang Masuk</small><strong>${rupiah(nominalMasuk)}</strong><em>Total nilai penerimaan</em></div></div><div class="stat-card green"><span class="stat-icon">${navSvg('barang_masuk')}</span><div><small>Jumlah Barang Masuk</small><strong>${totalMasuk.toLocaleString('id-ID')}</strong><em>Total kuantitas masuk</em></div></div><div class="stat-card red"><span class="stat-icon">${navSvg('barang_keluar')}</span><div><small>Barang Keluar</small><strong>${totalKeluar}</strong><em>Transaksi aktif</em></div></div><div class="stat-card purple"><span class="stat-icon">${navSvg('stock_opname')}</span><div><small>Sisa Stok</small><strong>${totalSisa.toLocaleString('id-ID')}</strong><em>Total stok saat ini</em></div></div></section><section class="charts-grid"><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h3>Barang berdasarkan kategori</h3><p>Delapan kategori dengan jumlah barang terbanyak.</p></div></div><div class="chart-wrap"><canvas id="categoryChart"></canvas></div></article><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">AKTIVITAS</span><h3>Barang keluar per bulan</h3><p>Enam bulan terakhir, transaksi aktif.</p></div></div><div class="chart-wrap"><canvas id="outgoingChart"></canvas></div></article></section><section class="card recent"><div class="section-head"><div><span class="eyebrow">AKTIVITAS TERKINI</span><h3>Transaksi terbaru</h3><p>Enam transaksi barang keluar terakhir.</p></div><button class="ghost" data-page="barang_keluar">Lihat semua <span aria-hidden="true">→</span></button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Penerima</th><th>Tujuan</th></tr></thead><tbody>${recentData.map(r=>`<tr><td>${fmtDate(r.tanggal_keluar)}</td><td><strong>${esc(r.penerima_nama||'-')}</strong></td><td>${esc(r.tujuan_ruangan||'-')}</td></tr>`).join('')||'<tr><td colspan="3" class="empty">Belum ada transaksi.</td></tr>'}</tbody></table></div></section>`}
+  return `<section class="welcome card"><div class="welcome-copy"><span class="eyebrow">DASHBOARD</span><h2>Selamat Datang</h2><p>Sistem Informasi Pengurus Barang untuk administrasi persediaan UPTD PPD Malingping.</p><div class="welcome-meta"><span class="status-pill"><i></i> Sistem Online</span><span>•</span><span>${new Intl.DateTimeFormat('id-ID',{dateStyle:'full'}).format(now)}</span></div></div><div class="welcome-emblem"><img src="${BANTEN_LOGO}" alt="Lambang Provinsi Banten"><div><strong>PEMERINTAH PROVINSI BANTEN</strong><span>UPTD PPD MALINGPING</span></div></div></section><section class="stats-grid"><div class="stat-card blue"><span class="stat-icon">${navSvg('barang')}</span><div><small>Total Barang</small><strong>${totalBarang}</strong><em>Master barang</em></div></div><div class="stat-card blue"><span class="stat-icon">${navSvg('barang_masuk')}</span><div><small>Nilai Barang Masuk</small><strong>${rupiah(nominalMasuk)}</strong><em>Total nilai penerimaan</em></div></div><div class="stat-card green"><span class="stat-icon">${navSvg('barang_masuk')}</span><div><small>Jumlah Barang Masuk</small><strong>${totalMasuk.toLocaleString('id-ID')}</strong><em>Total kuantitas masuk</em></div></div><div class="stat-card red"><span class="stat-icon">${navSvg('barang_keluar')}</span><div><small>Barang Keluar</small><strong>${totalKeluar}</strong><em>Transaksi aktif</em></div></div><div class="stat-card purple"><span class="stat-icon">${navSvg('stock_opname')}</span><div><small>Sisa Stok</small><strong>${totalSisa.toLocaleString('id-ID')}</strong><em>Total stok saat ini</em></div></div></section><section class="charts-grid"><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h3>Barang berdasarkan kategori</h3><p>Delapan kategori dengan jumlah barang terbanyak.</p></div></div><div class="chart-wrap"><canvas id="categoryChart"></canvas></div></article><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">AKTIVITAS</span><h3>Barang keluar per bulan</h3><p>Enam bulan terakhir, transaksi aktif.</p></div></div><div class="chart-wrap"><canvas id="outgoingChart"></canvas></div></article></section><section class="card recent"><div class="section-head"><div><span class="eyebrow">AKTIVITAS TERKINI</span><h3>Transaksi terbaru</h3><p>Enam transaksi barang keluar terakhir.</p></div><button class="ghost" data-page="barang_keluar">Lihat semua <span aria-hidden="true">→</span></button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Penerima</th><th>Tujuan</th></tr></thead><tbody>${recentData.map(r=>`<tr><td>${fmtDate(r.tanggal_keluar)}</td><td><strong>${esc(r.penerima_nama||'-')}</strong></td><td>${esc(r.tujuan_ruangan||'-')}</td></tr>`).join('')||'<tr><td colspan="3" class="empty">Belum ada transaksi.</td></tr>'}</tbody></table></div></section>`}
 
 async function barangPage(){const [{data,error},{data:k,error:ke}]=await Promise.all([client.from('barang').select('*, kategori:kategori_id(nama_kategori)').order('id'),client.from('kategori').select('*').order('nama_kategori')]);if(error)throw error;if(ke)throw ke;return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER DATA</span><h2>Master Barang</h2><p>Kelola data barang dan informasi stok tanpa field LKI.</p></div>${profile?.role==='admin'?'<button class="primary" id="addBarang">＋ Tambah Barang</button>':''}</div><div class="filter-bar"><div class="search-box">⌕<input id="barangSearch" placeholder="Cari nama, tipe, merk, atau satuan..."></div><select id="barangFilter"><option value="">Semua kategori</option>${(k||[]).map(x=>`<option value="${x.id}">${esc(x.nama_kategori)}</option>`).join('')}</select><span id="barangCount" class="result-count">${data?.length||0} data</span></div><div class="table-wrap"><table id="barangTable"><thead><tr><th>ID</th><th>Nama Barang</th><th>Kategori</th><th>Tipe</th><th>Merk</th><th>Satuan</th><th>Harga Terakhir</th><th>Stok</th><th>Aksi</th></tr></thead><tbody>${(data||[]).map(barangRow).join('')||emptyRow(9)}</tbody></table></div></section>`}
 function barangRow(r){const low=Number(r.sisa??0)<=Number(r.stok_minimum??0);return `<tr data-search="${esc([r.nama_barang,r.tipe,r.merk,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())}" data-kategori="${r.kategori_id||''}"><td class="id-cell">#${r.id}</td><td><strong>${esc(r.nama_barang)}</strong></td><td>${esc(r.kategori?.nama_kategori||'-')}</td><td>${esc(r.tipe||'-')}</td><td>${esc(r.merk||'-')}</td><td>${esc(r.satuan||'-')}</td><td>${rupiah(r.harga_terakhir)}</td><td><span class="stock ${low?'low':''}">${r.sisa??0}</span></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-barang" data-id="'+r.id+'">Edit</button><button class="btn-sm danger delete-barang" data-id="'+r.id+'">Hapus</button></div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`}
@@ -395,6 +396,7 @@ const topNavGroups=[
   {key:'admin',label:'Admin',icon:'pengguna',items:[['pengguna','Kelola Pengguna']],adminOnly:true}
 ];
 async function renderApp(page='dashboard', restoreScrollY=null){
+  topNavPinned=null;
   const r=await client.auth.getSession();
   session=r.data.session;
   if(!session)return showLogin();
@@ -435,7 +437,7 @@ function topNavGroup(group,page){
     const m=group.items[0];
     return '<a href="#'+m[0]+'" data-page="'+m[0]+'" class="top-nav-link '+(active?'active':'')+'"><span class="nav-icon">'+navSvg(group.icon)+'</span><span>'+group.label+'</span></a>';
   }
-  return '<div class="top-nav-group '+(active?'active':'')+'"><button type="button" class="top-nav-trigger" aria-haspopup="true"><span class="nav-icon">'+navSvg(group.icon)+'</span><span>'+group.label+'</span><span class="nav-caret" aria-hidden="true">⌄</span></button><div class="top-submenu">'+
+  return '<div class="top-nav-group '+(active?'active ':'')+(topNavPinned===group.key?'pinned':'')+'" data-top-group="'+group.key+'"><button type="button" class="top-nav-trigger" aria-haspopup="true" aria-expanded="'+(topNavPinned===group.key?'true':'false')+'"><span class="nav-icon">'+navSvg(group.icon)+'</span><span>'+group.label+'</span><span class="nav-caret" aria-hidden="true">⌄</span></button><div class="top-submenu">'+
     group.items.map(m=>'<a href="#'+m[0]+'" data-page="'+m[0]+'" class="'+(page===m[0]?'active':'')+'"><span class="nav-icon">'+navSvg(m[0])+'</span><span>'+m[1]+'</span></a>').join('')+
     '</div></div>';
 }
@@ -447,13 +449,13 @@ function renderDashboardCharts(){
   const muted=text.getPropertyValue('--muted').trim()||'#718096';
   const grid=text.getPropertyValue('--chart-grid').trim()||'rgba(120,140,160,.15)';
   const blue=text.getPropertyValue('--blue-700').trim()||'#0b5cab';
-  const orange=text.getPropertyValue('--gold').trim()||'#d89a16';
+  const accent=text.getPropertyValue('--blue-700').trim()||'#0B5CAB';
   window.SIPBChartInstances?.forEach(x=>x?.destroy?.());
   window.SIPBChartInstances=[];
   const bar=document.getElementById('categoryChart');
   const line=document.getElementById('outgoingChart');
   if(bar){
-    window.SIPBChartInstances.push(new Chart(bar,{type:'bar',data:{labels:data.categoryLabels||[],datasets:[{label:'Jumlah barang',data:data.categoryData||[],backgroundColor:orange,borderRadius:7,maxBarThickness:34}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:900,easing:'easeOutQuart'},plugins:{legend:{display:false}},scales:{x:{ticks:{color:muted,font:{size:11}},grid:{display:false}},y:{beginAtZero:true,ticks:{precision:0,color:muted,font:{size:11}},grid:{color:grid}}}}}));
+    window.SIPBChartInstances.push(new Chart(bar,{type:'bar',data:{labels:data.categoryLabels||[],datasets:[{label:'Jumlah barang',data:data.categoryData||[],backgroundColor:accent,borderRadius:7,maxBarThickness:34}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:900,easing:'easeOutQuart'},plugins:{legend:{display:false}},scales:{x:{ticks:{color:muted,font:{size:11}},grid:{display:false}},y:{beginAtZero:true,ticks:{precision:0,color:muted,font:{size:11}},grid:{color:grid}}}}}));
   }
   if(line){
     window.SIPBChartInstances.push(new Chart(line,{type:'line',data:{labels:data.monthLabels||[],datasets:[{label:'Transaksi aktif',data:data.monthData||[],borderColor:blue,backgroundColor:'rgba(11,92,171,.10)',fill:true,tension:.35,pointRadius:4,pointHoverRadius:6,pointBackgroundColor:orange,pointBorderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:1100,easing:'easeOutQuart'},plugins:{legend:{display:false}},scales:{x:{ticks:{color:muted,font:{size:11}},grid:{display:false}},y:{beginAtZero:true,ticks:{precision:0,color:muted,font:{size:11}},grid:{color:grid}}}}}));
@@ -554,6 +556,21 @@ function bind(page){
 }
 function bindForm(id){$('backBarang').onclick=()=>renderApp('barang');$('cancelBarang').onclick=()=>renderApp('barang');$('saveBarang').onclick=async()=>{const payload={nama_barang:$('b_nama').value.trim(),kategori_id:$('b_kat').value?+$('b_kat').value:null,tipe:$('b_tipe').value.trim()||'-',merk:$('b_merk').value.trim()||'-',satuan:$('b_satuan').value.trim(),stok_minimum:+$('b_min').value||0};if(!payload.nama_barang)return toast('Nama barang wajib diisi.','error');const btn=$('saveBarang');btn.disabled=true;btn.textContent='Menyimpan...';const q=id?client.from('barang').update(payload).eq('id',id):client.from('barang').insert(payload);const {error}=await q;if(error){btn.disabled=false;btn.textContent=id?'Simpan Perubahan':'Simpan Barang';return fail(error)}toast(id?'Barang diperbarui':'Barang ditambahkan');renderApp('barang')}}
 document.addEventListener('click',e=>{
+  const trigger=e.target.closest('.top-nav-trigger');
+  if(trigger){
+    e.preventDefault();
+    const group=trigger.closest('.top-nav-group');
+    if(group){
+      const key=group.dataset.topGroup;
+      topNavPinned=topNavPinned===key?null:key;
+      document.querySelectorAll('.top-nav-group').forEach(g=>{
+        const pinned=g.dataset.topGroup===topNavPinned;
+        g.classList.toggle('pinned',pinned);
+        g.querySelector('.top-nav-trigger')?.setAttribute('aria-expanded',pinned?'true':'false');
+      });
+    }
+    return;
+  }
   const target=e.target.closest('[data-page]');
   if(!target)return;
   e.preventDefault();
