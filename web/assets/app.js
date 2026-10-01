@@ -119,7 +119,7 @@ function bind(page){
     document.querySelectorAll('.delete-kat').forEach(btn=>btn.onclick=async()=>{if(!confirm('Hapus kategori ini? Barang yang masih memakai kategori ini dapat mencegah penghapusan.'))return;const {error}=await client.from('kategori').delete().eq('id',+btn.dataset.id);if(error)return fail(error);toast('Kategori dihapus');renderApp('kategori')});
   }
   if(page==='barang_masuk') $('addMasuk').onclick=async()=>{$('content').innerHTML=await barangMasukForm();bindMasukForm()};
-  if(page==='barang_keluar') $('addKeluar').onclick=async()=>{$('content').innerHTML=await barangKeluarForm();bindKeluarForm()};
+  if(page==='barang_keluar') { const add=$('addKeluar'); if(add) add.onclick=async()=>{$('content').innerHTML=await barangKeluarForm();bindKeluarForm()}; document.querySelectorAll('.cancel-keluar').forEach(btn=>btn.onclick=async()=>{const id=Number(btn.dataset.id);if(!id)return;if(!confirm('Batalkan transaksi barang keluar #'+id+'? Stok akan dikembalikan dan transaksi tetap tercatat sebagai DIBATALKAN.'))return;btn.disabled=true;btn.textContent='Membatalkan...';try{const result=await client.rpc('cancel_barang_keluar',{p_transaksi_id:id});if(result.error)throw result.error;toast('Transaksi #'+id+' dibatalkan. Stok telah dikembalikan.');renderApp('barang_keluar')}catch(e){btn.disabled=false;btn.textContent='Batalkan';fail(e)}}); }
   if(page==='barang_keluar'){
     document.querySelectorAll('.cancel-keluar').forEach(btn=>btn.onclick=async()=>{
       const id=Number(btn.dataset.id);
