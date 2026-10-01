@@ -437,7 +437,7 @@ function topNavGroup(group,page){
     const m=group.items[0];
     return '<a href="#'+m[0]+'" data-page="'+m[0]+'" class="top-nav-link '+(active?'active':'')+'"><span class="nav-icon">'+navSvg(group.icon)+'</span><span>'+group.label+'</span></a>';
   }
-  return '<div class="top-nav-group '+(active?'active ':'')+(topNavPinned===group.key?'pinned':'')+'" data-top-group="'+group.key+'"><button type="button" class="top-nav-trigger" aria-haspopup="true" aria-expanded="'+(topNavPinned===group.key?'true':'false')+'"><span class="nav-icon">'+navSvg(group.icon)+'</span><span>'+group.label+'</span><span class="nav-caret" aria-hidden="true">⌄</span></button><div class="top-submenu">'+
+  return '<div class="top-nav-group '+(active?'active ':'')+(topNavPinned===group.key?'open':'')+'" data-top-group="'+group.key+'"><button type="button" class="top-nav-trigger" aria-haspopup="true" aria-expanded="'+(topNavPinned===group.key?'true':'false')+'"><span class="nav-icon">'+navSvg(group.icon)+'</span><span>'+group.label+'</span><span class="nav-caret" aria-hidden="true">⌄</span></button><div class="top-submenu">'+
     group.items.map(m=>'<a href="#'+m[0]+'" data-page="'+m[0]+'" class="'+(page===m[0]?'active':'')+'"><span class="nav-icon">'+navSvg(m[0])+'</span><span>'+m[1]+'</span></a>').join('')+
     '</div></div>';
 }
@@ -458,7 +458,7 @@ function renderDashboardCharts(){
     window.SIPBChartInstances.push(new Chart(bar,{type:'bar',data:{labels:data.categoryLabels||[],datasets:[{label:'Jumlah barang',data:data.categoryData||[],backgroundColor:accent,borderRadius:7,maxBarThickness:34}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:900,easing:'easeOutQuart'},plugins:{legend:{display:false}},scales:{x:{ticks:{color:muted,font:{size:11}},grid:{display:false}},y:{beginAtZero:true,ticks:{precision:0,color:muted,font:{size:11}},grid:{color:grid}}}}}));
   }
   if(line){
-    window.SIPBChartInstances.push(new Chart(line,{type:'line',data:{labels:data.monthLabels||[],datasets:[{label:'Transaksi aktif',data:data.monthData||[],borderColor:blue,backgroundColor:'rgba(11,92,171,.10)',fill:true,tension:.35,pointRadius:4,pointHoverRadius:6,pointBackgroundColor:orange,pointBorderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:1100,easing:'easeOutQuart'},plugins:{legend:{display:false}},scales:{x:{ticks:{color:muted,font:{size:11}},grid:{display:false}},y:{beginAtZero:true,ticks:{precision:0,color:muted,font:{size:11}},grid:{color:grid}}}}}));
+    window.SIPBChartInstances.push(new Chart(line,{type:'line',data:{labels:data.monthLabels||[],datasets:[{label:'Transaksi aktif',data:data.monthData||[],borderColor:blue,backgroundColor:'rgba(11,92,171,.10)',fill:true,tension:.35,pointRadius:4,pointHoverRadius:6,pointBackgroundColor:accent,pointBorderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:1100,easing:'easeOutQuart'},plugins:{legend:{display:false}},scales:{x:{ticks:{color:muted,font:{size:11}},grid:{display:false}},y:{beginAtZero:true,ticks:{precision:0,color:muted,font:{size:11}},grid:{color:grid}}}}}));
   }
 }
 
@@ -564,9 +564,10 @@ document.addEventListener('click',e=>{
       const key=group.dataset.topGroup;
       topNavPinned=topNavPinned===key?null:key;
       document.querySelectorAll('.top-nav-group').forEach(g=>{
-        const pinned=g.dataset.topGroup===topNavPinned;
-        g.classList.toggle('pinned',pinned);
-        g.querySelector('.top-nav-trigger')?.setAttribute('aria-expanded',pinned?'true':'false');
+        const open=g.dataset.topGroup===topNavPinned;
+        g.classList.toggle('open',open);
+        g.classList.remove('pinned');
+        g.querySelector('.top-nav-trigger')?.setAttribute('aria-expanded',open?'true':'false');
       });
     }
     return;
