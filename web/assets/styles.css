@@ -2626,3 +2626,100 @@ tbody tr:hover{
     animation:none!important;
   }
 }
+
+
+/* Final polish for the new rail */
+.sidebar{
+  inset:16px auto 16px 16px;
+}
+@media(min-width:901px){
+  .sidebar-backdrop{
+    display:none!important;
+  }
+}
+
+/* Dark mode parity for the new visual system */
+:root[data-theme="dark"]{
+  --sipb-bg:#0E1721;
+  --sipb-white:#17232E;
+  --sipb-text:#EDF3F8;
+  --sipb-muted:#A6B4C2;
+  --sipb-line:#2B3C4D;
+}
+:root[data-theme="dark"] .sidebar{
+  background:linear-gradient(180deg,#101D2A,#142638);
+  border-color:#2B4052;
+  box-shadow:12px 0 38px rgba(0,0,0,.28);
+}
+:root[data-theme="dark"] .brand-side{
+  border-bottom-color:#2B4052;
+}
+:root[data-theme="dark"] .brand-side-mark{
+  background:rgba(255,255,255,.08);
+}
+:root[data-theme="dark"] .brand-side strong{
+  color:#EDF3F8;
+}
+:root[data-theme="dark"] .brand-side span,
+:root[data-theme="dark"] .nav-label{
+  color:#94A9BC;
+}
+:root[data-theme="dark"] .nav a{
+  color:#B8C7D5;
+}
+:root[data-theme="dark"] .nav a:hover{
+  background:#1A2B3A;
+  color:#EAF3FA;
+}
+:root[data-theme="dark"] .nav a.active{
+  background:#1D3448;
+  border-color:#31536E;
+  color:#8CC4F2;
+}
+:root[data-theme="dark"] .logout{
+  background:#182936;
+  border-color:#304457;
+  color:#B8C7D5;
+}
+:root[data-theme="dark"] .side-bottom{
+  border-top-color:#2B4052;
+}
+:root[data-theme="dark"] .stat-card,
+:root[data-theme="dark"] .chart-card,
+:root[data-theme="dark"] .recent,
+:root[data-theme="dark"] .page-card,
+:root[data-theme="dark"] .table-wrap,
+:root[data-theme="dark"] .filter-bar,
+:root[data-theme="dark"] .search-box{
+  background:#17232E;
+  border-color:#2B3C4D;
+}
+:root[data-theme="dark"] .stat-card.blue{
+  background:linear-gradient(140deg,#0B5CAB,#176FAF);
+  border-color:transparent;
+}
+:root[data-theme="dark"] th{
+  background:#1B2B39;
+  color:#9FB0BF;
+}
+:root[data-theme="dark"] td{
+  border-bottom-color:#263746;
+}
+:root[data-theme="dark"] tbody tr:hover{
+  background:#1B2B39;
+}
+:root[data-theme="dark"] .ghost,
+:root[data-theme="dark"] .menu-toggle{
+  background:#17232E;
+  border-color:#34495B;
+  color:#BFD0DF;
+}
+:root[data-theme="dark"] .form-grid input,
+:root[data-theme="dark"] .form-grid select,
+:root[data-theme="dark"] .form-grid textarea,
+:root[data-theme="dark"] .page-card input,
+:root[data-theme="dark"] .page-card select{
+  background:#14222E;
+  color:#EDF3F8;
+  border-color:#34495B;
+}
