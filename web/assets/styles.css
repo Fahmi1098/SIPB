@@ -3461,3 +3461,221 @@ tbody tr:hover{
   background:#E8F2FA;
   color:#0A4E8A;
 }
+
+/* =========================================================
+   SIPB COMPACT TOP NAV + HOVER SUBMENUS + TRANSACTION ROW FIX
+   ========================================================= */
+.top-nav-layout .top-nav{
+  overflow:visible;
+  position:relative;
+  gap:5px;
+}
+.top-nav-group{
+  position:relative;
+  flex:0 0 auto;
+}
+.top-nav-group .top-nav-trigger,
+.top-nav > .top-nav-link{
+  min-height:40px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  padding:8px 10px;
+  border:1px solid transparent;
+  border-radius:10px;
+  color:rgba(255,255,255,.80);
+  background:transparent;
+  text-decoration:none;
+  font:inherit;
+  font-size:.63rem;
+  font-weight:800;
+  white-space:nowrap;
+  cursor:pointer;
+  transition:background .18s ease,color .18s ease,transform .18s ease,border-color .18s ease;
+}
+.top-nav-group .top-nav-trigger:hover,
+.top-nav-group:focus-within .top-nav-trigger,
+.top-nav-group.active .top-nav-trigger,
+.top-nav > .top-nav-link:hover,
+.top-nav > .top-nav-link.active{
+  background:rgba(255,255,255,.11);
+  color:#fff;
+}
+.top-nav-group.active .top-nav-trigger{
+  border-color:rgba(255,255,255,.16);
+}
+.top-nav-group .nav-icon,
+.top-nav > .top-nav-link .nav-icon{
+  width:22px;
+  height:22px;
+  display:grid;
+  place-items:center;
+  flex:0 0 auto;
+}
+.top-nav-group .nav-icon svg,
+.top-nav > .top-nav-link .nav-icon svg{
+  width:17px;
+  height:17px;
+}
+.nav-caret{
+  margin-left:1px;
+  font-size:.68rem;
+  line-height:1;
+  transition:transform .18s ease;
+}
+.top-nav-group:hover .nav-caret,
+.top-nav-group:focus-within .nav-caret{
+  transform:rotate(180deg);
+}
+.top-submenu{
+  position:absolute;
+  top:calc(100% + 7px);
+  left:0;
+  z-index:130;
+  min-width:205px;
+  padding:7px;
+  border:1px solid var(--sipb-line,#DFE7EF);
+  border-radius:13px;
+  background:var(--sipb-white,#fff);
+  box-shadow:0 18px 38px rgba(8,44,78,.18);
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transform:translateY(-6px);
+  transition:opacity .16s ease,transform .16s ease,visibility .16s ease;
+}
+.top-nav-group:hover .top-submenu,
+.top-nav-group:focus-within .top-submenu{
+  opacity:1;
+  visibility:visible;
+  pointer-events:auto;
+  transform:translateY(0);
+}
+.top-submenu a{
+  display:flex !important;
+  align-items:center;
+  justify-content:flex-start !important;
+  gap:9px !important;
+  width:100%;
+  min-height:38px !important;
+  margin:0 !important;
+  padding:8px 10px !important;
+  border:1px solid transparent !important;
+  border-radius:9px !important;
+  color:var(--sipb-text,#182B42) !important;
+  background:transparent !important;
+  box-shadow:none !important;
+  font-size:.65rem !important;
+  font-weight:760 !important;
+  text-decoration:none;
+  transform:none !important;
+}
+.top-submenu a:hover,
+.top-submenu a:focus-visible{
+  background:#EEF5FA !important;
+  color:var(--sipb-blue,#0B5CAB) !important;
+}
+.top-submenu a.active{
+  background:rgba(11,92,171,.10) !important;
+  color:var(--sipb-blue-dark,#083F78) !important;
+  border-color:rgba(11,92,171,.13) !important;
+}
+.top-submenu .nav-icon{
+  width:20px;
+  height:20px;
+}
+.top-submenu .nav-icon svg{
+  width:16px;
+  height:16px;
+}
+.top-nav-group:last-child .top-submenu{
+  left:auto;
+  right:0;
+}
+@media(max-width:1180px){
+  .top-nav-group .top-nav-trigger,
+  .top-nav > .top-nav-link{
+    padding:8px 8px;
+    font-size:.59rem;
+  }
+  .top-submenu{
+    min-width:195px;
+  }
+}
+@media(max-width:900px){
+  .top-nav-layout .top-nav{
+    overflow-x:auto;
+    overflow-y:visible;
+    align-items:flex-start;
+    padding-bottom:4px;
+  }
+  .top-nav-group .top-nav-trigger,
+  .top-nav > .top-nav-link{
+    min-height:38px;
+    padding:7px 9px;
+    font-size:.58rem;
+  }
+  .top-submenu{
+    top:calc(100% + 5px);
+    min-width:190px;
+  }
+}
+
+/* Keep the last-item remove control clickable and aligned on the same row. */
+.transaction-row{
+  grid-template-columns:minmax(240px,1fr) 140px minmax(110px,1.15fr) 42px;
+}
+.transaction-row .ki-barang{grid-column:1;grid-row:1}
+.transaction-row .ki-jumlah{grid-column:2;grid-row:1}
+.transaction-row .kuasi-hint{grid-column:3;grid-row:1;min-width:0}
+.transaction-row .remove-item{
+  grid-column:4;
+  grid-row:1;
+  width:42px;
+  min-width:42px;
+  min-height:39px;
+  display:grid;
+  place-items:center;
+  padding:0;
+  margin:0;
+  cursor:pointer;
+  position:relative;
+  z-index:2;
+}
+@media(max-width:760px){
+  .transaction-row{
+    grid-template-columns:minmax(0,1fr) 98px 42px;
+  }
+  .transaction-row .ki-barang{grid-column:1;grid-row:1}
+  .transaction-row .ki-jumlah{grid-column:2;grid-row:1}
+  .transaction-row .kuasi-hint{
+    grid-column:1 / -1;
+    grid-row:2;
+    min-height:18px;
+  }
+  .transaction-row .remove-item{
+    grid-column:3;
+    grid-row:1;
+  }
+}
+
+/* Dark-mode dropdown parity */
+:root[data-theme="dark"] .top-submenu{
+  background:#17232E;
+  border-color:#34495B;
+  box-shadow:0 18px 38px rgba(0,0,0,.34);
+}
+:root[data-theme="dark"] .top-submenu a{
+  color:#D8E4EE !important;
+}
+:root[data-theme="dark"] .top-submenu a:hover,
+:root[data-theme="dark"] .top-submenu a:focus-visible{
+  background:#1D3448 !important;
+  color:#8CC4F2 !important;
+}
+:root[data-theme="dark"] .top-submenu a.active{
+  background:#203B54 !important;
+  color:#9DCEEF !important;
+  border-color:#31536E !important;
+}
