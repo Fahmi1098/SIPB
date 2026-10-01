@@ -1,19 +1,15 @@
 (() => {
   const enhance = () => {
     if (!window.SIPBPrint) return;
-    document.querySelectorAll('.cancel-keluar').forEach(cancel => {
-      const id = Number(cancel.dataset.id);
-      const cell = cancel.parentElement;
-      if (!id || !cell || cell.querySelector('.sipb-row-print')) return;
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'btn-sm sipb-row-print';
-      b.textContent = 'Cetak';
-      b.onclick = () => window.SIPBPrint.transaction(id);
-      cell.insertBefore(b, cancel);
+    document.querySelectorAll('.sipb-inline-print').forEach(btn => {
+      if (btn.dataset.bound) return;
+      const id = Number(btn.dataset.id);
+      if (!id) return;
+      btn.dataset.bound = '1';
+      btn.onclick = () => window.SIPBPrint.transaction(id);
     });
   };
   const obs = new MutationObserver(enhance);
   obs.observe(document.body, {childList:true, subtree:true});
-  setTimeout(enhance, 800);
+  setTimeout(enhance, 300);
 })();
