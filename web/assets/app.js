@@ -439,24 +439,27 @@ async function kuasiPage(){
 }
 
 async function showKuasiDetail(id){
-  const [{data:batch,error:be},{data:history,error:he}]=await Promise.all([
+  const [{data:batch,error:be},{data:allocations,error:ae},{data:legacy,error:le}]=await Promise.all([
     client.from('stok_kuasi').select('id,barang_id,prefix_huruf,panjang_digit,digit_awal,digit_akhir,digit_sekarang,sisa_lembar,tanggal_masuk,nomor_dus,barang:barang_id(nama_barang,satuan,merk,tipe)').eq('id',id).single(),
-    client.from('detail_barang_keluar').select('id,jumlah,nomor_awal,nomor_akhir,nomor_dus,transaksi:transaksi_keluar_id(id,tanggal_keluar,penerima_nama,penerima_jabatan,tujuan_ruangan,status,jenis_dokumen)').order('id',{ascending:false}).limit(100)
+    client.from('transaksi_kuasi_alokasi').select('id,transaksi_keluar_id,detail_barang_keluar_id,jumlah,digit_awal,digit_akhir,created_at,transaksi:transaksi_keluar_id(id,tanggal_keluar,penerima_nama,penerima_jabatan,tujuan_ruangan,status,jenis_dokumen),detail:detail_barang_keluar_id(nomor_awal,nomor_akhir,nomor_dus)').eq('stok_kuasi_id',id).order('id',{ascending:false}),
+    client.from('detail_barang_keluar').select('id,jumlah,nomor_awal,nomor_akhir,nomor_dus,transaksi:transaksi_keluar_id(id,status)').eq('barang_id',id).limit(5000)
   ]);
-  if(be||he)throw(be||he);
+  if(be||ae||le)throw(be||ae||le);
   const pad=Number(batch.panjang_digit)||0,p=batch.prefix_huruf||'';
   const awal=p+String(batch.digit_awal).padStart(pad,'0'),akhir=p+String(batch.digit_akhir).padStart(pad,'0'),sekarang=p+String(batch.digit_sekarang).padStart(pad,'0');
-  const related=(history||[]).filter(r=>{
-    if(!r.transaksi||r.transaksi.status==='DIBATALKAN')return false;
-    const a=String(r.nomor_awal||''),b=String(r.nomor_akhir||'');
-    return String(r.nomor_dus||'')===String(batch.nomor_dus||'') || (a && (a===awal||a===sekarang||a===akhir||b===awal||b===sekarang||b===akhir));
-  });
+  const related=(allocations||[]).filter(r=>(r.transaksi?.status||'AKTIF')==='AKTIF');
+  const allocatedDetailIds=new Set((allocations||[]).map(r=>Number(r.detail_barang_keluar_id)));
+  const legacyUntracked=(legacy||[]).filter(r=>(r.transaksi?.status||'AKTIF')==='AKTIF'&&!allocatedDetailIds.has(Number(r.id)));
   const box=document.createElement('div');box.className='modal-backdrop';
   box.innerHTML='<div class="modal-card kuasi-detail-modal"><div class="modal-head"><div><span class="eyebrow">DETAIL BATCH KUASI</span><h2>'+esc(batch.barang?.nama_barang||'-')+'</h2><p>'+esc(batch.barang?.satuan||'')+' · '+esc(batch.barang?.merk||'-')+' / '+esc(batch.barang?.tipe||'-')+'</p></div><button class="modal-close" aria-label="Tutup">×</button></div>'+
   '<div class="kuasi-detail-summary"><div><small>Tanggal Masuk</small><strong>'+fmtDate(batch.tanggal_masuk)+'</strong></div><div><small>No. Dus</small><strong>'+esc(batch.nomor_dus||'-')+'</strong></div><div><small>Rentang</small><strong>'+esc(awal)+' → '+esc(akhir)+'</strong></div><div><small>Nomor Berikutnya</small><strong>'+esc(sekarang)+'</strong></div><div><small>Sisa Lembar</small><strong>'+batch.sisa_lembar+'</strong></div></div>'+
-  '<div class="alert-box"><strong>FIFO:</strong> sistem akan mengutamakan batch tertua untuk barang yang sama. Riwayat distribusi di bawah ditampilkan berdasarkan nomor dus/seri yang dapat dicocokkan.</div>'+
-  '<div class="section-head compact"><div><h3>Riwayat Distribusi Terkait</h3><p>'+related.length+' transaksi ditemukan.</p></div></div>'+
-  '<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Jumlah</th><th>Nomor</th><th>Penerima</th><th>Tujuan</th></tr></thead><tbody>'+(related.map(r=>'<tr><td>'+fmtDate(r.transaksi?.tanggal_keluar)+'</td><td>'+r.jumlah+'</td><td>'+esc(r.nomor_awal&&r.nomor_akhir?r.nomor_awal+' → '+r.nomor_akhir:r.nomor_awal||'-')+'</td><td>'+esc(r.transaksi?.penerima_nama||'-')+'</td><td>'+esc(r.transaksi?.tujuan_ruangan||'-')+'</td></tr>').join('')||emptyRow(5))+'</tbody></table></div></div>';
+  '<div class="alert-box"><strong>FIFO:</strong> histori di bawah diambil langsung dari <b>transaksi_kuasi_alokasi</b>, sehingga hubungan batch dan transaksi tidak lagi ditebak dari nomor dus/seri.</div>'+
+  '<div class="section-head compact"><div><h3>Riwayat Distribusi Batch</h3><p>'+related.length+' alokasi tercatat secara exact.</p></div></div>'+
+  '<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Transaksi</th><th>Jumlah</th><th>Nomor Seri</th><th>No. Dus</th><th>Penerima</th><th>Tujuan</th></tr></thead><tbody>'+
+  (related.map(r=>'<tr><td>'+fmtDate(r.transaksi?.tanggal_keluar)+'</td><td>#'+r.transaksi_keluar_id+'</td><td>'+r.jumlah+'</td><td>'+esc(r.detail?.nomor_awal&&r.detail?.nomor_akhir?r.detail.nomor_awal+' → '+r.detail.nomor_akhir:'-')+'</td><td>'+esc(r.detail?.nomor_dus||batch.nomor_dus||'-')+'</td><td>'+esc(r.transaksi?.penerima_nama||'-')+'</td><td>'+esc(r.transaksi?.tujuan_ruangan||'-')+'</td></tr>').join('')||emptyRow(7))+
+  '</tbody></table></div>'+
+  (legacyUntracked.length?'<div class="alert-box kuasi-legacy-warning"><strong>Catatan data lama:</strong> '+legacyUntracked.length+' detail Barang Keluar lama belum memiliki alokasi batch. Data tersebut tidak dimasukkan ke histori batch agar tidak menghasilkan hubungan yang keliru.</div>':'')+
+  '</div>';
   document.body.appendChild(box);
   enhanceTables(box);
   const close=()=>box.remove();
