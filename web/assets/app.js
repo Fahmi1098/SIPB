@@ -377,13 +377,18 @@ function showHistoryDetail(k){
   document.body.appendChild(box);enhanceTables(box);const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.onclick=e=>{if(e.target===box)close()};
 }
 const menu=[['dashboard','Dashboard'],['barang_masuk','Barang Masuk'],['barang_keluar','Barang Keluar'],['stock_opname','Stock Opname'],['barang','Master Barang'],['kategori','Kategori'],['pegawai','Pegawai'],['kartu','Kartu Persediaan'],['kuasi','Stok Kuasi'],['riwayat','Riwayat Transaksi'],['pengguna','Kelola Pengguna']];
-const topNavGroups=[
-  {key:'dashboard',label:'Dashboard',icon:'dashboard',items:[['dashboard','Dashboard']]},
-  {key:'barang',label:'Barang',icon:'barang',items:[['barang_masuk','Barang Masuk'],['barang_keluar','Barang Keluar'],['barang','Master Barang']]},
-  {key:'persediaan',label:'Persediaan',icon:'stock_opname',items:[['stock_opname','Stock Opname'],['kartu','Kartu Persediaan'],['kuasi','Stok Kuasi']]},
-  {key:'referensi',label:'Data Referensi',icon:'kategori',items:[['kategori','Kategori'],['pegawai','Pegawai']]},
-  {key:'laporan',label:'Laporan',icon:'riwayat',items:[['riwayat','Riwayat Transaksi']]},
-  {key:'admin',label:'Admin',icon:'pengguna',items:[['pengguna','Kelola Pengguna']],adminOnly:true}
+const topNavItems=[
+  ['dashboard','Dashboard','dashboard'],
+  ['barang_masuk','Barang Masuk','barang_masuk'],
+  ['barang_keluar','Barang Keluar','barang_keluar'],
+  ['stock_opname','Stock Opname','stock_opname'],
+  ['barang','Master Barang','barang'],
+  ['kategori','Kategori','kategori'],
+  ['pegawai','Pegawai','pegawai'],
+  ['kartu','Kartu Persediaan','kartu'],
+  ['kuasi','Stok Kuasi','kuasi'],
+  ['riwayat','Riwayat Transaksi','riwayat'],
+  ['pengguna','Kelola Pengguna','pengguna']
 ];
 async function renderApp(page='dashboard', restoreScrollY=null){
   const r=await client.auth.getSession();
@@ -393,7 +398,7 @@ async function renderApp(page='dashboard', restoreScrollY=null){
   document.documentElement.dataset.theme=uiTheme;
   root.innerHTML=`<div class="dashboard top-nav-layout"><main class="main"><header class="top">
     <div class="top-brand"><div class="top-brand-mark"><img src="${BANTEN_LOGO}" alt="Lambang Provinsi Banten"></div><div class="top-brand-copy"><strong>SIPB</strong><span>UPTD PPD Malingping</span></div></div>
-    <nav class="top-nav" aria-label="Navigasi utama">${topNavGroups.filter(g=>!g.adminOnly||profile?.role==='admin').map(g=>topNavGroup(g,page)).join('')}</nav>
+    <nav class="top-nav" aria-label="Navigasi utama">${topNavItems.filter(item=>item[0]!=='pengguna'||profile?.role==='admin').map(([key,label,icon])=>`<a href="#${key}" data-page="${key}" data-label="${label}" aria-label="${label}" title="${label}" class="top-nav-icon-link ${page===key?'active':''}"><span class="nav-icon">${navSvg(icon)}</span><span class="nav-label">${label}</span></a>`).join('')}</nav>
     <div class="top-title"><span>Administrasi Persediaan</span><h1>${menu.find(x=>x[0]===page)?.[1]||'Dashboard'}</h1></div>
     <div class="top-actions"><button class="theme-toggle" id="themeToggle" type="button" aria-label="Ubah tema"><span class="theme-icon">${uiTheme==='dark'?'☀':'☾'}</span><span>${uiTheme==='dark'?'Mode terang':'Mode gelap'}</span></button><span class="status-pill"><i></i> Sistem Online</span><button class="top-logout" id="logout" type="button" aria-label="Keluar">↪</button></div>
   </header><div id="content">${loading('Memuat data...')}</div></main></div>`;
@@ -420,16 +425,6 @@ async function renderApp(page='dashboard', restoreScrollY=null){
 }
 function navSvg(key){const p={dashboard:'<path d="m3 10 9-7 9 7"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-7h6v7"/>',barang_masuk:'<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',barang_keluar:'<path d="M12 21V9"/><path d="m7 14 5-5 5 5"/><path d="M5 3h14"/>',stock_opname:'<path d="m5 12 4 4L19 6"/><rect x="3" y="3" width="18" height="18" rx="3"/>',barang:'<path d="M4 6h16v14H4z"/><path d="M8 6V4h8v2"/><path d="M8 11h8"/><path d="M8 15h5"/>',kategori:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/>',pegawai:'<circle cx="12" cy="8" r="3.5"/><path d="M5 21c.8-3.7 3-5.5 7-5.5s6.2 1.8 7 5.5"/>',kartu:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/>',kuasi:'<path d="M6 4h12v16H6z"/><path d="M9 8h6M9 12h6M9 16h4"/>',riwayat:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',pengguna:'<circle cx="12" cy="8" r="3"/><path d="M5 21c1-3.3 3.3-5 7-5s6 1.7 7 5"/>'};return '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+(p[key]||p.dashboard)+'</svg>'}
 function navItem(m,page){return '<a href="#'+m[0]+'" data-page="'+m[0]+'" class="'+(page===m[0]?'active':'')+'"><span class="nav-icon">'+navSvg(m[0])+'</span><span>'+m[1]+'</span></a>'}
-function topNavGroup(group,page){
-  const active=group.items.some(m=>page===m[0]);
-  if(group.items.length===1){
-    const m=group.items[0];
-    return '<a href="#'+m[0]+'" data-page="'+m[0]+'" class="top-nav-link '+(active?'active':'')+'"><span class="nav-icon">'+navSvg(group.icon)+'</span><span>'+group.label+'</span></a>';
-  }
-  return '<div class="top-nav-group '+(active?'active':'')+'" data-top-group="'+group.key+'"><div class="top-nav-trigger" aria-hidden="true"><span class="nav-icon">'+navSvg(group.icon)+'</span><span>'+group.label+'</span><span class="nav-caret" aria-hidden="true">⌄</span></div><div class="top-submenu">'+
-    group.items.map(m=>'<a href="#'+m[0]+'" data-page="'+m[0]+'" class="'+(page===m[0]?'active':'')+'"><span class="nav-icon">'+navSvg(m[0])+'</span><span>'+m[1]+'</span></a>').join('')+
-    '</div></div>';
-}
 
 function renderDashboardCharts(){
   if(typeof Chart==='undefined')return;
