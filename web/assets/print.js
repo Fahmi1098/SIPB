@@ -49,14 +49,15 @@
       <meta name="viewport" content="width=device-width,initial-scale=1">
       <title>${esc(title)}</title>
       <style>
-        @page{size:${orientation==='folio'?'21.5cm 33cm':'A4 '+orientation};margin:0}
+        @page{size:A4 ${orientation};margin:0}
         @page landscape{size:A4 landscape;margin:0}
+        @page folio{size:21.5cm 33cm;margin:0}
         *{box-sizing:border-box}
         html,body{margin:0;padding:0}
         body{background:#eee;font-family:Arial,Helvetica,sans-serif;color:#111;font-size:12pt;line-height:1.45}
         .sheet{width:21cm;min-height:29.7cm;margin:0 auto;background:#fff;padding:1.2cm 2cm 2.5cm 3cm}
         .sheet.landscape{width:29.7cm;min-height:21cm;padding:1.2cm 2cm 2.5cm 2cm;page:landscape}
-        .sheet.folio{width:21.5cm;min-height:33cm;padding:1.35cm 1.5cm 2.5cm 2cm}
+        .sheet.folio{width:21.5cm;min-height:33cm;padding:1.35cm 1.5cm 2.5cm 2cm;page:folio}
         .sheet + .sheet{break-before:page}
         .toolbar{position:fixed;right:18px;bottom:18px;z-index:10}
         .toolbar button{border:0;border-radius:8px;padding:10px 16px;background:#0b5cab;color:#fff;font-weight:700;cursor:pointer}
