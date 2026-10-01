@@ -1,4 +1,4 @@
--- Migration 017: deterministic lock order for multi-item outgoing transactions
+-- Migration 020: validate every outgoing item before aggregation
 -- Prevent concurrent Barang Keluar calls from acquiring barang locks in different orders.
 
 CREATE OR REPLACE FUNCTION public.record_barang_keluar(
@@ -52,7 +52,7 @@ BEGIN
     RAISE EXCEPTION 'Minimal satu barang harus dipilih';
   END IF;
 
-  -- Validate each raw item before aggregation.
+  -- Validate every raw line before aggregation.
   IF EXISTS (
     SELECT 1
     FROM jsonb_array_elements(p_items) AS x
