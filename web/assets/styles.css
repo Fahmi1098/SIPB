@@ -3990,3 +3990,16 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
   color:var(--blue-700) !important;
 }
 .kartu-detail-card{border-top-color:var(--blue-700) !important}
+
+/* FINAL: when one submenu is pinned by click, prevent any other hover submenu from opening. */
+.top-nav:has(.top-nav-group.pinned) .top-nav-group:not(.pinned):hover .top-submenu,
+.top-nav:has(.top-nav-group.pinned) .top-nav-group:not(.pinned):focus-within .top-submenu{
+  opacity:0 !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+  transform:translateY(-6px) !important;
+}
+.top-nav:has(.top-nav-group.pinned) .top-nav-group:not(.pinned):hover .top-nav-trigger{
+  background:transparent !important;
+  color:rgba(255,255,255,.80) !important;
+}
