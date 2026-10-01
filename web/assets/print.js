@@ -36,35 +36,65 @@
         @page{size:A4 ${orientation};margin:0}
         @page landscape{size:A4 landscape;margin:0}
         *{box-sizing:border-box}
-        body{margin:0;background:#eee;font-family:"Times New Roman",serif;color:#111}
-        .sheet{width:21cm;min-height:29.7cm;margin:12px auto;background:#fff;padding:1.35cm 1.6cm}
-        .sheet.landscape{width:29.7cm;min-height:21cm;page:landscape}
+        html,body{margin:0;padding:0}
+        body{background:#eee;font-family:Arial,Helvetica,sans-serif;color:#111;font-size:12pt;line-height:1.45}
+        .sheet{width:21cm;min-height:29.7cm;margin:0 auto;background:#fff;padding:1.2cm 2cm 2.5cm 3cm}
+        .sheet.landscape{width:29.7cm;min-height:21cm;padding:1.2cm 2cm 2.5cm 2cm;page:landscape}
         .sheet + .sheet{break-before:page}
         .toolbar{position:fixed;right:18px;bottom:18px;z-index:10}
         .toolbar button{border:0;border-radius:8px;padding:10px 16px;background:#0b5cab;color:#fff;font-weight:700;cursor:pointer}
-        .kop{width:100%;border-collapse:collapse;margin-bottom:5px}
+        .kop{width:100%;border-collapse:collapse;margin:0 0 8px}
         .kop td{vertical-align:middle}
-        .logo{width:78px;height:auto}
-        .kop-text{text-align:center}
-        .kop-text h4,.kop-text h3,.kop-text h2{margin:0;line-height:1.15}
-        .kop-text h4{font-size:13pt}.kop-text h3{font-size:15pt}.kop-text h2{font-size:13pt;margin-top:4px}
-        .alamat{font-size:9.5pt;margin:5px 0 0;line-height:1.25}
-        .line{border-bottom:3px solid #111;margin:7px 0 18px}
-        .title{text-align:center;font-size:14pt;font-weight:700;text-decoration:underline;margin:0 0 18px}
+        .kop-logo-cell{width:15%;text-align:center;padding-right:4px}
+        .kop-text{width:85%;text-align:center;padding:0}
+        .logo{width:2.15cm;height:auto;display:block;margin:0 auto}
+        .kop-text h4,.kop-text h3,.kop-text h2{margin:0;text-align:center;line-height:1.1;font-family:Arial,Helvetica,sans-serif}
+        .kop-text h4{font-size:11.5pt;font-weight:400}
+        .kop-text h3{font-size:15.3pt;font-weight:700}
+        .kop-text h2{font-size:12.5pt;font-weight:700;margin-top:2px}
+        .kop .alamat{display:block;width:100%;font-size:9.5pt;font-weight:400;line-height:1.2;margin:4px 0 0;text-align:center !important}
+        .line{border-bottom:3px solid #111;margin:6px 0 18px}
+        .line.thin{border-bottom-width:1.5px;margin:4px 0 14px}
+        .title{text-align:center;font-size:13pt;font-weight:700;text-decoration:underline;margin:0 0 15px}
         .title.no-underline{text-decoration:none}
-        .meta{width:100%;border-collapse:collapse;font-size:11pt;margin-bottom:10px}
-        .meta td{padding:2px 0;vertical-align:top}
-        .meta td:first-child{width:18%}.meta td:nth-child(2){width:2%}
-        p{font-size:11pt;line-height:1.5;text-align:justify}
-        table.data{width:100%;border-collapse:collapse;margin:12px 0 18px}
-        .data th,.data td{border:1px solid #111;padding:5px 6px;font-size:9.5pt}
-        .data th{text-align:center;background:#f2f2f2}.data td.center{text-align:center}.data td.right{text-align:right}
-        .sign{width:100%;border-collapse:collapse;margin-top:42px;text-align:center}
-        .sign td{border:0;width:50%;vertical-align:top;font-size:11pt}
-        .space{height:78px}.name{font-weight:700;text-decoration:underline}
-        .note{font-size:9pt;color:#555;margin-top:8px}
-        .status{display:inline-block;padding:3px 8px;border:1px solid #888;border-radius:4px;font-size:9pt;font-weight:700}
-        @media print{body{background:#fff}.sheet{margin:0;box-shadow:none;width:100%;min-height:auto}.toolbar{display:none}}
+        .meta{width:100%;border-collapse:collapse;font-size:12pt;margin-bottom:10px}
+        .meta td{padding:1px 0;vertical-align:top;text-align:left}
+        .meta td:first-child{width:17%}.meta td:nth-child(2){width:2%}
+        .meta td:nth-child(3){width:81%}
+        .meta-tight td:first-child{width:16%}.meta-tight td:nth-child(2){width:2%}.meta-tight td:nth-child(3){width:82%}
+        p{font-size:12pt;line-height:1.5;text-align:justify;margin:0 0 10px}
+        .intro{text-align:justify;text-indent:0}
+        table.data{width:100%;border-collapse:collapse;margin:10px 0 15px;page-break-inside:auto}
+        .data th,.data td{border:1px solid #111;padding:5px 6px;font-size:10.5pt;vertical-align:middle}
+        .data th{text-align:center;background:#fff;font-weight:700}
+        .data td.center{text-align:center}.data td.right{text-align:right}.data td.left{text-align:left}
+        .data thead{display:table-header-group}
+        .data tfoot{display:table-row-group}
+        .sign{width:100%;border-collapse:collapse;margin-top:32px;text-align:center}
+        .sign td{border:0;width:50%;vertical-align:top;font-size:12pt}
+        .sign-3 td{width:33.333%}
+        .sign-left td{text-align:left}
+        .space{height:82px}
+        .space-sm{height:56px}
+        .name{font-weight:700;text-decoration:underline}
+        .note{font-size:9.5pt;color:#444;margin-top:8px;text-align:left}
+        .status{display:inline-block;padding:2px 7px;border:1px solid #777;border-radius:3px;font-size:10pt;font-weight:700;margin-bottom:6px}
+        .form-label{font-weight:700}
+        .bend-head{width:100%;border-collapse:collapse;margin-bottom:8px}
+        .bend-head td{vertical-align:top;font-size:11pt}
+        .bend-title{font-size:13pt;font-weight:700;line-height:1.2}
+        .bend-subtitle{font-size:12pt;font-weight:700;text-transform:uppercase}
+        .bend-model{width:30%;border-collapse:collapse;margin-left:auto}
+        .bend-model td,.bend-model th{border:1px solid #111;padding:5px 6px;font-size:10.5pt}
+        .bend-model th{text-align:center}
+        .bend-model td:first-child{width:38%}
+        .small{font-size:10pt}
+        .terbilang{text-transform:capitalize}
+        @media print{
+          body{background:#fff}
+          .sheet,.sheet.landscape{margin:0;box-shadow:none;width:100%;min-height:auto}
+          .toolbar{display:none}
+        }
       </style></head><body>
       <div class="toolbar"><button onclick="window.print()">Cetak Dokumen</button></div>
       ${body}
@@ -108,18 +138,39 @@
   function kop() {
     const logo = new URL('assets/logo_banten.png', location.href).href;
     return `<table class="kop"><tr>
-      <td style="width:15%;text-align:center"><img class="logo" src="${logo}" alt="Logo Banten"></td>
-      <td style="width:70%" class="kop-text">
+      <td class="kop-logo-cell"><img class="logo" src="${logo}" alt="Lambang Daerah Provinsi Banten"></td>
+      <td class="kop-text">
         <h4>PEMERINTAH PROVINSI BANTEN</h4>
         <h3>BADAN PENDAPATAN DAERAH</h3>
         <h2>UPTD PENGELOLAAN PENDAPATAN DAERAH MALINGPING</h2>
-        <p class="alamat">Jl. Baru Simpang - Beyeh Kec. Malingping<br>
-        Email samsat.malingping.official@gmail.com Kode Pos. 42391</p>
-      </td><td style="width:15%"></td>
+        <div class="alamat">Jl. Baru Simpang - Beyeh Kec. Malingping, Kabupaten Lebak, Banten 42391<br>
+        Email samsat.malingping.official@gmail.com &nbsp;|&nbsp; Kode Pos 42391</div>
+      </td>
     </tr></table><div class="line"></div>`;
   }
 
-  function serial(d) {
+
+  function terbilang(n) {
+    n = Math.floor(Math.abs(Number(n)||0));
+    const angka=['','satu','dua','tiga','empat','lima','enam','tujuh','delapan','sembilan','sepuluh','sebelas'];
+    if(n<12)return angka[n];
+    if(n<20)return terbilang(n-10)+' belas';
+    if(n<100)return terbilang(Math.floor(n/10))+' puluh'+(n%10?' '+terbilang(n%10):'');
+    if(n<200)return 'seratus'+(n%100?' '+terbilang(n-100):'');
+    if(n<1000)return terbilang(Math.floor(n/100))+' ratus'+(n%100?' '+terbilang(n%100):'');
+    if(n<2000)return 'seribu'+(n%1000?' '+terbilang(n-1000):'');
+    if(n<1000000)return terbilang(Math.floor(n/1000))+' ribu'+(n%1000?' '+terbilang(n%1000):'');
+    if(n<1000000000)return terbilang(Math.floor(n/1000000))+' juta'+(n%1000000?' '+terbilang(n%1000000):'');
+    if(n<1000000000000)return terbilang(Math.floor(n/1000000000))+' miliar'+(n%1000000000?' '+terbilang(n%1000000000):'');
+    return terbilang(Math.floor(n/1000000000000))+' triliun'+(n%1000000000000?' '+terbilang(n%1000000000000):'');
+  }
+
+  function terbilangRupiah(n) {
+    const v=Math.floor(Math.abs(Number(n)||0));
+    return (v===0?'nol':terbilang(v))+' rupiah';
+  }
+
+  function serial(d) {  function serial(d) {
     if (d.nomor_awal && d.nomor_akhir) return esc(d.nomor_awal)+' → '+esc(d.nomor_akhir);
     return d.nomor_dus ? 'Dus '+esc(d.nomor_dus) : '-';
   }
@@ -152,46 +203,79 @@
 
       const nota=`<section class="sheet">${kop()}
         <div class="title no-underline">NOTA DINAS</div>
-        <table class="meta">
-          <tr><td>Kepada</td><td>:</td><td>Yth. ${esc(kepala?.jabatan||'Kepala UPTD PPD Malingping')}</td></tr>
+        <table class="meta meta-tight">
+          <tr><td>Yth.</td><td>:</td><td>${esc(kepala?.jabatan||'Kepala UPTD PPD Malingping')}</td></tr>
           <tr><td>Dari</td><td>:</td><td>${esc(fromJob)}</td></tr>
-          <tr><td>Nomor</td><td>:</td><td>000.2.3.1/${no}/UPTD.PPD.MLP/${new Date(head.tanggal_keluar).getFullYear()}</td></tr>
+          <tr><td>Tembusan</td><td>:</td><td>-</td></tr>
           <tr><td>Tanggal</td><td>:</td><td>${dateText(head.tanggal_keluar)}</td></tr>
-          <tr><td>Lampiran</td><td>:</td><td>1 (satu) Lembar</td></tr>
+          <tr><td>Nomor</td><td>:</td><td>000.2.3.1/${no}/UPTD.PPD.MLP/${new Date(head.tanggal_keluar).getFullYear()}</td></tr>
+          <tr><td>Sifat</td><td>:</td><td>Biasa</td></tr>
+          <tr><td>Lampiran</td><td>:</td><td>1 (satu) lembar</td></tr>
           <tr><td>Hal</td><td>:</td><td>Permintaan Barang Habis Pakai</td></tr>
-        </table><div class="line" style="border-width:1.5px;margin-bottom:15px"></div>
+        </table>
+        <div class="line thin"></div>
         ${statusMark}
-        <p>Sehubungan dengan kebutuhan barang habis pakai pada <b>${esc(head.tujuan_ruangan||'Umum')}</b>, disampaikan rincian kebutuhan sebagai berikut:</p>
-        <table class="data"><thead><tr><th>NO</th><th>NAMA BARANG</th><th>JUMLAH</th><th>SATUAN</th><th>KETERANGAN</th></tr></thead>
+        <p class="intro">Sehubungan dengan kebutuhan barang habis pakai untuk mendukung kelancaran pelaksanaan tugas pada <b>${esc(head.tujuan_ruangan||'Umum')}</b>, dengan ini disampaikan permintaan barang sebagai berikut:</p>
+        <table class="data"><thead><tr><th style="width:7%">NO</th><th>NAMA BARANG</th><th style="width:15%">JUMLAH</th><th style="width:15%">SATUAN</th><th>KETERANGAN</th></tr></thead>
         <tbody>${details.map((d,i)=>`<tr><td class="center">${i+1}</td><td>${esc(d.barang?.nama_barang||'-')}</td><td class="center">${d.jumlah}</td><td class="center">${esc(d.barang?.satuan||'-')}</td><td>${serial(d)}</td></tr>`).join('')}</tbody></table>
-        <p>Demikian disampaikan, atas perhatian dan kebijaksanaannya diucapkan terima kasih.</p>
-        <table class="sign"><tr><td></td><td>${esc(receiverJob)}</td></tr><tr><td></td><td class="space"></td></tr>
-        <tr><td></td><td><span class="name">${esc(receiver.toUpperCase())}</span><br>NIP. ${esc(head.penerima_nip||'-')}</td></tr></table>
+        <p>Demikian Nota Dinas ini disampaikan untuk dapat dipergunakan sebagaimana mestinya. Atas perhatian dan tindak lanjutnya, diucapkan terima kasih.</p>
+        <table class="sign"><tr><td></td><td>${esc(fromJob)}</td></tr><tr><td></td><td class="space"></td></tr>
+        <tr><td></td><td><span class="name">${esc(from.toUpperCase())}</span><br>NIP. ${esc(head.penyerah_nip||'-')}</td></tr></table>
       </section>`;
 
+
       const bastRegular=regular.length?`<section class="sheet">${kop()}
-        <div class="title">BERITA ACARA SERAH TERIMA BARANG</div>${statusMark}
-        <p>Pada tanggal <b>${dateText(head.tanggal_keluar)}</b>, telah dilakukan serah terima barang habis pakai dari Pengurus Barang kepada <b>${esc(head.tujuan_ruangan||'Umum')}</b> berupa barang-barang sebagai berikut:</p>
-        <table class="data"><thead><tr><th>NO</th><th>NAMA BARANG</th><th>MEREK / TIPE</th><th>JUMLAH</th><th>SATUAN</th><th>KETERANGAN</th></tr></thead>
+        <div class="title">BERITA ACARA SERAH TERIMA BARANG</div>
+        <div class="title" style="font-size:11pt;margin-top:-8px">NOMOR: 000.2.3.1/${no}/BAST/UPTD.PPD.MLP/${new Date(head.tanggal_keluar).getFullYear()}</div>
+        ${statusMark}
+        <p>Pada hari ini, tanggal <b>${dateText(head.tanggal_keluar)}</b>, telah dilaksanakan serah terima barang habis pakai dari <b>${esc(from)}</b> selaku Pengurus Barang kepada <b>${esc(receiver)}</b> selaku penerima barang pada ${esc(head.tujuan_ruangan||'Unit Kerja/ Ruangan')}.</p>
+        <p>Adapun barang yang diserahterimakan adalah sebagai berikut:</p>
+        <table class="data"><thead><tr><th style="width:7%">NO</th><th>NAMA BARANG</th><th>MEREK / TIPE</th><th style="width:13%">JUMLAH</th><th style="width:13%">SATUAN</th><th>KETERANGAN</th></tr></thead>
         <tbody>${rows(regular)}</tbody></table>
-        <p>Barang-barang tersebut diserahkan dalam kondisi baik dan siap digunakan sesuai kebutuhan operasional. Demikian Berita Acara Serah Terima Barang ini dibuat untuk digunakan sebagaimana mestinya.</p>
-        <table class="sign"><tr><td>Yang Menyerahkan,</td><td>Yang Menerima,</td></tr><tr><td class="space"></td><td class="space"></td></tr>
-        <tr><td><span class="name">${esc(from.toUpperCase())}</span><br>NIP. ${esc(head.penyerah_nip||'-')}</td><td><span class="name">${esc(receiver.toUpperCase())}</span><br>NIP. ${esc(head.penerima_nip||'-')}</td></tr></table>
-      </section>`:''; 
+        <p>Barang tersebut telah diterima dalam keadaan baik dan selanjutnya menjadi tanggung jawab penerima sesuai peruntukannya. Berita Acara Serah Terima Barang ini dibuat dengan sebenarnya untuk dipergunakan sebagaimana mestinya.</p>
+        <table class="sign sign-3"><tr><td>Yang Menyerahkan,</td><td>Yang Menerima,</td><td>Mengetahui/Mengesahkan,</td></tr>
+        <tr><td class="space"></td><td class="space"></td><td class="space"></td></tr>
+        <tr><td><span class="name">${esc(from.toUpperCase())}</span><br>NIP. ${esc(head.penyerah_nip||'-')}<br>${esc(fromJob)}</td>
+        <td><span class="name">${esc(receiver.toUpperCase())}</span><br>NIP. ${esc(head.penerima_nip||'-')}<br>${esc(receiverJob)}</td>
+        <td><span class="name">${esc((kepala?.nama_pegawai||'-').toUpperCase())}</span><br>NIP. ${esc(kepala?.nip||'-')}<br>${esc(kepala?.jabatan||'Kepala UPTD PPD Malingping')}</td></tr></table>
+      </section>`:'';
+
 
       const bastKuasi=kuasi.length?`<section class="sheet">${kop()}
-        <div class="title">BERITA ACARA SERAH TERIMA BARANG<br>BARANG BERSERI / KUASI</div>${statusMark}
-        <p>Pada tanggal <b>${dateText(head.tanggal_keluar)}</b>, telah dilakukan serah terima barang berseri kepada <b>${esc(head.tujuan_ruangan||'Umum')}</b> dengan rincian sebagai berikut:</p>
-        <table class="data"><thead><tr><th>NO</th><th>NAMA BARANG</th><th>JUMLAH</th><th>SATUAN</th><th>NOMOR / DUS</th></tr></thead>
+        <div class="title">BERITA ACARA SERAH TERIMA BARANG</div>
+        <div class="title" style="font-size:11pt;margin-top:-8px">BARANG BERSERI / KUASI</div>
+        <div class="title" style="font-size:11pt;margin-top:-8px">NOMOR: 000.2.3.1/${no}/BAST-K/UPTD.PPD.MLP/${new Date(head.tanggal_keluar).getFullYear()}</div>
+        ${statusMark}
+        <p>Pada hari ini, tanggal <b>${dateText(head.tanggal_keluar)}</b>, telah dilaksanakan serah terima barang berseri/kuasi dari <b>${esc(from)}</b> selaku Pengurus Barang kepada <b>${esc(receiver)}</b> selaku penerima barang pada ${esc(head.tujuan_ruangan||'Unit Kerja/ Ruangan')}.</p>
+        <p>Rincian barang berseri/kuasi yang diserahterimakan:</p>
+        <table class="data"><thead><tr><th style="width:7%">NO</th><th>NAMA BARANG</th><th style="width:14%">JUMLAH</th><th style="width:14%">SATUAN</th><th>NOMOR SERI / DUS</th></tr></thead>
         <tbody>${kuasi.map((d,i)=>`<tr><td class="center">${i+1}</td><td>${esc(d.barang?.nama_barang||'-')}</td><td class="center">${d.jumlah}</td><td class="center">${esc(d.barang?.satuan||'-')}</td><td>${serial(d)}</td></tr>`).join('')}</tbody></table>
-        <p>Dokumen ini mencatat rincian barang berseri yang diserahkan dan menjadi bagian dari administrasi persediaan SIPB.</p>
-        <table class="sign"><tr><td>Yang Menyerahkan,</td><td>Yang Menerima,</td></tr><tr><td class="space"></td><td class="space"></td></tr>
-        <tr><td><span class="name">${esc(from.toUpperCase())}</span><br>NIP. ${esc(head.penyerah_nip||'-')}</td><td><span class="name">${esc(receiver.toUpperCase())}</span><br>NIP. ${esc(head.penerima_nip||'-')}</td></tr></table>
-      </section>`:''; 
+        <p>Barang berseri/kuasi tersebut telah diterima dalam keadaan baik dan dicatat sebagai bagian dari administrasi persediaan SIPB. Berita Acara ini dibuat dengan sebenarnya untuk dipergunakan sebagaimana mestinya.</p>
+        <table class="sign sign-3"><tr><td>Yang Menyerahkan,</td><td>Yang Menerima,</td><td>Mengetahui/Mengesahkan,</td></tr>
+        <tr><td class="space"></td><td class="space"></td><td class="space"></td></tr>
+        <tr><td><span class="name">${esc(from.toUpperCase())}</span><br>NIP. ${esc(head.penyerah_nip||'-')}<br>${esc(fromJob)}</td>
+        <td><span class="name">${esc(receiver.toUpperCase())}</span><br>NIP. ${esc(head.penerima_nip||'-')}<br>${esc(receiverJob)}</td>
+        <td><span class="name">${esc((kepala?.nama_pegawai||'-').toUpperCase())}</span><br>NIP. ${esc(kepala?.nip||'-')}<br>${esc(kepala?.jabatan||'Kepala UPTD PPD Malingping')}</td></tr></table>
+      </section>`:'';
+
 
       const total=details.reduce((sum,d)=>sum+Number(d.jumlah||0)*Number(d.barang?.harga_terakhir||0),0);
       const bendRows=details.map((d,i)=>{const price=Number(d.barang?.harga_terakhir||0);const qty=Number(d.jumlah||0);return '<tr><td class="center">'+(i+1)+'</td><td>'+esc(d.barang?.nama_barang||'-')+'</td><td>'+esc(d.nomor_awal||'-')+'</td><td class="center">'+qty+'</td><td class="center">'+esc(d.barang?.satuan||'-')+'</td><td class="right">'+(price?rupiah(price):'-')+'</td><td class="right">'+(price?rupiah(price*qty):'-')+'</td></tr>'}).join('');
-      const bend29='<section class="sheet landscape">'+kop()+'<table class="meta"><tr><td style="width:65%">BUKTI BARANG DARI DAERAH/UNIT<br><b>UPTD PPD Malingping</b><br>KEPADA DAERAH/UNIT/SAMSAT/GERAI/UPT<br><b>'+esc(head.tujuan_ruangan||'-')+'</b></td><td><table class="data" style="margin:0"><tr><th>MODEL</th><th>BEND 29</th></tr><tr><td>NOMOR</td><td>'+no+'/UPTD.PPD.MLP/'+String(new Date(head.tanggal_keluar).getMonth()+1).padStart(2,'0')+'/'+new Date(head.tanggal_keluar).getFullYear()+'</td></tr><tr><td>BULAN</td><td>'+dateText(head.tanggal_keluar)+'</td></tr></table></td></tr></table><table class="data"><thead><tr><th>NO</th><th>BARANG DITERIMA DARI GUDANG</th><th>NOMOR RATOR</th><th>JUMLAH</th><th>SATUAN</th><th>HARGA SATUAN</th><th>JUMLAH HARGA</th></tr></thead><tbody>'+bendRows+'</tbody><tfoot><tr><th colspan="6" class="right">TOTAL KESELURUHAN (Rp)</th><th class="right">'+rupiah(total)+'</th></tr></tfoot></table><table class="sign"><tr><td></td><td></td><td>Malingping, '+dateText(head.tanggal_keluar)+'</td></tr><tr><td>Yang Menerima<br>'+esc(receiverJob)+'</td><td>Mengetahui,<br>'+esc(kepala?.jabatan||'Kepala UPTD PPD Malingping')+'</td><td>Yang Menyerahkan<br>Pengurus Barang</td></tr><tr><td class="space"></td><td class="space"></td><td class="space"></td></tr><tr><td><span class="name">'+esc(receiver.toUpperCase())+'</span><br>NIP. '+esc(head.penerima_nip||'-')+'</td><td><span class="name">'+esc((kepala?.nama_pegawai||'-').toUpperCase())+'</span><br>NIP. '+esc(kepala?.nip||'-')+'</td><td><span class="name">'+esc(from.toUpperCase())+'</span><br>NIP. '+esc(head.penyerah_nip||'-')+'</td></tr></table></section>';
+      const total=details.reduce((sum,d)=>sum+Number(d.jumlah||0)*Number(d.barang?.harga_terakhir||0),0);
+      const bendRows=details.map((d,i)=>{
+        const price=Number(d.barang?.harga_terakhir||0);
+        const qty=Number(d.jumlah||0);
+        const totalRow=price*qty;
+        return '<tr><td class="center">'+(i+1)+'</td><td>'+esc(d.barang?.nama_barang||'-')+'</td><td class="center">'+esc(d.barang?.satuan||'-')+'</td><td class="right">'+qty+'</td><td class="center terbilang">'+esc(terbilang(qty))+'</td><td class="right">'+(price?rupiah(price):'-')+'</td><td class="right">'+(totalRow?rupiah(totalRow):'-')+'</td></tr>'
+      }).join('');
+      const bend29='<section class="sheet landscape">'+kop()+
+        '<table class="bend-head"><tr><td style="width:68%"><div class="bend-title">BUKTI BARANG DARI GUDANG PEMERINTAH DAERAH</div><div class="bend-subtitle">KEPADA DAERAH / UNIT / SAMSAT / GERAI / UPT</div><div style="margin-top:4px">Kepada Unit/Ruangan: <b>'+esc(head.tujuan_ruangan||'-')+'</b></div></td><td style="width:32%"><table class="bend-model"><tr><th colspan="2">MODEL BEND 29</th></tr><tr><td>Nomor</td><td>'+no+'/BEND29/UPTD.PPD.MLP/'+String(new Date(head.tanggal_keluar).getFullYear())+'</td></tr><tr><td>Tanggal</td><td>'+dateText(head.tanggal_keluar)+'</td></tr></table></td></tr></table>'+
+        '<table class="data"><thead><tr><th style="width:6%">NO</th><th>BARANG DITERIMA DARI GUDANG</th><th style="width:13%">SATUAN</th><th style="width:11%">JUMLAH<br>ANGKA</th><th style="width:18%">JUMLAH<br>HURUF</th><th style="width:15%">HARGA SATUAN</th><th style="width:17%">JUMLAH HARGA</th></tr></thead><tbody>'+bendRows+'</tbody><tfoot><tr><th colspan="6" class="right">TOTAL</th><th class="right">'+rupiah(total)+'</th></tr></tfoot></table>'+
+        '<p class="small">Terbilang nilai barang: <b class="terbilang">'+esc(terbilangRupiah(total))+'</b>.</p>'+
+        '<table class="sign sign-3"><tr><td>Yang Menerima,</td><td>Pengurus Barang,</td><td>Mengetahui/Mengesahkan,<br>Kepala UPTD PPD Malingping</td></tr><tr><td class="space-sm"></td><td class="space-sm"></td><td class="space-sm"></td></tr><tr><td><span class="name">'+esc(receiver.toUpperCase())+'</span><br>NIP. '+esc(head.penerima_nip||'-')+'<br>'+esc(receiverJob)+'</td><td><span class="name">'+esc(from.toUpperCase())+'</span><br>NIP. '+esc(head.penyerah_nip||'-')+'<br>'+esc(fromJob)+'</td><td><span class="name">'+esc((kepala?.nama_pegawai||'-').toUpperCase())+'</span><br>NIP. '+esc(kepala?.nip||'-')+'</td></tr></table>'+
+        '<p class="small" style="margin-top:8px">Rangkap 3 (tiga).</p>'+
+      '</section>';
+
       openPrint('Dokumen Barang Keluar #'+id,nota+bastRegular+bastKuasi+bend29,'portrait',printWindow);
     } catch(e) {
       try { printWindow.close(); } catch (_) {}
