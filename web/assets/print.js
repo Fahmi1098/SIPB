@@ -49,13 +49,14 @@
       <meta name="viewport" content="width=device-width,initial-scale=1">
       <title>${esc(title)}</title>
       <style>
-        @page{size:A4 ${orientation};margin:0}
+        @page{size:${orientation==='folio'?'21.5cm 33cm':'A4 '+orientation};margin:0}
         @page landscape{size:A4 landscape;margin:0}
         *{box-sizing:border-box}
         html,body{margin:0;padding:0}
         body{background:#eee;font-family:Arial,Helvetica,sans-serif;color:#111;font-size:12pt;line-height:1.45}
         .sheet{width:21cm;min-height:29.7cm;margin:0 auto;background:#fff;padding:1.2cm 2cm 2.5cm 3cm}
         .sheet.landscape{width:29.7cm;min-height:21cm;padding:1.2cm 2cm 2.5cm 2cm;page:landscape}
+        .sheet.folio{width:21.5cm;min-height:33cm;padding:1.35cm 1.5cm 2.5cm 2cm}
         .sheet + .sheet{break-before:page}
         .toolbar{position:fixed;right:18px;bottom:18px;z-index:10}
         .toolbar button{border:0;border-radius:8px;padding:10px 16px;background:#0b5cab;color:#fff;font-weight:700;cursor:pointer}
@@ -113,7 +114,7 @@
         .terbilang{text-transform:capitalize}
         @media print{
           body{background:#fff}
-          .sheet,.sheet.landscape{margin:0;box-shadow:none;width:100%;min-height:auto}
+          .sheet,.sheet.landscape,.sheet.folio{margin:0;box-shadow:none;width:100%;min-height:auto}
           .toolbar{display:none}
         }
       </style></head><body>
@@ -304,7 +305,7 @@
         const totalRow=price*qty;
         return '<tr><td class="center">'+(i+1)+'</td><td>'+esc(d.barang?.nama_barang||'-')+'</td><td class="center">'+esc(d.barang?.satuan||'-')+'</td><td class="right">'+qty+'</td><td class="center terbilang">'+esc(terbilang(qty))+'</td><td class="right">'+(price?rupiah(price):'-')+'</td><td class="right">'+(totalRow?rupiah(totalRow):'-')+'</td></tr>'
       }).join('');
-      const bend29=`<section class='sheet landscape'>${kop()}
+      const bend29=`<section class='sheet folio'>${kop()}
         <table class='bend-head'>
           <tr>
             <td style='width:67%'>
