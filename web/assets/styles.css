@@ -5748,3 +5748,17 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
 .top-nav-layout .top-nav-icon-link[data-label="Laporan Persediaan"]:focus-visible::after{
   max-width:132px !important;
 }
+/* FINAL FIX 20261002-25 — never clip Laporan Persediaan label */
+.top-nav-layout .top-nav-icon-link[data-label="Laporan Persediaan"]:hover,
+.top-nav-layout .top-nav-icon-link[data-label="Laporan Persediaan"]:focus-visible{
+  width:205px !important;
+  min-width:205px !important;
+  overflow:visible !important;
+}
+.top-nav-layout .top-nav-icon-link[data-label="Laporan Persediaan"]:hover::after,
+.top-nav-layout .top-nav-icon-link[data-label="Laporan Persediaan"]:focus-visible::after{
+  max-width:none !important;
+  width:max-content !important;
+  overflow:visible !important;
+  white-space:nowrap !important;
+}
