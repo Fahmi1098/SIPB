@@ -227,12 +227,12 @@ async function barangMasukPage(){const [{data:rows,error},{data:items,error:ie},
 async function barangMasukForm(){
   const canCreate=profile?.role==='admin';
   const [{data:items,error},{data:kats,error:ke}]=await Promise.all([
-    client.from('barang').select('id,nama_barang,satuan,kategori_id,kategori:kategori_id(nama_kategori)').order('nama_barang'),
+    client.from('barang').select('id,nama_barang,satuan,kategori_id,tipe,merk,kategori:kategori_id(id,nama_kategori)').order('nama_barang'),
     client.from('kategori').select('*').order('nama_kategori')
   ]);
   if(error||ke)throw(error||ke);
   return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PENERIMAAN</span><h2>Rekam Barang Masuk</h2><p>Stok, transaksi penerimaan, dan batch Kuasi disimpan atomik dalam satu transaksi database.</p></div><button class="ghost" id="backMasuk">← Kembali</button></div><div class="form-grid">
-  <label>Barang yang sudah ada <select id="m_barang">${canCreate?'<option value="">＋ Barang baru</option>':''}${items.map(x=>`<option value="${x.id}" data-kuasi="${String(x.kategori?.nama_kategori||'').toLowerCase().includes('kuasi')?'1':'0'}">${esc(x.nama_barang)} — ${esc(x.satuan||'-')}</option>`).join('')}</select></label>
+  <label>Barang yang sudah ada <select id="m_barang">${canCreate?'<option value="">＋ Barang baru</option>':''}${items.map(x=>`<option value="${x.id}" data-kuasi="${String(x.kategori?.nama_kategori||'').toLowerCase().includes('kuasi')?'1':'0'}" data-kategori="${x.kategori_id||''}" data-satuan="${esc(x.satuan||'')}" data-tipe="${esc(x.tipe||'')}" data-merk="${esc(x.merk||'')}">${esc(x.nama_barang)} — ${esc(x.satuan||'-')}</option>`).join('')}</select></label>
   <label${canCreate?'':' style="display:none"'}>Nama Barang Baru <input id="m_nama" placeholder="Isi jika memilih Barang baru"></label>
   <label${canCreate?'':' style="display:none"'}>Kategori Barang Baru <select id="m_kat"><option value="">- Pilih kategori -</option>${kats.map(x=>`<option value="${x.id}" data-kuasi="${String(x.nama_kategori||'').toLowerCase().includes('kuasi')?'1':'0'}">${esc(x.nama_kategori)}</option>`).join('')}</select></label>
   <label>Tipe <input id="m_tipe" value="-"></label><label>Merk <input id="m_merk" value="-"></label><label>Satuan <input id="m_satuan" placeholder="BUAH / PCS / KOTAK"></label>
@@ -499,7 +499,13 @@ function bind(page){
   if(page==='riwayat'){
     const apply=()=>{const q=$('historySearch').value.toLowerCase().trim(),t=$('historyType').value;document.querySelectorAll('#historyTable tbody tr[data-search]').forEach(r=>{r.style.display=(!q||r.dataset.search.includes(q))&&(!t||r.dataset.type===t)?'':'none'})};
     $('historySearch').oninput=apply;$('historyType').onchange=apply;
-    document.querySelectorAll('.history-detail').forEach(b=>b.onclick=()=>showHistoryDetail(b.dataset.key));
+    const historyTable=$('historyTable');
+    if(historyTable){
+      historyTable.onclick=e=>{
+        const detail=e.target.closest('.history-detail');
+        if(detail)showHistoryDetail(detail.dataset.key);
+      };
+    }
     document.querySelectorAll('.history-cancel').forEach(btn=>btn.onclick=async()=>{
       const id=Number(btn.dataset.id); if(!id)return;
       if(!(await sipbConfirm('Batalkan transaksi barang keluar #'+id+'? Stok akan dikembalikan dan transaksi tetap tercatat sebagai DIBATALKAN.')))return;
@@ -694,7 +700,34 @@ async function bindMasukForm(){
   $('cancelMasuk').onclick=()=>renderApp('dashboard');
   const toggle=()=>{
     const sel=$('m_barang'), opt=sel.selectedOptions[0];
-    const isNew=!sel.value, kat=$('m_kat').selectedOptions[0];
+    const isNew=!sel.value;
+    const nama=$('m_nama'),katSel=$('m_kat'),tipe=$('m_tipe'),merk=$('m_merk'),satuan=$('m_satuan');
+    if(isNew){
+      nama.disabled=false;
+      katSel.disabled=false;
+      satuan.disabled=false;
+      tipe.readOnly=false;
+      merk.readOnly=false;
+      if(nama.dataset.auto==='1')nama.value='';
+      if(katSel.dataset.auto==='1')katSel.value='';
+      if(satuan.dataset.auto==='1')satuan.value='';
+      if(tipe.dataset.auto==='1')tipe.value='-';
+      if(merk.dataset.auto==='1')merk.value='-';
+      [nama,katSel,satuan,tipe,merk].forEach(el=>{el.dataset.auto='0'});
+    }else{
+      nama.value='';
+      nama.disabled=true;
+      katSel.value=opt?.dataset.kategori||'';
+      katSel.disabled=true;
+      satuan.value=opt?.dataset.satuan||'';
+      satuan.disabled=true;
+      tipe.value=opt?.dataset.tipe||'-';
+      tipe.readOnly=true;
+      merk.value=opt?.dataset.merk||'-';
+      merk.readOnly=true;
+      [katSel,satuan,tipe,merk].forEach(el=>{el.dataset.auto='1'});
+    }
+    const kat=katSel.selectedOptions[0];
     const kuasi=isNew?(kat?.dataset.kuasi==='1'):(opt?.dataset.kuasi==='1');
     $('masukKuasi').style.display=kuasi?'block':'none';
     if(!kuasi){$('m_dus').value='';$('m_awal').value='';$('m_akhir').value=''}
