@@ -4668,3 +4668,50 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
     max-width:100px !important;
   }
 }
+
+
+/* FINAL FIX 20261002-09 — render nav title from data-label */
+.top-nav-layout .top-nav-icon-link .nav-label{
+  display:none !important;
+}
+.top-nav-layout .top-nav-icon-link::after{
+  content:attr(data-label) !important;
+  display:block !important;
+  flex:1 1 auto !important;
+  min-width:0 !important;
+  max-width:0 !important;
+  margin-left:0 !important;
+  padding:0 !important;
+  overflow:hidden !important;
+  color:#fff !important;
+  background:transparent !important;
+  border:0 !important;
+  box-shadow:none !important;
+  font-size:.68rem !important;
+  font-weight:800 !important;
+  line-height:1.1 !important;
+  white-space:nowrap !important;
+  opacity:0 !important;
+  visibility:hidden !important;
+  text-align:left !important;
+  transition:max-width .22s cubic-bezier(.2,.7,.2,1),margin-left .16s ease,opacity .14s ease !important;
+}
+.top-nav-layout .top-nav-icon-link:hover::after,
+.top-nav-layout .top-nav-icon-link:focus-visible::after{
+  max-width:110px !important;
+  margin-left:9px !important;
+  opacity:1 !important;
+  visibility:visible !important;
+}
+@media(max-width:1100px){
+  .top-nav-layout .top-nav-icon-link:hover::after,
+  .top-nav-layout .top-nav-icon-link:focus-visible::after{
+    max-width:100px !important;
+  }
+}
+@media(max-width:900px){
+  .top-nav-layout .top-nav-icon-link:hover::after,
+  .top-nav-layout .top-nav-icon-link:focus-visible::after{
+    max-width:100px !important;
+  }
+}
