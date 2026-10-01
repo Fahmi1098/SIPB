@@ -173,7 +173,7 @@ async function cancelAndDeleteOutgoing(id){
 function showLogin(message=''){
  root.innerHTML=`<main class="login"><button class="login-theme-toggle theme-toggle" id="loginThemeToggle" type="button"><span class="theme-icon">${uiTheme==='dark'?'☀':'☾'}</span><span>${uiTheme==='dark'?'Mode terang':'Mode gelap'}</span></button><section class="login-shell"><aside class="login-aside"><div class="login-emblem"><img src="${BANTEN_LOGO}" alt="Lambang Provinsi Banten"></div><div class="login-org">PEMERINTAH PROVINSI BANTEN</div><h1>UPTD PENGELOLAAN PENDAPATAN DAERAH MALINGPING</h1><p>Sistem Informasi Pengurus Barang</p><div class="login-rule"></div><small>Portal internal pengelolaan persediaan barang.</small></aside><section class="login-card"><div class="brand"><div><h2>Sistem Informasi Pengurus Barang</h2><p>UPTD PPD Malingping</p></div></div><div class="login-title">Masuk ke sistem</div><p class="login-desc">Gunakan akun yang terdaftar untuk melanjutkan.</p><form id="loginForm"><label for="email">Email</label><input id="email" type="email" required autocomplete="username" placeholder="akun@instansi.go.id"><label for="password">Password</label><div class="password-wrap"><input id="password" type="password" required autocomplete="current-password" placeholder="••••••••"><button type="button" class="password-toggle" id="togglePassword" aria-label="Tampilkan password" title="Tampilkan password"><svg class="eye-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z"></path><circle cx="12" cy="12" r="2.8"></circle></svg></button></div><button class="primary login-btn" type="submit"><span>Masuk</span><span aria-hidden="true">→</span></button>${message?`<div class="alert">${esc(message)}</div>`:''}</form><div class="login-footer">© ${new Date().getFullYear()} UPTD PPD Malingping</div></section></section></main>`;
  $('togglePassword').onclick=()=>{const p=$('password'),b=$('togglePassword');p.type=p.type==='password'?'text':'password';const shown=p.type==='text';b.setAttribute('aria-label',shown?'Sembunyikan password':'Tampilkan password');b.setAttribute('title',shown?'Sembunyikan password':'Tampilkan password');b.innerHTML="<svg class=\"eye-svg\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z\"></path><circle cx=\"12\" cy=\"12\" r=\"2.8\"></circle></svg>"};
- $('loginThemeToggle').onclick=()=>{uiTheme=uiTheme==='dark'?'light':'dark';localStorage.setItem('sipb-theme',uiTheme);document.documentElement.dataset.theme=uiTheme;showLogin(message)};
+ $('loginThemeToggle').onclick=()=>{changeSipbTheme(null,message)};
  $('loginForm').addEventListener('submit',async e=>{e.preventDefault();const email=$('email').value.trim(),password=$('password').value,btn=e.submitter;btn.disabled=true;btn.textContent='Memproses...';const {error}=await client.auth.signInWithPassword({email,password});if(error)return showLogin(error.message);sidebarOpen=false;renderApp('dashboard')});
 }
 
@@ -400,7 +400,7 @@ async function renderApp(page='dashboard', restoreScrollY=null){
     <div class="top-brand"><div class="top-brand-mark"><img src="${BANTEN_LOGO}" alt="Lambang Provinsi Banten"></div><div class="top-brand-copy"><strong>SIPB</strong><span>UPTD PPD Malingping</span></div></div>
     <nav class="top-nav" aria-label="Navigasi utama">${topNavItems.filter(item=>item[0]!=='pengguna'||profile?.role==='admin').map(([key,label,icon])=>`<a href="#${key}" data-page="${key}" data-label="${label}" aria-label="${label}" class="top-nav-icon-link ${page===key?'active':''}"><span class="nav-icon">${navSvg(icon)}</span><span class="nav-label">${label}</span></a>`).join('')}</nav>
     <div class="top-title"><span>Administrasi Persediaan</span><h1>${menu.find(x=>x[0]===page)?.[1]||'Dashboard'}</h1></div>
-    <div class="top-actions"><button class="theme-toggle top-action-icon" id="themeToggle" type="button" aria-label="Ubah tema" data-label="${uiTheme==='dark'?'Mode terang':'Mode gelap'}"><span class="theme-icon">${uiTheme==='dark'?'☀':'☾'}</span><span>${uiTheme==='dark'?'Mode terang':'Mode gelap'}</span></button><span class="top-separator" aria-hidden="true"></span><button class="top-logout top-action-icon" id="logout" type="button" aria-label="Keluar" data-label="Keluar"><span class="logout-icon">↪</span></button></div>
+    <div class="top-actions"><button class="theme-toggle top-action-icon" id="themeToggle" type="button" aria-label="${uiTheme==='dark'?'Mode terang':'Mode gelap'}"><span class="theme-icon">${uiTheme==='dark'?'☀':'☾'}</span><span class="top-action-label">${uiTheme==='dark'?'Mode terang':'Mode gelap'}</span></button><span class="top-separator" aria-hidden="true"></span><button class="top-logout top-action-icon" id="logout" type="button" aria-label="Keluar"><span class="logout-icon">↪</span><span class="top-action-label">Keluar</span></button></div>
   </header><div id="content">${loading('Memuat data...')}</div></main></div>`;
   document.documentElement.dataset.theme=uiTheme;
   $('themeToggle').onclick=()=>{changeSipbTheme(page)};
@@ -423,7 +423,7 @@ async function renderApp(page='dashboard', restoreScrollY=null){
     }
   }
 }
-function changeSipbTheme(page){
+function changeSipbTheme(page=null,loginMessage=''){
   const nextTheme=uiTheme==='dark'?'light':'dark';
   const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
   document.querySelector('.theme-transition')?.remove();
@@ -432,7 +432,7 @@ function changeSipbTheme(page){
     uiTheme=nextTheme;
     localStorage.setItem('sipb-theme',uiTheme);
     document.documentElement.dataset.theme=uiTheme;
-    renderApp(page);
+    page===null?showLogin(loginMessage):renderApp(page);
     return;
   }
 
@@ -449,7 +449,7 @@ function changeSipbTheme(page){
     uiTheme=nextTheme;
     localStorage.setItem('sipb-theme',uiTheme);
     document.documentElement.dataset.theme=uiTheme;
-    renderApp(page);
+    page===null?showLogin(loginMessage):renderApp(page);
   },360);
 
   window.setTimeout(()=>scene.classList.add('is-leaving'),720);
