@@ -105,6 +105,10 @@
         .bend-model td,.bend-model th{border:1px solid #111;padding:5px 6px;font-size:10.5pt}
         .bend-model th{text-align:center}
         .bend-model td:first-child{width:38%}
+        .bend-meta{width:100%;border-collapse:collapse;margin-top:7px}
+        .bend-meta td{padding:1px 0;font-size:11pt}
+        .bend-meta td:first-child{width:20%}.bend-meta td:nth-child(2){width:2%}.bend-meta td:nth-child(3){width:78%}
+        .made{font-size:11pt;text-align:right;margin:18px 0 0}
         .small{font-size:10pt}
         .terbilang{text-transform:capitalize}
         @media print{
@@ -300,15 +304,53 @@
         const totalRow=price*qty;
         return '<tr><td class="center">'+(i+1)+'</td><td>'+esc(d.barang?.nama_barang||'-')+'</td><td class="center">'+esc(d.barang?.satuan||'-')+'</td><td class="right">'+qty+'</td><td class="center terbilang">'+esc(terbilang(qty))+'</td><td class="right">'+(price?rupiah(price):'-')+'</td><td class="right">'+(totalRow?rupiah(totalRow):'-')+'</td></tr>'
       }).join('');
-      const bend29='<section class="sheet landscape">'+kop()+
-        '<table class="bend-head"><tr><td style="width:68%"><div class="bend-title">BUKTI BARANG DARI GUDANG PEMERINTAH DAERAH</div><div class="bend-subtitle">KEPADA DAERAH / UNIT / SAMSAT / GERAI / UPT</div><div style="margin-top:4px">Kepada Unit/Ruangan: <b>'+esc(head.tujuan_ruangan||'-')+'</b></div></td><td style="width:32%"><table class="bend-model"><tr><th colspan="2">MODEL BEND 29</th></tr><tr><td>Nomor</td><td>'+no+'/BEND29/UPTD.PPD.MLP/'+String(new Date(head.tanggal_keluar).getFullYear())+'</td></tr><tr><td>Tanggal</td><td>'+dateText(head.tanggal_keluar)+'</td></tr></table></td></tr></table>'+
-        '<table class="data"><thead><tr><th style="width:6%">NO</th><th>BARANG DITERIMA DARI GUDANG</th><th style="width:13%">SATUAN</th><th style="width:11%">JUMLAH<br>ANGKA</th><th style="width:18%">JUMLAH<br>HURUF</th><th style="width:15%">HARGA SATUAN</th><th style="width:17%">JUMLAH HARGA</th></tr></thead><tbody>'+bendRows+'</tbody><tfoot><tr><th colspan="6" class="right">TOTAL</th><th class="right">'+rupiah(total)+'</th></tr></tfoot></table>'+
-        '<p class="small">Terbilang nilai barang: <b class="terbilang">'+esc(terbilangRupiah(total))+'</b>.</p>'+
-        '<table class="sign"><tr><td>Yang Menerima,</td><td>PENGURUS BARANG,</td></tr><tr><td class="space-sm"></td><td class="space-sm"></td></tr><tr><td><span class="name">'+esc(receiver.toUpperCase())+'</span><br>NIP. '+esc(head.penerima_nip||'-')+'<br>'+esc(receiverJob)+'</td><td><span class="name">'+esc(from.toUpperCase())+'</span><br>NIP. '+esc(head.penyerah_nip||'-')+'<br>'+esc(fromJob)+'</td></tr></table>'+
-        '<table class="sign" style="width:50%;margin:16px auto 0"><tr><td>Mengetahui/Mengesahkan,<br>'+esc(kepala?.jabatan||'Kepala UPTD PPD Malingping')+'</td></tr><tr><td class="space-sm"></td></tr><tr><td><span class="name">'+esc((kepala?.nama_pegawai||'-').toUpperCase())+'</span><br>NIP. '+esc(kepala?.nip||'-')+'</td></tr></table>'+
-        '<p class="small" style="margin-top:8px">Rangkap 3 (tiga).</p>'+
-      '</section>';
-
+      const bend29=`<section class='sheet landscape'>${kop()}
+        <table class='bend-head'>
+          <tr>
+            <td style='width:67%'>
+              <div class='bend-title'>BUKTI BARANG DARI PEMERINTAH PROVINSI BANTEN</div>
+              <div class='bend-subtitle'>UPTD PENGELOLAAN PENDAPATAN DAERAH MALINGPING</div>
+              <table class='bend-meta'>
+                <tr><td>GUDANG</td><td>:</td><td>UPTD PPD Malingping</td></tr>
+                <tr><td>BUKTI BARANG DARI</td><td>:</td><td>PENGURUS BARANG</td></tr>
+                <tr><td>KEPADA</td><td>:</td><td><b>${esc(head.tujuan_ruangan||'-')}</b></td></tr>
+              </table>
+            </td>
+            <td style='width:33%'>
+              <table class='bend-model'><tr><th colspan='2'>MODEL : 29</th></tr>
+                <tr><td>Nomor</td><td>${no}/BEND29/UPTD.PPD.MLP/${String(new Date(head.tanggal_keluar).getFullYear())}</td></tr>
+                <tr><td>Tanggal</td><td>${dateWithDay(head.tanggal_keluar)}</td></tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+        <table class='data'>
+          <thead><tr>
+            <th style='width:6%'>NO</th>
+            <th>NAMA BARANG</th>
+            <th style='width:13%'>SATUAN</th>
+            <th style='width:11%'>JUMLAH<br>ANGKA</th>
+            <th style='width:18%'>JUMLAH<br>HURUF</th>
+            <th style='width:15%'>HARGA SATUAN</th>
+            <th style='width:17%'>JUMLAH HARGA</th>
+          </tr></thead>
+          <tbody>${bendRows}</tbody>
+          <tfoot><tr><th colspan='6' class='right'>TOTAL</th><th class='right'>${rupiah(total)}</th></tr></tfoot>
+        </table>
+        <p class='small'>Terbilang nilai barang: <b class='terbilang'>${esc(terbilangRupiah(total))}</b>.</p>
+        <table style='width:100%;border-collapse:collapse;margin-top:12px'><tr>
+          <td style='width:50%;font-size:11pt;vertical-align:top'>Daerah/Unit : <b>${esc(head.tujuan_ruangan||'-')}</b><br>Tanggal : ${dateWithDay(head.tanggal_keluar)}</td>
+          <td style='width:50%;font-size:11pt;text-align:right;vertical-align:top'>Dibuat di Malingping<br>Tanggal : ${dateWithDay(head.tanggal_keluar)}</td>
+        </tr></table>
+        <table class='sign'><tr><td>Yang Menerima,</td><td>PENGURUS BARANG</td></tr>
+          <tr><td class='space-sm'></td><td class='space-sm'></td></tr>
+          <tr><td><span class='name'>${esc(receiver.toUpperCase())}</span><br>NIP. ${esc(head.penerima_nip||'-')}</td>
+          <td><span class='name'>${esc(from.toUpperCase())}</span><br>NIP. ${esc(head.penyerah_nip||'-')}</td></tr></table>
+        <table class='sign' style='width:50%;margin:16px auto 0'><tr><td>Mengetahui/Mengesahkan,<br>Kepala UPTD PPD Malingping</td></tr>
+          <tr><td class='space-sm'></td></tr>
+          <tr><td><span class='name'>${esc((kepala?.nama_pegawai||'-').toUpperCase())}</span><br>NIP. ${esc(kepala?.nip||'-')}</td></tr></table>
+        <p class='small' style='margin-top:8px'>Rangkap 3 (tiga).</p>
+      </section>`;
       openPrint('Dokumen Barang Keluar #'+id,nota+bastRegular+bastKuasi+bend29,'portrait',printWindow);
     } catch(e) {
       try { printWindow.close(); } catch (_) {}
