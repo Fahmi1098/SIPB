@@ -22,8 +22,8 @@
     style:'currency', currency:'IDR', maximumFractionDigits:0
   }).format(Number(v) || 0);
 
-  function openPrint(title, body, orientation='portrait') {
-    const w = window.open('', '_blank', 'noopener,noreferrer');
+  function openPrint(title, body, orientation='portrait', existingWindow=null) {
+    const w = existingWindow || window.open('', '_blank', 'noopener,noreferrer');
     if (!w) {
       window.alert('Popup diblokir browser. Izinkan popup untuk mencetak dokumen SIPB.');
       return;
@@ -117,6 +117,12 @@
   }
 
   async function printTransaction(id) {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      window.alert('Popup diblokir browser. Izinkan popup untuk mencetak dokumen SIPB.');
+      return;
+    }
+    printWindow.document.write('<!doctype html><html><body style="font-family:Arial;padding:30px">Menyiapkan dokumen SIPB...</body></html>');
     try {
       const {head,details,allocations}=await getTransaction(id);
       const kepala=await getKepala();
@@ -178,13 +184,20 @@
       const total=details.reduce((sum,d)=>sum+Number(d.jumlah||0)*Number(d.barang?.harga_terakhir||0),0);
       const bendRows=details.map((d,i)=>{const price=Number(d.barang?.harga_terakhir||0);const qty=Number(d.jumlah||0);return '<tr><td class="center">'+(i+1)+'</td><td>'+esc(d.barang?.nama_barang||'-')+'</td><td>'+esc(d.nomor_awal||'-')+'</td><td class="center">'+qty+'</td><td class="center">'+esc(d.barang?.satuan||'-')+'</td><td class="right">'+(price?rupiah(price):'-')+'</td><td class="right">'+(price?rupiah(price*qty):'-')+'</td></tr>'}).join('');
       const bend29='<section class="sheet landscape">'+kop()+'<table class="meta"><tr><td style="width:65%">BUKTI BARANG DARI DAERAH/UNIT<br><b>UPTD PPD Malingping</b><br>KEPADA DAERAH/UNIT/SAMSAT/GERAI/UPT<br><b>'+esc(head.tujuan_ruangan||'-')+'</b></td><td><table class="data" style="margin:0"><tr><th>MODEL</th><th>BEND 29</th></tr><tr><td>NOMOR</td><td>'+no+'/UPTD.PPD.MLP/'+String(new Date(head.tanggal_keluar).getMonth()+1).padStart(2,'0')+'/'+new Date(head.tanggal_keluar).getFullYear()+'</td></tr><tr><td>BULAN</td><td>'+dateText(head.tanggal_keluar)+'</td></tr></table></td></tr></table><table class="data"><thead><tr><th>NO</th><th>BARANG DITERIMA DARI GUDANG</th><th>NOMOR RATOR</th><th>JUMLAH</th><th>SATUAN</th><th>HARGA SATUAN</th><th>JUMLAH HARGA</th></tr></thead><tbody>'+bendRows+'</tbody><tfoot><tr><th colspan="6" class="right">TOTAL KESELURUHAN (Rp)</th><th class="right">'+rupiah(total)+'</th></tr></tfoot></table><table class="sign"><tr><td></td><td></td><td>Malingping, '+dateText(head.tanggal_keluar)+'</td></tr><tr><td>Yang Menerima<br>'+esc(receiverJob)+'</td><td>Mengetahui,<br>'+esc(kepala?.jabatan||'Kepala UPTD PPD Malingping')+'</td><td>Yang Menyerahkan<br>Pengurus Barang</td></tr><tr><td class="space"></td><td class="space"></td><td class="space"></td></tr><tr><td><span class="name">'+esc(receiver.toUpperCase())+'</span><br>NIP. '+esc(head.penerima_nip||'-')+'</td><td><span class="name">'+esc((kepala?.nama_pegawai||'-').toUpperCase())+'</span><br>NIP. '+esc(kepala?.nip||'-')+'</td><td><span class="name">'+esc(from.toUpperCase())+'</span><br>NIP. '+esc(head.penyerah_nip||'-')+'</td></tr></table></section>';
-      openPrint('Dokumen Barang Keluar #'+id,nota+bastRegular+bastKuasi+bend29,'portrait');
+      openPrint('Dokumen Barang Keluar #'+id,nota+bastRegular+bastKuasi+bend29,'portrait',printWindow);
     } catch(e) {
+      try { printWindow.close(); } catch (_) {}
       window.alert('Gagal menyiapkan dokumen: '+(e?.message||e));
     }
   }
 
   async function printKartu(id) {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      window.alert('Popup diblokir browser. Izinkan popup untuk mencetak dokumen SIPB.');
+      return;
+    }
+    printWindow.document.write('<!doctype html><html><body style="font-family:Arial;padding:30px">Menyiapkan kartu persediaan...</body></html>');
     try {
       const [itemQ,masukQ,keluarQ,opnameQ]=await Promise.all([
         printClient.from('barang').select('id,nama_barang,satuan,merk,tipe,sisa,harga_terakhir,kategori:kategori_id(nama_kategori)').eq('id',id).single(),
@@ -208,8 +221,8 @@
         <table class="data"><thead><tr><th>NO</th><th>TANGGAL</th><th>JENIS</th><th>MASUK</th><th>KELUAR</th><th>SALDO</th><th>HARGA</th><th>KETERANGAN</th></tr></thead><tbody>${body||'<tr><td colspan="8" class="center">Belum ada mutasi.</td></tr>'}</tbody></table>
         <p class="note">Saldo akhir kartu: ${saldo}. Saldo master barang saat ini: ${item.sisa??0}.</p>
       </section>`;
-      openPrint('Kartu Persediaan - '+item.nama_barang,html,'landscape');
-    }catch(e){window.alert('Gagal menyiapkan kartu persediaan: '+(e?.message||e))}
+      openPrint('Kartu Persediaan - '+item.nama_barang,html,'landscape',printWindow);
+    }catch(e){try { printWindow.close(); } catch (_) {} window.alert('Gagal menyiapkan kartu persediaan: '+(e?.message||e))}
   }
 
   function addButton(target, text, handler, cls='ghost') {
