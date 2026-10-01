@@ -298,7 +298,52 @@ function keluarItemRow(items){
 
 async function stockOpnamePage(){const [{data:rows,error},{data:items,error:ie}]=await Promise.all([client.from('riwayat_opname').select('*,barang:barang_id(nama_barang)').order('id',{ascending:false}).limit(200),client.from('barang').select('id,nama_barang,sisa,satuan').order('nama_barang')]);if(error||ie)throw(error||ie);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PERSEDIAAN</span><h2>Stock Opname</h2><p>Penyesuaian stok fisik terhadap stok sistem.</p></div><button class="primary" id="addOpname">＋ Rekam Stock Opname</button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Barang</th><th>Sistem</th><th>Fisik</th><th>Selisih</th><th>Petugas</th><th>Keterangan</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${fmtDate(r.tanggal_opname)}</td><td>${esc(r.barang?.nama_barang||'-')}</td><td>${r.stok_sistem}</td><td>${r.stok_fisik}</td><td><span class="stock ${r.selisih<0?'low':''}">${r.selisih>0?'+':''}${r.selisih}</span></td><td>${esc(r.petugas||'-')}</td><td>${esc(r.keterangan||'-')}</td></tr>`).join('')||emptyRow(7)}</tbody></table></div></section>`}
 
-async function kuasiPage(){const {data,error}=await client.from('stok_kuasi').select('id,barang_id,prefix_huruf,panjang_digit,digit_awal,digit_akhir,digit_sekarang,sisa_lembar,tanggal_masuk,nomor_dus,barang:barang_id(nama_barang,satuan)').gt('sisa_lembar',0).order('tanggal_masuk',{ascending:true}).order('id',{ascending:true});if(error)throw error;const grouped={};data.forEach(r=>{const k=r.barang_id;if(!grouped[k])grouped[k]=[];grouped[k].push(r)});return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PERSEDIAAN</span><h2>Stok Kuasi</h2><p>Informasi batch dokumen berseri yang masih tersedia. Urutan batch mengikuti FIFO.</p></div><span class="status-pill">${data.length} batch aktif</span></div><div class="alert-box"><strong>FIFO:</strong> batch dengan tanggal masuk paling lama akan menjadi antrean pertama untuk distribusi.</div><div class="table-wrap"><table><thead><tr><th>Barang</th><th>Tgl Masuk</th><th>Rentang Awal</th><th>Nomor Tersedia</th><th>Sisa</th><th>Dus</th><th>Status</th></tr></thead><tbody>${data.map(r=>{const pad=Number(r.panjang_digit)||0,p=r.prefix_huruf||'',awal=p+String(r.digit_awal).padStart(pad,'0'),akhir=p+String(r.digit_akhir).padStart(pad,'0'),sekarang=p+String(r.digit_sekarang).padStart(pad,'0');const first=grouped[r.barang_id][0].id===r.id;return `<tr><td><strong>${esc(r.barang?.nama_barang||'-')}</strong><br><small>${esc(r.barang?.satuan||'')}</small></td><td>${fmtDate(r.tanggal_masuk)}</td><td>${esc(awal)} → ${esc(akhir)}</td><td><strong>${esc(sekarang)} → ${esc(akhir)}</strong></td><td><span class="stock">${r.sisa_lembar}</span></td><td>${esc(r.nomor_dus||'-')}</td><td>${first?'<span class="badge-soft success">Antrean Pertama</span>':'<span class="badge-soft">Menunggu</span>'}</td></tr>`}).join('')||emptyRow(7)}</tbody></table></div></section>`}
+async function kuasiPage(){
+  const {data,error}=await client.from('stok_kuasi').select('id,barang_id,prefix_huruf,panjang_digit,digit_awal,digit_akhir,digit_sekarang,sisa_lembar,tanggal_masuk,nomor_dus,barang:barang_id(nama_barang,satuan)').gt('sisa_lembar',0).order('tanggal_masuk',{ascending:true}).order('id',{ascending:true});
+  if(error)throw error;
+  const rows=data||[];
+  const grouped={};
+  rows.forEach(r=>{const k=r.barang_id;if(!grouped[k])grouped[k]=[];grouped[k].push(r)});
+  const totalLembar=rows.reduce((n,r)=>n+(Number(r.sisa_lembar)||0),0);
+  const itemCount=Object.keys(grouped).length;
+  const firstByBarang=new Set(Object.values(grouped).map(g=>g[0]?.id));
+  const batchRows=rows.map(r=>{
+    const pad=Number(r.panjang_digit)||0,p=r.prefix_huruf||'';
+    const awal=p+String(r.digit_awal).padStart(pad,'0'),akhir=p+String(r.digit_akhir).padStart(pad,'0'),sekarang=p+String(r.digit_sekarang).padStart(pad,'0');
+    const first=firstByBarang.has(r.id);
+    return '<tr class="kuasi-batch-row" data-id="'+r.id+'"><td><strong>'+esc(r.barang?.nama_barang||'-')+'</strong><br><small>'+esc(r.barang?.satuan||'')+'</small></td><td>'+fmtDate(r.tanggal_masuk)+'</td><td>'+esc(awal)+' → '+esc(akhir)+'</td><td><strong>'+esc(sekarang)+' → '+esc(akhir)+'</strong></td><td><span class="stock '+(Number(r.sisa_lembar)<=20?'low':'')+'">'+r.sisa_lembar+'</span></td><td>'+esc(r.nomor_dus||'-')+'</td><td>'+(first?'<span class="badge-soft success">FIFO berikutnya</span>':'<span class="badge-soft">Menunggu</span>')+'</td><td><button class="btn-sm view-kuasi" data-id="'+r.id+'">Detail</button></td></tr>';
+  }).join('');
+  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PERSEDIAAN BERSERI</span><h2>Stok Kuasi</h2><p>Pantau batch, rentang nomor, saldo lembar, dan antrean FIFO secara terperinci.</p></div><span class="status-pill">'+rows.length+' batch aktif</span></div>'+
+  '<div class="kuasi-summary-grid"><div class="kartu-summary"><span class="kartu-summary-icon">'+navSvg('barang')+'</span><div><small>Item Kuasi</small><strong>'+itemCount+'</strong></div></div><div class="kartu-summary"><span class="kartu-summary-icon">'+navSvg('kartu')+'</span><div><small>Batch Aktif</small><strong>'+rows.length+'</strong></div></div><div class="kartu-summary"><span class="kartu-summary-icon">'+navSvg('stock_opname')+'</span><div><small>Total Lembar</small><strong>'+totalLembar.toLocaleString('id-ID')+'</strong></div></div><div class="kartu-summary '+(rows.some(r=>Number(r.sisa_lembar)<=20)?'attention':'')+'"><span class="kartu-summary-icon">'+navSvg('barang_keluar')+'</span><div><small>Batch Menipis</small><strong>'+rows.filter(r=>Number(r.sisa_lembar)<=20).length+'</strong></div></div></div>'+
+  '<div class="alert-box kuasi-fifo-banner"><strong>FIFO aktif:</strong> batch paling lama pada masing-masing barang berada paling depan dalam antrean distribusi. Klik <b>Detail</b> untuk melihat informasi batch dan riwayat distribusi.</div>'+
+  '<div class="table-wrap"><table id="kuasiTable"><thead><tr><th>Barang</th><th>Tgl Masuk</th><th>Rentang Batch</th><th>Nomor Berikutnya</th><th>Sisa</th><th>No. Dus</th><th>Status</th><th>Aksi</th></tr></thead><tbody>'+(batchRows||emptyRow(8))+'</tbody></table></div></section>';
+}
+
+async function showKuasiDetail(id){
+  const [{data:batch,error:be},{data:history,error:he}]=await Promise.all([
+    client.from('stok_kuasi').select('id,barang_id,prefix_huruf,panjang_digit,digit_awal,digit_akhir,digit_sekarang,sisa_lembar,tanggal_masuk,nomor_dus,barang:barang_id(nama_barang,satuan,merk,tipe)').eq('id',id).single(),
+    client.from('detail_barang_keluar').select('id,jumlah,nomor_awal,nomor_akhir,nomor_dus,transaksi:transaksi_keluar_id(id,tanggal_keluar,penerima_nama,penerima_jabatan,tujuan_ruangan,status,jenis_dokumen)').order('id',{ascending:false}).limit(100)
+  ]);
+  if(be||he)throw(be||he);
+  const pad=Number(batch.panjang_digit)||0,p=batch.prefix_huruf||'';
+  const awal=p+String(batch.digit_awal).padStart(pad,'0'),akhir=p+String(batch.digit_akhir).padStart(pad,'0'),sekarang=p+String(batch.digit_sekarang).padStart(pad,'0');
+  const related=(history||[]).filter(r=>{
+    if(!r.transaksi||r.transaksi.status==='DIBATALKAN')return false;
+    const a=String(r.nomor_awal||''),b=String(r.nomor_akhir||'');
+    return String(r.nomor_dus||'')===String(batch.nomor_dus||'') || (a && (a===awal||a===sekarang||a===akhir||b===awal||b===sekarang||b===akhir));
+  });
+  const box=document.createElement('div');box.className='modal-backdrop';
+  box.innerHTML='<div class="modal-card kuasi-detail-modal"><div class="modal-head"><div><span class="eyebrow">DETAIL BATCH KUASI</span><h2>'+esc(batch.barang?.nama_barang||'-')+'</h2><p>'+esc(batch.barang?.satuan||'')+' · '+esc(batch.barang?.merk||'-')+' / '+esc(batch.barang?.tipe||'-')+'</p></div><button class="modal-close" aria-label="Tutup">×</button></div>'+
+  '<div class="kuasi-detail-summary"><div><small>Tanggal Masuk</small><strong>'+fmtDate(batch.tanggal_masuk)+'</strong></div><div><small>No. Dus</small><strong>'+esc(batch.nomor_dus||'-')+'</strong></div><div><small>Rentang</small><strong>'+esc(awal)+' → '+esc(akhir)+'</strong></div><div><small>Nomor Berikutnya</small><strong>'+esc(sekarang)+'</strong></div><div><small>Sisa Lembar</small><strong>'+batch.sisa_lembar+'</strong></div></div>'+
+  '<div class="alert-box"><strong>FIFO:</strong> sistem akan mengutamakan batch tertua untuk barang yang sama. Riwayat distribusi di bawah ditampilkan berdasarkan nomor dus/seri yang dapat dicocokkan.</div>'+
+  '<div class="section-head compact"><div><h3>Riwayat Distribusi Terkait</h3><p>'+related.length+' transaksi ditemukan.</p></div></div>'+
+  '<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Jumlah</th><th>Nomor</th><th>Penerima</th><th>Tujuan</th></tr></thead><tbody>'+(related.map(r=>'<tr><td>'+fmtDate(r.transaksi?.tanggal_keluar)+'</td><td>'+r.jumlah+'</td><td>'+esc(r.nomor_awal&&r.nomor_akhir?r.nomor_awal+' → '+r.nomor_akhir:r.nomor_awal||'-')+'</td><td>'+esc(r.transaksi?.penerima_nama||'-')+'</td><td>'+esc(r.transaksi?.tujuan_ruangan||'-')+'</td></tr>').join('')||emptyRow(5))+'</tbody></table></div></div>';
+  document.body.appendChild(box);
+  enhanceTables(box);
+  const close=()=>box.remove();
+  box.querySelector('.modal-close').onclick=close;
+  box.onclick=e=>{if(e.target===box)close()};
+}
 
 async function kartuPage(){
   const {data:items,error}=await client.from('barang').select('id,nama_barang,satuan,merk,tipe,sisa,stok_minimum,harga_terakhir,kategori:kategori_id(id,nama_kategori)').order('nama_barang');
