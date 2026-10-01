@@ -3679,3 +3679,19 @@ tbody tr:hover{
   color:#9DCEEF !important;
   border-color:#31536E !important;
 }
+
+/* Mobile: allow grouped dropdowns to extend vertically without clipping. */
+@media(max-width:900px){
+  .top-nav-layout .top-nav{
+    overflow:visible;
+    flex-wrap:wrap;
+    row-gap:3px;
+    align-content:flex-start;
+  }
+  .top-nav-group{
+    z-index:150;
+  }
+  .top-submenu{
+    z-index:160;
+  }
+}
