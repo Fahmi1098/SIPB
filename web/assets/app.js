@@ -24,8 +24,23 @@ async function simple(title,table,cols){const {data,error}=await client.from(tab
 
 async function barangMasukPage(){const [{data:rows,error},{data:items,error:ie},{data:kats,error:ke}]=await Promise.all([client.from('barang_masuk').select('*,barang:barang_id(nama_barang,satuan)').order('id',{ascending:false}).limit(200),client.from('barang').select('id,nama_barang,satuan').order('nama_barang'),client.from('kategori').select('*').order('nama_kategori')]);if(error||ie||ke)throw(error||ie||ke);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">TRANSAKSI PERSEDIAAN</span><h2>Barang Masuk</h2><p>Penerimaan barang akan otomatis menambah stok dan memperbarui harga terakhir.</p></div><button class="primary" id="addMasuk">＋ Rekam Barang Masuk</button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Barang</th><th>Jumlah</th><th>Harga Satuan</th><th>Sumber Dana</th><th>Penyerah</th><th>Penerima</th></tr></thead><tbody>${(rows||[]).map(r=>`<tr><td>${fmtDate(r.tanggal_masuk)}</td><td><strong>${esc(r.barang?.nama_barang||'-')}</strong></td><td>${r.jumlah} ${esc(r.barang?.satuan||'')}</td><td>${rupiah(r.harga_satuan)}</td><td>${esc(r.sumber_dana||'-')}</td><td>${esc(r.nama_penyerah||'-')}</td><td>${esc(r.nama_penerima||'-')}</td></tr>`).join('')||emptyRow(7)}</tbody></table></div></section>`}
 
-async function barangMasukForm(){const [{data:items,error},{data:kats,error:ke}]=await Promise.all([client.from('barang').select('id,nama_barang,satuan').order('nama_barang'),client.from('kategori').select('*').order('nama_kategori')]);if(error||ke)throw(error||ke);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PENERIMAAN</span><h2>Rekam Barang Masuk</h2><p>Data LKI tidak digunakan.</p></div><button class="ghost" id="backMasuk">← Kembali</button></div><div class="form-grid"><label>Barang yang sudah ada <select id="m_barang"><option value="">＋ Barang baru</option>${items.map(x=>`<option value="${x.id}">${esc(x.nama_barang)} — ${esc(x.satuan||'-')}</option>`).join('')}</select></label><label>Nama Barang Baru <input id="m_nama" placeholder="Isi jika memilih Barang baru"></label><label>Kategori Barang Baru <select id="m_kat"><option value="">- Pilih kategori -</option>${kats.map(x=>`<option value="${x.id}">${esc(x.nama_kategori)}</option>`).join('')}</select></label><label>Tipe <input id="m_tipe" value="-"></label><label>Merk <input id="m_merk" value="-"></label><label>Satuan <input id="m_satuan" placeholder="BUAH / PCS / KOTAK"></label><label>Jumlah Masuk <input id="m_jumlah" type="number" min="1" value="1"></label><label>Harga Satuan <input id="m_harga" type="number" min="0" step="0.01" value="0"></label><label>Sumber Dana <select id="m_sumber"><option>APBD</option><option>APBN</option><option>Lainnya</option></select></label><label>Tanggal Masuk <input id="m_tanggal" type="date" value="${new Date().toISOString().slice(0,10)}"></label><label>Nama Penyerah <input id="m_penyerah" required placeholder="Pihak ke Tiga"></label><label>Nama Penerima <input id="m_penerima" value="${esc(profile?.nama_lengkap||'')}"></label></div><div class="form-actions"><button class="primary" id="saveMasuk">Rekam & Tambah Stok</button><button class="ghost" id="cancelMasuk">Batal</button></div></section>`}
-
+async function barangMasukForm(){
+  const [{data:items,error},{data:kats,error:ke}]=await Promise.all([
+    client.from('barang').select('id,nama_barang,satuan,kategori_id,kategori:kategori_id(nama_kategori)').order('nama_barang'),
+    client.from('kategori').select('*').order('nama_kategori')
+  ]);
+  if(error||ke)throw(error||ke);
+  return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PENERIMAAN</span><h2>Rekam Barang Masuk</h2><p>Stok, transaksi penerimaan, dan batch Kuasi disimpan atomik dalam satu transaksi database.</p></div><button class="ghost" id="backMasuk">← Kembali</button></div><div class="form-grid">
+  <label>Barang yang sudah ada <select id="m_barang"><option value="">＋ Barang baru</option>${items.map(x=>`<option value="${x.id}" data-kuasi="${String(x.kategori?.nama_kategori||'').toLowerCase().includes('kuasi')?'1':'0'}">${esc(x.nama_barang)} — ${esc(x.satuan||'-')}</option>`).join('')}</select></label>
+  <label>Nama Barang Baru <input id="m_nama" placeholder="Isi jika memilih Barang baru"></label>
+  <label>Kategori Barang Baru <select id="m_kat"><option value="">- Pilih kategori -</option>${kats.map(x=>`<option value="${x.id}" data-kuasi="${String(x.nama_kategori||'').toLowerCase().includes('kuasi')?'1':'0'}">${esc(x.nama_kategori)}</option>`).join('')}</select></label>
+  <label>Tipe <input id="m_tipe" value="-"></label><label>Merk <input id="m_merk" value="-"></label><label>Satuan <input id="m_satuan" placeholder="BUAH / PCS / KOTAK"></label>
+  <label>Jumlah Masuk <input id="m_jumlah" type="number" min="1" value="1"></label><label>Harga Satuan <input id="m_harga" type="number" min="0" step="0.01" value="0"></label>
+  <label>Sumber Dana <select id="m_sumber"><option>APBD</option><option>APBN</option><option>Lainnya</option></select></label>
+  <label>Tanggal Masuk <input id="m_tanggal" type="date" value="${new Date().toISOString().slice(0,10)}"></label>
+  <label>Nama Penyerah <input id="m_penyerah" required placeholder="Pihak ke Tiga"></label><label>Nama Penerima <input id="m_penerima" value="${esc(profile?.nama_lengkap||'')}"></label>
+  </div><div id="masukKuasi" class="kuasi-box" style="display:none"><strong>📑 Batch Kuasi</strong><span>Isi rentang nomor seri yang diterima. Jumlah harus sama dengan rentang.</span><div class="form-grid"><label>No. Dus <input id="m_dus" placeholder="Contoh: 411"></label><label>No. Seri Awal <input id="m_awal" placeholder="A-001"></label><label>No. Seri Akhir <input id="m_akhir" placeholder="A-100"></label></div></div><div class="form-actions"><button class="primary" id="saveMasuk">Rekam & Tambah Stok</button><button class="ghost" id="cancelMasuk">Batal</button></div></section>`;
+}
 async function barangKeluarPage(){const {data,error}=await client.from('transaksi_keluar').select('*,detail_barang_keluar(count)').order('id',{ascending:false}).limit(200);if(error)throw error;return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">TRANSAKSI PERSEDIAAN</span><h2>Barang Keluar</h2><p>Pengeluaran akan memvalidasi stok sebelum transaksi direkam.</p></div><button class="primary" id="addKeluar">＋ Rekam Barang Keluar</button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Penyerah</th><th>Penerima</th><th>Tujuan</th><th>Item</th></tr></thead><tbody>${(data||[]).map(r=>`<tr><td>${fmtDate(r.tanggal_keluar)}</td><td>${esc(r.penyerah_nama||'-')}</td><td><strong>${esc(r.penerima_nama||'-')}</strong></td><td>${esc(r.tujuan_ruangan||'-')}</td><td>${r.detail_barang_keluar?.[0]?.count??0}</td></tr>`).join('')||emptyRow(5)}</tbody></table></div></section>`}
 
 async function barangKeluarForm(){const [{data:items,error},{data:pegawai,error:pe}]=await Promise.all([client.from('barang').select('id,nama_barang,satuan,sisa,kategori').order('nama_barang'),client.from('pegawai').select('*').order('nama_pegawai')]);if(error||pe)throw(error||pe);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h2>Rekam Barang Keluar</h2><p>Stok akan dikurangi setelah seluruh item lolos validasi.</p></div><button class="ghost" id="backKeluar">← Kembali</button></div><div class="form-grid"><label>Tanggal Keluar <input id="k_tanggal" type="date" value="${new Date().toISOString().slice(0,10)}"></label><label>Penyerah <input id="k_penyerah" value="${esc(profile?.nama_lengkap||'')}"></label><label>Penerima <input id="k_penerima" list="pegawaiList" placeholder="Nama pegawai/penerima"><datalist id="pegawaiList">${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}">`).join('')}</datalist></label><label>Jabatan Penerima <input id="k_jabatan"></label><label>NIP Penerima <input id="k_nip"></label><label>Tujuan / Ruangan <input id="k_tujuan" placeholder="Contoh: Tata Usaha"></label></div><div class="section-head compact"><div><h3>Daftar Barang</h3><p>Tambahkan satu atau beberapa item.</p></div><button class="ghost" id="addItemKeluar">＋ Tambah Item</button></div><div id="keluarItems"></div><div class="form-actions"><button class="primary" id="saveKeluar">Rekam Transaksi & Kurangi Stok</button><button class="ghost" id="cancelKeluar">Batal</button></div></section>`}
@@ -163,4 +178,38 @@ async function bindKeluarForm(){
     }
   };
 }
-async function bindMasukForm(){ $('backMasuk').onclick=()=>renderApp('barang_masuk'); $('cancelMasuk').onclick=()=>renderApp('barang_masuk'); $('saveMasuk').onclick=async()=>{const existing=+$('m_barang').value||0,nama=$('m_nama').value.trim(),jumlah=+$('m_jumlah').value,harga=+$('m_harga').value||0;if(!jumlah||jumlah<1)return toast('Jumlah harus lebih dari 0.','error');if(!existing&&!nama)return toast('Pilih barang atau isi nama barang baru.','error');if(!harga&&harga!==0)return toast('Harga tidak valid.','error');const btn=$('saveMasuk');btn.disabled=true;btn.textContent='Menyimpan...';try{let barangId=existing;if(!barangId){const {data,error}=await client.from('barang').insert({kategori_id:$('m_kat').value?+$('m_kat').value:null,nama_barang:nama,tipe:$('m_tipe').value.trim()||'-',merk:$('m_merk').value.trim()||'-',satuan:$('m_satuan').value.trim()||'PCS',harga_terakhir:harga,jumlah_total:0,terpakai:0,sisa:0,stok_minimum:0}).select('id').single();if(error)throw error;barangId=data.id}const {error:ie}=await client.from('barang_masuk').insert({barang_id:barangId,jumlah,harga_satuan:harga,sumber_dana:$('m_sumber').value,tanggal_masuk:$('m_tanggal').value,nama_penyerah:$('m_penyerah').value.trim()||'Pihak ke Tiga',nama_penerima:$('m_penerima').value.trim()||profile?.nama_lengkap||session.user.email});if(ie)throw ie;const {data:b,error:be}=await client.from('barang').select('jumlah_total,sisa').eq('id',barangId).single();if(be)throw be;const {error:ue}=await client.from('barang').update({jumlah_total:(b.jumlah_total||0)+jumlah,sisa:(b.sisa||0)+jumlah,harga_terakhir:harga}).eq('id',barangId);if(ue)throw ue;toast('Barang masuk berhasil direkam dan stok bertambah.');renderApp('barang_masuk')}catch(e){btn.disabled=false;btn.textContent='Rekam & Tambah Stok';fail(e)}} }
+async function bindMasukForm(){
+  $('backMasuk').onclick=()=>renderApp('barang_masuk');
+  $('cancelMasuk').onclick=()=>renderApp('barang_masuk');
+  const toggle=()=>{
+    const sel=$('m_barang'), opt=sel.selectedOptions[0];
+    const isNew=!sel.value, kat=$('m_kat').selectedOptions[0];
+    const kuasi=isNew?(kat?.dataset.kuasi==='1'):(opt?.dataset.kuasi==='1');
+    $('masukKuasi').style.display=kuasi?'block':'none';
+    if(!kuasi){$('m_dus').value='';$('m_awal').value='';$('m_akhir').value=''}
+  };
+  $('m_barang').onchange=toggle;$('m_kat').onchange=toggle;toggle();
+  $('saveMasuk').onclick=async()=>{
+    const existing=Number($('m_barang').value)||null,nama=$('m_nama').value.trim(),jumlah=Number($('m_jumlah').value),harga=Number($('m_harga').value);
+    if(!jumlah||jumlah<1)return toast('Jumlah harus lebih dari 0.','error');
+    if(harga<0||Number.isNaN(harga))return toast('Harga tidak valid.','error');
+    if(!existing&&!nama)return toast('Pilih barang atau isi nama barang baru.','error');
+    if(!existing&&!Number($('m_kat').value))return toast('Kategori barang baru wajib dipilih.','error');
+    const btn=$('saveMasuk');btn.disabled=true;btn.textContent='Memproses transaksi...';
+    try{
+      const result=await client.rpc('record_barang_masuk',{
+        p_barang_id:existing,p_kategori_id:Number($('m_kat').value)||null,
+        p_nama_barang:nama,p_tipe:$('m_tipe').value.trim()||'-',p_merk:$('m_merk').value.trim()||'-',
+        p_satuan:$('m_satuan').value.trim()||'PCS',p_jumlah:jumlah,p_harga_satuan:harga,
+        p_sumber_dana:$('m_sumber').value,p_tanggal:$('m_tanggal').value,
+        p_nama_penyerah:$('m_penyerah').value.trim()||'Pihak ke Tiga',
+        p_nama_penerima:$('m_penerima').value.trim()||profile?.nama_lengkap||session.user.email,
+        p_nomor_dus:$('m_dus').value.trim()||null,p_nomor_awal:$('m_awal').value.trim()||null,p_nomor_akhir:$('m_akhir').value.trim()||null
+      });
+      if(result.error)throw result.error;
+      toast('Barang masuk berhasil direkam (#'+(result.data?.id||'')+'). Stok diperbarui atomik.');
+      renderApp('barang_masuk');
+    }catch(e){btn.disabled=false;btn.textContent='Rekam & Tambah Stok';fail(e)}
+  };
+}
+
