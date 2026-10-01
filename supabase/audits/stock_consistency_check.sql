@@ -73,6 +73,7 @@ SELECT
   END AS status
 FROM public.barang b
 LEFT JOIN public.stok_kuasi sk ON sk.barang_id=b.id
-WHERE lower(COALESCE(b.kategori,'')) LIKE '%kuasi%'
+JOIN public.kategori k ON k.id=b.kategori_id
+WHERE lower(COALESCE(k.nama_kategori,'')) LIKE '%kuasi%'
 GROUP BY b.id,b.nama_barang,b.sisa
 ORDER BY b.id;
