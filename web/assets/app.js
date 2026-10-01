@@ -72,6 +72,56 @@ function sortTable(table,col,dir=1){
     if(indicator)indicator.textContent=i===col?(dir===1?'↑':'↓'):'↕';
   });
 }
+function tableFileName(table){
+  const card=table.closest('.page-card,.recent,.modal-card');
+  const title=card?.querySelector('h2,h3')?.textContent?.trim()||document.title||'SIPB';
+  const slug=title.replace(/[^\w\s-]/g,'').trim().replace(/\s+/g,'-').toLowerCase()||'tabel';
+  return 'SIPB-'+slug+'-'+localDate();
+}
+function tableExportData(table){
+  const headers=[...(table.tHead?.rows?.[0]?.cells||[])]
+    .map((th,i)=>({i,label:th.textContent.replace(/[↑↓↕]/g,'').trim()}))
+    .filter(x=>x.label&&x.label!=='Aksi');
+  const rows=[...(table.tBodies?.[0]?.rows||[])]
+    .filter(row=>!row.querySelector('.empty')&&row.dataset.tableSearchMatch!=='0'&&getComputedStyle(row).display!=='none'&&!row.classList.contains('table-pagination-hidden'));
+  return {
+    headers:headers.map(x=>x.label),
+    rows:rows.map(row=>headers.map(x=>String(row.cells[x.i]?.innerText||'').replace(/\s+/g,' ').trim()))
+  };
+}
+function downloadTableBlob(blob,fileName){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function exportTableCSV(table){
+  const data=tableExportData(table);
+  if(!data.rows.length){toast('Tidak ada data yang dapat diekspor.','error');return}
+  const csv=[data.headers,...data.rows].map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  downloadTableBlob(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}),tableFileName(table)+'.csv');
+  toast('CSV berhasil diekspor.');
+}
+function exportTableExcel(table){
+  const data=tableExportData(table);
+  if(!data.rows.length){toast('Tidak ada data yang dapat diekspor.','error');return}
+  if(window.XLSX){
+    const ws=window.XLSX.utils.aoa_to_sheet([data.headers,...data.rows]);
+    const wb=window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(wb,ws,'Data');
+    window.XLSX.writeFile(wb,tableFileName(table)+'.xlsx');
+    toast('Excel berhasil diekspor.');
+    return;
+  }
+  const head=data.headers.map(v=>'<th>'+esc(v)+'</th>').join('');
+  const body=data.rows.map(row=>'<tr>'+row.map(v=>'<td>'+esc(v)+'</td>').join('')+'</tr>').join('');
+  const html='<!doctype html><html><head><meta charset="utf-8"></head><body><table border="1"><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></body></html>';
+  downloadTableBlob(new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'}),tableFileName(table)+'.xls');
+  toast('Excel kompatibel berhasil diekspor.');
+}
 function enhanceTables(scope=document){
   const isDocument=scope===document;
   const rootScope=scope?.querySelectorAll?scope:document;
@@ -99,6 +149,7 @@ function enhanceTables(scope=document){
           const dir=card?.querySelector('.table-sort-direction');
           if(sel)sel.value=String(col);
           if(dir)dir.value=nextDir===1?'asc':'desc';
+          table.refreshPagination?.();
         });
       });
       table.dataset.sortReady='1';
@@ -139,6 +190,7 @@ function enhanceTables(scope=document){
         table.dataset.sortCol=sortSel.value;
         table.dataset.sortDir=String(direction);
         sortTable(table,Number(sortSel.value),direction);
+        table.refreshPagination?.();
       });
       dirWrap.querySelector('select').addEventListener('change',()=>{
         if(sortSel.value==='')return;
@@ -146,6 +198,7 @@ function enhanceTables(scope=document){
         table.dataset.sortCol=sortSel.value;
         table.dataset.sortDir=String(direction);
         sortTable(table,Number(sortSel.value),direction);
+        table.refreshPagination?.();
       });
     }
     if(!toolbar.querySelector('.table-filter-search') && !toolbar.querySelector('.search-box')){
@@ -155,12 +208,75 @@ function enhanceTables(scope=document){
       toolbar.insertBefore(search,toolbar.firstChild);
       search.querySelector('input').addEventListener('input',e=>{
         const q=e.target.value.toLowerCase().trim();
-        table.querySelectorAll('tbody tr').forEach(row=>{
+        table.tBodies?.[0]?.querySelectorAll('tr').forEach(row=>{
           if(row.querySelector('.empty'))return;
-          row.style.display=!q||row.textContent.toLowerCase().includes(q)?'':'none';
+          row.dataset.tableSearchMatch=!q||row.textContent.toLowerCase().includes(q)?'1':'0';
         });
+        table.dataset.page='1';
+        table.refreshPagination?.();
       });
     }
+    if(!toolbar.querySelector('.table-export-actions')){
+      const actions=document.createElement('div');
+      actions.className='table-export-actions';
+      actions.innerHTML='<button type="button" class="btn-sm table-export-excel" title="Ekspor seluruh data hasil filter ke Excel">Excel</button><button type="button" class="btn-sm table-export-csv" title="Ekspor seluruh data hasil filter ke CSV">CSV</button>';
+      toolbar.appendChild(actions);
+      actions.querySelector('.table-export-excel').onclick=()=>exportTableExcel(table);
+      actions.querySelector('.table-export-csv').onclick=()=>exportTableCSV(table);
+    }
+    if(table.dataset.paginationReady!=='1'){
+      const tableWrap=table.closest('.table-wrap');
+      const pager=document.createElement('div');
+      pager.className='table-pagination';
+      pager.innerHTML='<div class="pagination-info"></div><div class="pagination-controls"><button type="button" class="pagination-prev" aria-label="Halaman sebelumnya">‹</button><span class="pagination-pages"></span><button type="button" class="pagination-next" aria-label="Halaman berikutnya">›</button><label class="pagination-size"><span>Tampilkan</span><select><option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="100">100</option><option value="all">Semua</option></select></label></div>';
+      tableWrap?.parentNode?.insertBefore(pager,tableWrap.nextSibling);
+      const pageSize=pager.querySelector('select');
+      const info=pager.querySelector('.pagination-info');
+      const pages=pager.querySelector('.pagination-pages');
+      const prev=pager.querySelector('.pagination-prev');
+      const next=pager.querySelector('.pagination-next');
+      const visibleRows=()=>{
+        table.tBodies?.[0]?.querySelectorAll('tr').forEach(row=>{
+          if(!row.querySelector('.empty'))row.classList.remove('table-pagination-hidden');
+        });
+        return [...(table.tBodies?.[0]?.rows||[])].filter(row=>!row.querySelector('.empty')&&row.dataset.tableSearchMatch!=='0'&&getComputedStyle(row).display!=='none');
+      };
+      const drawPager=(total,page,totalPages)=>{
+        info.textContent=total?((page-1)*Number(pageSize.value==='all'?total:pageSize.value)+1)+'–'+Math.min(page*Number(pageSize.value==='all'?total:pageSize.value),total)+' dari '+total:'0 data';
+        pages.innerHTML='';
+        if(pageSize.value==='all'||totalPages<=1){
+          prev.disabled=true;next.disabled=true;return;
+        }
+        const addPage=(n,label=n)=>{
+          const b=document.createElement('button');b.type='button';b.className='pagination-page'+(n===page?' active':'');b.textContent=String(label);b.onclick=()=>{table.dataset.page=String(n);table.refreshPagination?.()};pages.appendChild(b);
+        };
+        const set=new Set([1,totalPages,page-1,page,page+1]);
+        [...set].filter(n=>n>=1&&n<=totalPages).sort((a,b)=>a-b).forEach((n,idx,arr)=>{
+          if(idx&&n-arr[idx-1]>1){const dots=document.createElement('span');dots.className='pagination-dots';dots.textContent='…';pages.appendChild(dots)}
+          addPage(n);
+        });
+        prev.disabled=page<=1;next.disabled=page>=totalPages;
+      };
+      table.refreshPagination=()=>{
+        const rows=visibleRows();
+        const total=rows.length;
+        const rawSize=pageSize.value;
+        const size=rawSize==='all'?Math.max(total,1):Number(rawSize)||10;
+        const totalPages=Math.max(1,Math.ceil(total/size));
+        let page=Math.min(Math.max(Number(table.dataset.page||1),1),totalPages);
+        table.dataset.page=String(page);
+        const start=(page-1)*size,end=rawSize==='all'?total:start+size;
+        rows.forEach((row,i)=>{if(rawSize!=='all'&&(i<start||i>=end))row.classList.add('table-pagination-hidden')});
+        drawPager(total,page,totalPages);
+      };
+      pageSize.addEventListener('change',()=>{table.dataset.page='1';table.refreshPagination()});
+      prev.onclick=()=>{table.dataset.page=String(Math.max(1,Number(table.dataset.page||1)-1));table.refreshPagination()};
+      next.onclick=()=>{table.dataset.page=String(Number(table.dataset.page||1)+1);table.refreshPagination()};
+      table.dataset.paginationReady='1';
+      const observer=new MutationObserver(()=>window.requestAnimationFrame(()=>table.refreshPagination()));
+      if(table.tBodies?.[0])observer.observe(table.tBodies[0],{subtree:true,attributes:true,attributeFilter:['style']});
+    }
+    table.refreshPagination?.();
   });
 }
 async function cancelAndDeleteOutgoing(id){
