@@ -5737,3 +5737,14 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
   .report-filter-bar,.report-summary-grid{grid-template-columns:1fr}
   .backup-actions button{width:100%}
 }
+
+/* FINAL FIX 20261002-24 — full topbar label for Laporan Persediaan */
+.top-nav-layout .top-nav-icon-link[data-label="Laporan Persediaan"]:hover,
+.top-nav-layout .top-nav-icon-link[data-label="Laporan Persediaan"]:focus-visible{
+  width:174px !important;
+  min-width:174px !important;
+}
+.top-nav-layout .top-nav-icon-link[data-label="Laporan Persediaan"]:hover::after,
+.top-nav-layout .top-nav-icon-link[data-label="Laporan Persediaan"]:focus-visible::after{
+  max-width:132px !important;
+}
