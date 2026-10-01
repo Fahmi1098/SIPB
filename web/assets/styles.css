@@ -4050,3 +4050,85 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
   right:5px !important;
   transform:translateY(-50%) !important;
 }
+
+/* FINAL: top navigation is hover-only for grouped menus. */
+.top-nav-group .top-nav-trigger{
+  pointer-events:none !important;
+  user-select:none;
+}
+.top-nav-group .top-submenu{
+  opacity:0 !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+  transform:translateY(-6px) !important;
+}
+.top-nav-group:hover .top-submenu{
+  opacity:1 !important;
+  visibility:visible !important;
+  pointer-events:auto !important;
+  transform:translateY(0) !important;
+}
+.top-nav-group:hover .top-nav-trigger{
+  background:rgba(255,255,255,.14) !important;
+  color:#fff !important;
+}
+.top-nav-group:hover .nav-caret{
+  transform:rotate(180deg);
+}
+.top-nav-group:focus-within .top-submenu{
+  opacity:0 !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+  transform:translateY(-6px) !important;
+}
+/* Dashboard: refined blue-only stat palette. */
+.stats-grid .stat-card.blue{
+  background:linear-gradient(140deg,#0B5CAB,#1877C2) !important;
+}
+.stats-grid .stat-card.green{
+  background:linear-gradient(140deg,#1474B8,#1D8BCB) !important;
+  border-color:transparent !important;
+  color:#fff !important;
+}
+.stats-grid .stat-card.red{
+  background:linear-gradient(140deg,#145B98,#207DBE) !important;
+  border-color:transparent !important;
+  color:#fff !important;
+}
+.stats-grid .stat-card.purple{
+  background:linear-gradient(140deg,#184C84,#2A72B2) !important;
+  border-color:transparent !important;
+  color:#fff !important;
+}
+.stats-grid .stat-card.blue small,
+.stats-grid .stat-card.blue em,
+.stats-grid .stat-card.green small,
+.stats-grid .stat-card.green em,
+.stats-grid .stat-card.red small,
+.stats-grid .stat-card.red em,
+.stats-grid .stat-card.purple small,
+.stats-grid .stat-card.purple em{
+  color:#D9ECFA !important;
+}
+.stats-grid .stat-card.green .stat-icon,
+.stats-grid .stat-card.red .stat-icon,
+.stats-grid .stat-card.purple .stat-icon{
+  background:rgba(255,255,255,.13) !important;
+  border-color:rgba(255,255,255,.18) !important;
+  color:#fff !important;
+}
+.stats-grid .stat-card:before{
+  background:rgba(255,255,255,.26) !important;
+}
+.section-head > .primary,
+.form-actions > .primary,
+.login-btn{
+  background:var(--sipb-blue) !important;
+  border-color:var(--sipb-blue) !important;
+}
+.section-head > .primary:hover,
+.form-actions > .primary:hover,
+.login-btn:hover{
+  background:var(--sipb-blue-mid) !important;
+  border-color:var(--sipb-blue-mid) !important;
+}
