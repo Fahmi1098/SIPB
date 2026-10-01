@@ -2723,3 +2723,287 @@ tbody tr:hover{
   color:#EDF3F8;
   border-color:#34495B;
 }
+
+
+/* =========================================================
+   SIDEBAR BEHAVIOR V3
+   >=1024px  : push content
+   <=1023px  : overlay drawer
+   ========================================================= */
+
+/* Desktop: sidebar expansion pushes the workspace */
+@media(min-width:1024px){
+  .main{
+    margin-left:var(--sipb-rail) !important;
+    width:auto !important;
+  }
+  .dashboard.menu-open .main{
+    margin-left:var(--sipb-open) !important;
+    width:auto !important;
+  }
+  .sidebar{
+    top:16px;
+    left:16px;
+    bottom:16px;
+    width:var(--sipb-rail);
+    transition:width .24s cubic-bezier(.2,.8,.2,1);
+  }
+  .sidebar.open{
+    width:var(--sipb-open);
+  }
+}
+
+/* Tablet + mobile: real overlay drawer */
+@media(max-width:1023px){
+  .sidebar{
+    top:0;
+    left:0;
+    bottom:0;
+    width:min(310px,88vw);
+    border-radius:0 18px 18px 0;
+    transform:translateX(-110%);
+    transition:transform .24s cubic-bezier(.2,.8,.2,1);
+    background:linear-gradient(180deg,var(--sipb-blue-dark),var(--sipb-blue));
+    border-color:transparent;
+    box-shadow:18px 0 50px rgba(6,42,78,.23);
+    padding:18px 14px 14px;
+  }
+  .sidebar.open{
+    width:min(310px,88vw);
+    transform:translateX(0);
+  }
+  .brand-side{
+    border-bottom-color:rgba(255,255,255,.12);
+  }
+  .brand-side-mark{
+    background:rgba(255,255,255,.12);
+    box-shadow:none;
+  }
+  .brand-side-mark img{
+    filter:drop-shadow(0 4px 8px rgba(0,0,0,.20));
+  }
+  .brand-side > div:nth-child(2){
+    opacity:1;
+    width:170px;
+    transform:none;
+    pointer-events:auto;
+  }
+  .brand-side strong{color:#fff}
+  .brand-side span{color:#C7DCF0}
+  .sidebar-close{
+    opacity:1;
+    pointer-events:auto;
+    color:#fff;
+    border-color:rgba(255,255,255,.18);
+    background:rgba(255,255,255,.08);
+  }
+  .nav-label{
+    max-height:30px;
+    padding:15px 9px 6px;
+    opacity:1;
+    color:#9FC0DE;
+  }
+  .nav a,
+  .sidebar.open .nav a{
+    justify-content:flex-start;
+    gap:10px;
+    padding:9px 10px;
+    color:#EDF5FC;
+  }
+  .nav a:hover{
+    background:rgba(255,255,255,.08);
+    color:#fff;
+  }
+  .nav a.active{
+    background:#fff;
+    color:var(--sipb-blue-dark);
+    border-color:rgba(255,255,255,.65);
+  }
+  .nav a > span:last-child,
+  .sidebar.open .nav a > span:last-child{
+    max-width:185px;
+    margin-left:1px;
+    opacity:1;
+    transform:none;
+  }
+  .side-user,
+  .sidebar.open .side-user{
+    justify-content:flex-start;
+    padding:3px 6px 10px;
+  }
+  .side-user > div:last-child,
+  .sidebar.open .side-user > div:last-child{
+    max-width:180px;
+    opacity:1;
+    transform:none;
+  }
+  .side-bottom{
+    border-top-color:rgba(255,255,255,.11);
+  }
+  .logout{
+    background:rgba(255,255,255,.06);
+    border-color:rgba(255,255,255,.16);
+    color:#fff;
+  }
+  .logout:hover{
+    background:#fff;
+    color:var(--sipb-orange-dark);
+    border-color:#fff;
+  }
+  .sidebar-backdrop{
+    display:block !important;
+    background:rgba(4,24,43,.34);
+    backdrop-filter:blur(2px);
+  }
+  .main,
+  .dashboard.menu-open .main{
+    width:auto !important;
+    margin-left:0 !important;
+    padding:0 20px 30px;
+  }
+  .top{
+    margin:12px 0 18px;
+    top:12px;
+    padding-left:68px;
+  }
+}
+
+/* Desktop compact header / banner so dashboard data starts earlier */
+@media(min-width:1024px){
+  .top{
+    min-height:68px;
+    margin-top:12px;
+    margin-bottom:16px;
+    padding-top:9px;
+    padding-bottom:9px;
+  }
+  .welcome{
+    min-height:142px;
+    padding:20px 24px;
+    margin-bottom:13px;
+    border-radius:17px;
+  }
+  .welcome h2{
+    margin-bottom:5px;
+    font-size:1.38rem;
+  }
+  .welcome p{
+    margin-bottom:10px;
+    font-size:.77rem;
+  }
+  .welcome-emblem{
+    width:225px;
+    min-width:225px;
+    padding:8px 8px 8px 18px;
+  }
+  .welcome-emblem img{
+    width:70px;
+    height:70px;
+  }
+  .stats-grid{
+    gap:11px;
+  }
+  .stat-card{
+    min-height:101px;
+    padding:14px;
+  }
+  .charts-grid{
+    margin-top:12px;
+    gap:12px;
+  }
+  .chart-card,
+  .recent{
+    padding:17px;
+  }
+  .chart-wrap{
+    height:245px;
+  }
+}
+
+/* Dashboard CTA */
+.dashboard-cta{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  flex:0 0 auto;
+  min-height:40px;
+  padding:9px 13px;
+  border:1px solid var(--sipb-orange);
+  border-radius:10px;
+  background:var(--sipb-orange);
+  color:#fff;
+  text-decoration:none;
+  font-size:.70rem;
+  font-weight:800;
+  box-shadow:0 7px 18px rgba(229,154,22,.20);
+  transition:transform .18s ease,background .18s ease,box-shadow .18s ease;
+}
+.dashboard-cta:hover{
+  transform:translateY(-2px);
+  background:var(--sipb-orange-dark);
+  border-color:var(--sipb-orange-dark);
+  box-shadow:0 11px 24px rgba(199,126,0,.24);
+}
+.dashboard-cta:active{
+  transform:translateY(0);
+}
+.welcome-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex:0 0 auto;
+}
+@media(max-width:900px){
+  .welcome-actions{
+    width:100%;
+  }
+  .dashboard-cta{
+    width:100%;
+  }
+}
+@media(max-width:520px){
+  .welcome-actions{
+    display:none;
+  }
+}
+
+/* Pastel semantic statistic icon tones */
+.stat-card.green .stat-icon{
+  background:rgba(22,160,93,.11);
+  border-color:rgba(22,160,93,.17);
+  color:#3D9D70;
+}
+.stat-card.red .stat-icon{
+  background:rgba(214,69,93,.10);
+  border-color:rgba(214,69,93,.16);
+  color:#D46A7A;
+}
+.stat-card.orange .stat-icon{
+  background:rgba(229,154,22,.11);
+  border-color:rgba(229,154,22,.17);
+  color:#C99027;
+}
+.stat-card.purple .stat-icon{
+  background:rgba(105,82,162,.10);
+  border-color:rgba(105,82,162,.16);
+  color:#846FAA;
+}
+.stat-card.blue .stat-icon{
+  background:rgba(11,92,171,.11);
+  border-color:rgba(11,92,171,.16);
+  color:#367FBE;
+}
+
+/* Keep the primary blue card visually strong without over-saturating its icon */
+.stat-card.blue .stat-icon{
+  background:rgba(255,255,255,.13);
+  border-color:rgba(255,255,255,.19);
+  color:#fff;
+}
+
+@media(max-width:1023px){
+  .welcome{
+    padding:20px;
+  }
+}
