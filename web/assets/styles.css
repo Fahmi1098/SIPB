@@ -3695,3 +3695,34 @@ tbody tr:hover{
     z-index:160;
   }
 }
+
+/* =========================================================
+   FINAL TOP NAV HOVER BRIDGE + MINIMUM ONE OUTGOING ITEM
+   ========================================================= */
+.top-nav-group::after{
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  top:100%;
+  height:10px;
+  z-index:129;
+}
+.top-nav-group .top-submenu{
+  top:calc(100% + 6px);
+}
+.top-nav-group:hover::after,
+.top-nav-group:focus-within::after{
+  pointer-events:auto;
+}
+.transaction-row .remove-item:disabled{
+  opacity:.40;
+  cursor:not-allowed;
+  transform:none !important;
+  box-shadow:none !important;
+}
+.transaction-row .remove-item:disabled:hover{
+  background:inherit;
+  color:inherit;
+  border-color:var(--line-strong);
+}
