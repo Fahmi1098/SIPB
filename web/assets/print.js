@@ -125,6 +125,7 @@
       const kuasi=details.filter(d=>String(d.barang?.kategori?.nama_kategori||'').toLowerCase().includes('kuasi'));
       const no=String(id).padStart(3,'0');
       const from=head.penyerah_nama||'-', receiver=head.penerima_nama||'-';
+      const fromJob=head.penyerah_jabatan||'Pengurus Barang';
       const receiverJob=head.penerima_jabatan||'Penerima Barang';
       const statusMark=active?'':'<p><span class="status">DIBATALKAN</span></p>';
 
@@ -139,7 +140,7 @@
         <div class="title no-underline">NOTA DINAS</div>
         <table class="meta">
           <tr><td>Kepada</td><td>:</td><td>Yth. ${esc(kepala?.jabatan||'Kepala UPTD PPD Malingping')}</td></tr>
-          <tr><td>Dari</td><td>:</td><td>${esc(receiverJob)}</td></tr>
+          <tr><td>Dari</td><td>:</td><td>${esc(fromJob)}</td></tr>
           <tr><td>Nomor</td><td>:</td><td>000.2.3.1/${no}/UPTD.PPD.MLP/${new Date(head.tanggal_keluar).getFullYear()}</td></tr>
           <tr><td>Tanggal</td><td>:</td><td>${dateText(head.tanggal_keluar)}</td></tr>
           <tr><td>Lampiran</td><td>:</td><td>1 (satu) Lembar</td></tr>
