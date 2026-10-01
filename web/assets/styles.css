@@ -3007,3 +3007,15 @@ tbody tr:hover{
     padding:20px;
   }
 }
+
+
+/* CTA remains available on every supported mobile width */
+@media(max-width:520px){
+  .welcome-actions{
+    display:flex;
+    width:100%;
+  }
+  .dashboard-cta{
+    width:100%;
+  }
+}
