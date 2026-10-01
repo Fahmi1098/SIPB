@@ -4715,3 +4715,23 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
     max-width:100px !important;
   }
 }
+
+
+/* FINAL FIX 20261002-10 — slim separator between theme and logout */
+.top-nav-layout .top-separator{
+  display:block !important;
+  width:1px !important;
+  height:22px !important;
+  flex:0 0 1px !important;
+  margin:0 4px !important;
+  background:rgba(255,255,255,.72) !important;
+  opacity:.72 !important;
+  border:0 !important;
+  box-shadow:none !important;
+}
+@media(max-width:900px){
+  .top-nav-layout .top-separator{
+    height:20px !important;
+    margin:0 3px !important;
+  }
+}
