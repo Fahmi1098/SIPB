@@ -8,7 +8,6 @@ const localDate=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getM
 const $=id=>document.getElementById(id);
 const BANTEN_LOGO='assets/logo_banten.png';
 let sidebarOpen=false;
-let topNavPinned=null;
 let uiTheme=localStorage.getItem('sipb-theme')||'light';
 document.documentElement.dataset.theme=uiTheme;
 const toast=(message,type='success')=>{let box=$('toastBox');if(!box){box=document.createElement('div');box.id='toastBox';box.className='toast-box';document.body.appendChild(box)}const el=document.createElement('div');el.className='toast '+type;el.textContent=message;box.appendChild(el);setTimeout(()=>el.remove(),3500)};
@@ -396,7 +395,6 @@ const topNavGroups=[
   {key:'admin',label:'Admin',icon:'pengguna',items:[['pengguna','Kelola Pengguna']],adminOnly:true}
 ];
 async function renderApp(page='dashboard', restoreScrollY=null){
-  topNavPinned=null;
   const r=await client.auth.getSession();
   session=r.data.session;
   if(!session)return showLogin();
@@ -437,7 +435,7 @@ function topNavGroup(group,page){
     const m=group.items[0];
     return '<a href="#'+m[0]+'" data-page="'+m[0]+'" class="top-nav-link '+(active?'active':'')+'"><span class="nav-icon">'+navSvg(group.icon)+'</span><span>'+group.label+'</span></a>';
   }
-  return '<div class="top-nav-group '+(active?'active ':'')+(topNavPinned===group.key?'open':'')+'" data-top-group="'+group.key+'"><button type="button" class="top-nav-trigger" aria-haspopup="true" aria-expanded="'+(topNavPinned===group.key?'true':'false')+'"><span class="nav-icon">'+navSvg(group.icon)+'</span><span>'+group.label+'</span><span class="nav-caret" aria-hidden="true">⌄</span></button><div class="top-submenu">'+
+  return '<div class="top-nav-group '+(active?'active':'')+'" data-top-group="'+group.key+'"><div class="top-nav-trigger" aria-hidden="true"><span class="nav-icon">'+navSvg(group.icon)+'</span><span>'+group.label+'</span><span class="nav-caret" aria-hidden="true">⌄</span></div><div class="top-submenu">'+
     group.items.map(m=>'<a href="#'+m[0]+'" data-page="'+m[0]+'" class="'+(page===m[0]?'active':'')+'"><span class="nav-icon">'+navSvg(m[0])+'</span><span>'+m[1]+'</span></a>').join('')+
     '</div></div>';
 }
@@ -556,22 +554,6 @@ function bind(page){
 }
 function bindForm(id){$('backBarang').onclick=()=>renderApp('barang');$('cancelBarang').onclick=()=>renderApp('barang');$('saveBarang').onclick=async()=>{const payload={nama_barang:$('b_nama').value.trim(),kategori_id:$('b_kat').value?+$('b_kat').value:null,tipe:$('b_tipe').value.trim()||'-',merk:$('b_merk').value.trim()||'-',satuan:$('b_satuan').value.trim(),stok_minimum:+$('b_min').value||0};if(!payload.nama_barang)return toast('Nama barang wajib diisi.','error');const btn=$('saveBarang');btn.disabled=true;btn.textContent='Menyimpan...';const q=id?client.from('barang').update(payload).eq('id',id):client.from('barang').insert(payload);const {error}=await q;if(error){btn.disabled=false;btn.textContent=id?'Simpan Perubahan':'Simpan Barang';return fail(error)}toast(id?'Barang diperbarui':'Barang ditambahkan');renderApp('barang')}}
 document.addEventListener('click',e=>{
-  const trigger=e.target.closest('.top-nav-trigger');
-  if(trigger){
-    e.preventDefault();
-    const group=trigger.closest('.top-nav-group');
-    if(group){
-      const key=group.dataset.topGroup;
-      topNavPinned=topNavPinned===key?null:key;
-      document.querySelectorAll('.top-nav-group').forEach(g=>{
-        const open=g.dataset.topGroup===topNavPinned;
-        g.classList.toggle('open',open);
-        g.classList.remove('pinned');
-        g.querySelector('.top-nav-trigger')?.setAttribute('aria-expanded',open?'true':'false');
-      });
-    }
-    return;
-  }
   const target=e.target.closest('[data-page]');
   if(!target)return;
   e.preventDefault();
