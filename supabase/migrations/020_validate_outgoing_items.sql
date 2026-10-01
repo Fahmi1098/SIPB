@@ -52,11 +52,10 @@ BEGIN
     RAISE EXCEPTION 'Minimal satu barang harus dipilih';
   END IF;
 
-  -- Validate every raw line before aggregation so a negative/zero quantity
-  -- cannot be hidden by a compensating positive duplicate line.
+  -- Validate each raw item before aggregation.
   IF EXISTS (
     SELECT 1
-    FROM jsonb_array_elements(p_items) x
+    FROM jsonb_array_elements(p_items) AS x
     WHERE NULLIF(trim(x->>'barang_id'),'') IS NULL
        OR NULLIF(trim(x->>'jumlah'),'') IS NULL
        OR (x->>'barang_id') !~ '^[0-9]+  FOR v_barang_id,v_total IN
