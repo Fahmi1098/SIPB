@@ -175,7 +175,10 @@
         <tr><td><span class="name">${esc(from.toUpperCase())}</span><br>NIP. ${esc(head.penyerah_nip||'-')}</td><td><span class="name">${esc(receiver.toUpperCase())}</span><br>NIP. ${esc(head.penerima_nip||'-')}</td></tr></table>
       </section>`:''; 
 
-      openPrint('Dokumen Barang Keluar #'+id,nota+bastRegular+bastKuasi,'portrait');
+      const total=details.reduce((sum,d)=>sum+Number(d.jumlah||0)*Number(d.barang?.harga_terakhir||0),0);
+      const bendRows=details.map((d,i)=>{const price=Number(d.barang?.harga_terakhir||0);const qty=Number(d.jumlah||0);return '<tr><td class="center">'+(i+1)+'</td><td>'+esc(d.barang?.nama_barang||'-')+'</td><td>'+esc(d.nomor_awal||'-')+'</td><td class="center">'+qty+'</td><td class="center">'+esc(d.barang?.satuan||'-')+'</td><td class="right">'+(price?rupiah(price):'-')+'</td><td class="right">'+(price?rupiah(price*qty):'-')+'</td></tr>'}).join('');
+      const bend29='<section class="sheet landscape">'+kop()+'<table class="meta"><tr><td style="width:65%">BUKTI BARANG DARI DAERAH/UNIT<br><b>UPTD PPD Malingping</b><br>KEPADA DAERAH/UNIT/SAMSAT/GERAI/UPT<br><b>'+esc(head.tujuan_ruangan||'-')+'</b></td><td><table class="data" style="margin:0"><tr><th>MODEL</th><th>BEND 29</th></tr><tr><td>NOMOR</td><td>'+no+'/UPTD.PPD.MLP/'+String(new Date(head.tanggal_keluar).getMonth()+1).padStart(2,'0')+'/'+new Date(head.tanggal_keluar).getFullYear()+'</td></tr><tr><td>BULAN</td><td>'+dateText(head.tanggal_keluar)+'</td></tr></table></td></tr></table><table class="data"><thead><tr><th>NO</th><th>BARANG DITERIMA DARI GUDANG</th><th>NOMOR RATOR</th><th>JUMLAH</th><th>SATUAN</th><th>HARGA SATUAN</th><th>JUMLAH HARGA</th></tr></thead><tbody>'+bendRows+'</tbody><tfoot><tr><th colspan="6" class="right">TOTAL KESELURUHAN (Rp)</th><th class="right">'+rupiah(total)+'</th></tr></tfoot></table><table class="sign"><tr><td></td><td></td><td>Malingping, '+dateText(head.tanggal_keluar)+'</td></tr><tr><td>Yang Menerima<br>'+esc(receiverJob)+'</td><td>Mengetahui,<br>'+esc(kepala?.jabatan||'Kepala UPTD PPD Malingping')+'</td><td>Yang Menyerahkan<br>Pengurus Barang</td></tr><tr><td class="space"></td><td class="space"></td><td class="space"></td></tr><tr><td><span class="name">'+esc(receiver.toUpperCase())+'</span><br>NIP. '+esc(head.penerima_nip||'-')+'</td><td><span class="name">'+esc((kepala?.nama_pegawai||'-').toUpperCase())+'</span><br>NIP. '+esc(kepala?.nip||'-')+'</td><td><span class="name">'+esc(from.toUpperCase())+'</span><br>NIP. '+esc(head.penyerah_nip||'-')+'</td></tr></table></section>';
+      openPrint('Dokumen Barang Keluar #'+id,nota+bastRegular+bastKuasi+bend29,'portrait');
     } catch(e) {
       window.alert('Gagal menyiapkan dokumen: '+(e?.message||e));
     }
@@ -220,6 +223,11 @@
   }
 
   function enhance() {
+    document.querySelectorAll('.sipb-inline-print').forEach(btn=>{
+      if(btn.dataset.bound) return;
+      btn.dataset.bound='1';
+      btn.onclick=()=>printTransaction(Number(btn.dataset.id));
+    });
     document.querySelectorAll('.cancel-keluar').forEach(btn=>{
       const cell=btn.parentElement;
       if(!cell || cell.querySelector('.sipb-print-btn')) return;
