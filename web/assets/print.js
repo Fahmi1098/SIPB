@@ -215,7 +215,7 @@
   async function printTransaction(id) {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      window.alert('Popup diblokir browser. Izinkan popup untuk mencetak dokumen SIPB.');
+      printNotice('Popup diblokir browser. Izinkan popup untuk mencetak dokumen SIPB.');
       return;
     }
     printWindow.document.write('<!doctype html><html><body style="font-family:Arial;padding:30px">Menyiapkan dokumen SIPB...</body></html>');
@@ -377,7 +377,7 @@
   async function printKartu(id) {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      window.alert('Popup diblokir browser. Izinkan popup untuk mencetak dokumen SIPB.');
+      printNotice('Popup diblokir browser. Izinkan popup untuk mencetak dokumen SIPB.');
       return;
     }
     printWindow.document.write('<!doctype html><html><body style="font-family:Arial;padding:30px">Menyiapkan kartu persediaan...</body></html>');
