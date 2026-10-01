@@ -883,7 +883,7 @@ function bind(page){
       row.dataset.status=!active?'active':'inactive';
       apply();
     });
-    document.querySelectorAll('.user-save').forEach(btn=>btn.onclick=async e=>{e.preventDefault();e.stopPropagation();
+    document.querySelectorAll('.user-save').forEach(btn=>btn.onclick=async evt=>{evt.preventDefault();evt.stopPropagation();
       const id=btn.dataset.id;
       const role=document.querySelector('.user-role[data-id="'+id+'"]')?.value;
       const active=document.querySelector('.status-toggle[data-id="'+id+'"]')?.dataset.active==='1';
@@ -914,7 +914,7 @@ function bind(page){
       });
     };
     search.oninput=apply;cat.onchange=apply;status.onchange=apply;
-    document.querySelectorAll('.view-kartu').forEach(btn=>btn.onclick=async e=>{e.preventDefault();e.stopPropagation();
+    document.querySelectorAll('.view-kartu').forEach(btn=>btn.onclick=async evt=>{evt.preventDefault();evt.stopPropagation();
       select.value=btn.dataset.id;$('kartuDetail').innerHTML=loading('Memuat kartu persediaan...');
       try{await loadKartuDetail(Number(btn.dataset.id));$('kartuDetail')?.scrollIntoView({behavior:'smooth',block:'start'})}
       catch(e){fail(e);$('kartuDetail').innerHTML=''}
@@ -927,7 +927,7 @@ function bind(page){
     };
   }
   if(page==='kuasi'){
-    document.querySelectorAll('.view-kuasi').forEach(btn=>btn.onclick=async e=>{e.preventDefault();e.stopPropagation();
+    document.querySelectorAll('.view-kuasi').forEach(btn=>btn.onclick=async evt=>{evt.preventDefault();evt.stopPropagation();
       btn.disabled=true;btn.textContent='Memuat...';
       try{await showKuasiDetail(Number(btn.dataset.id))}
       catch(e){fail(e)}
@@ -998,7 +998,7 @@ function bind(page){
         btn.disabled=false;
       }
     });
-    document.querySelectorAll('.delete-barang').forEach(btn=>btn.onclick=async e=>{e.preventDefault();e.stopPropagation();
+    document.querySelectorAll('.delete-barang').forEach(btn=>btn.onclick=async evt=>{evt.preventDefault();evt.stopPropagation();
       const id=Number(btn.dataset.id);
       if(!id)return;
       if(!(await sipbConfirm('Hapus barang ini dari Master Barang? Penghapusan hanya diizinkan jika barang sudah tidak memiliki riwayat Barang Keluar. Data terkait barang yang memang masih tersimpan akan ikut mengikuti aturan database.')))return;
@@ -1019,13 +1019,13 @@ function bind(page){
     if(add) add.onclick=async()=>{try{$('content').innerHTML=await pegawaiForm();bindPegawaiForm()}catch(e){fail(e)}};
     const apply=()=>{const q=$('pegawaiSearch').value.toLowerCase().trim();let shown=0;document.querySelectorAll('#pegawaiTable tbody tr[data-search]').forEach(r=>{const ok=!q||r.dataset.search.includes(q);r.style.display=ok?'':'none';if(ok)shown++});$('pegawaiCount').textContent=shown+' data'};
     $('pegawaiSearch').oninput=apply;
-    document.querySelectorAll('.edit-pegawai').forEach(btn=>btn.onclick=async e=>{e.preventDefault();e.stopPropagation();try{$('content').innerHTML=loading('Memuat pegawai...');$('content').innerHTML=await pegawaiForm(Number(btn.dataset.id));bindPegawaiForm(Number(btn.dataset.id))}catch(e){fail(e)}});
-    document.querySelectorAll('.delete-pegawai').forEach(btn=>btn.onclick=async e=>{e.preventDefault();e.stopPropagation();if(!(await sipbConfirm('Hapus data pegawai ini? Data historis transaksi tetap tersimpan.')))return;btn.disabled=true;const {error}=await client.from('pegawai').delete().eq('id',Number(btn.dataset.id));if(error){btn.disabled=false;return fail(error)}toast('Pegawai berhasil dihapus.');renderApp('pegawai')});
+    document.querySelectorAll('.edit-pegawai').forEach(btn=>btn.onclick=async evt=>{evt.preventDefault();evt.stopPropagation();try{$('content').innerHTML=loading('Memuat pegawai...');$('content').innerHTML=await pegawaiForm(Number(btn.dataset.id));bindPegawaiForm(Number(btn.dataset.id))}catch(e){fail(e)}});
+    document.querySelectorAll('.delete-pegawai').forEach(btn=>btn.onclick=async evt=>{evt.preventDefault();evt.stopPropagation();if(!(await sipbConfirm('Hapus data pegawai ini? Data historis transaksi tetap tersimpan.')))return;btn.disabled=true;const {error}=await client.from('pegawai').delete().eq('id',Number(btn.dataset.id));if(error){btn.disabled=false;return fail(error)}toast('Pegawai berhasil dihapus.');renderApp('pegawai')});
   }
   if(page==='kategori'){
     const addKategori=$('addKategori'); if(addKategori) addKategori.onclick=async e=>{e.preventDefault();e.stopPropagation();const n=await sipbPrompt('Nama kategori baru:');if(!n?.trim())return;const {error}=await client.from('kategori').insert({nama_kategori:n.trim()});if(error)return fail(error);toast('Kategori ditambahkan');renderApp('kategori')};
-    document.querySelectorAll('.edit-kat').forEach(btn=>btn.onclick=async e=>{e.preventDefault();e.stopPropagation();const {data,error}=await client.from('kategori').select('*').eq('id',+btn.dataset.id).single();if(error)return fail(error);const n=await sipbPrompt('Nama kategori:',data.nama_kategori);if(!n?.trim())return;const {error:e}=await client.from('kategori').update({nama_kategori:n.trim()}).eq('id',+btn.dataset.id);if(e)return fail(e);toast('Kategori diperbarui');renderApp('kategori')});
-    document.querySelectorAll('.delete-kat').forEach(btn=>btn.onclick=async e=>{e.preventDefault();e.stopPropagation();if(!(await sipbConfirm('Hapus kategori ini? Barang yang masih memakai kategori ini dapat mencegah penghapusan.')))return;const {error}=await client.from('kategori').delete().eq('id',+btn.dataset.id);if(error)return fail(error);toast('Kategori dihapus');renderApp('kategori')});
+    document.querySelectorAll('.edit-kat').forEach(btn=>btn.onclick=async evt=>{evt.preventDefault();evt.stopPropagation();const {data,error}=await client.from('kategori').select('*').eq('id',+btn.dataset.id).single();if(error)return fail(error);const n=await sipbPrompt('Nama kategori:',data.nama_kategori);if(!n?.trim())return;const {error:e}=await client.from('kategori').update({nama_kategori:n.trim()}).eq('id',+btn.dataset.id);if(e)return fail(e);toast('Kategori diperbarui');renderApp('kategori')});
+    document.querySelectorAll('.delete-kat').forEach(btn=>btn.onclick=async evt=>{evt.preventDefault();evt.stopPropagation();if(!(await sipbConfirm('Hapus kategori ini? Barang yang masih memakai kategori ini dapat mencegah penghapusan.')))return;const {error}=await client.from('kategori').delete().eq('id',+btn.dataset.id);if(error)return fail(error);toast('Kategori dihapus');renderApp('kategori')});
   }
   if(page==='barang_masuk'){
     bindMasukForm().catch(fail);
