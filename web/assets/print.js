@@ -230,7 +230,7 @@
     });
     document.querySelectorAll('.cancel-keluar').forEach(btn=>{
       const cell=btn.parentElement;
-      if(!cell || cell.querySelector('.sipb-print-btn')) return;
+      if(!cell || cell.querySelector('.sipb-inline-print') || cell.querySelector('.sipb-print-btn')) return;
       const id=Number(btn.dataset.id);
       const p=document.createElement('button');
       p.className='btn-sm sipb-print-btn';
