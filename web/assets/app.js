@@ -107,7 +107,7 @@ async function riwayatPage(){
   ].sort((a,b)=>String(b.date).localeCompare(String(a.date))||Number(b.id)-Number(a.id));
   const key=(type,id)=>type+'_'+id;
   window.__sipbHistory=Object.fromEntries(rows.map(r=>[key(r.type,r.id),r]));
-  return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">AUDIT PERSEDIAAN</span><h2>Riwayat Transaksi</h2><p>Gabungan penerimaan dan pengeluaran barang, termasuk rincian item dan nomor seri Kuasi.</p></div><span class="status-pill">${rows.length} transaksi</span></div><div class="filter-bar"><div class="search-box">⌕<input id="historySearch" placeholder="Cari tanggal, penerima, barang, atau tujuan..."></div><select id="historyType"><option value="">Semua transaksi</option><option value="MASUK">Barang Masuk</option><option value="KELUAR">Barang Keluar</option></select></div><div class="table-wrap"><table id="historyTable"><thead><tr><th>Jenis</th><th>Tanggal</th><th>No.</th><th>Pihak</th><th>Tujuan/Penerima</th><th>Dokumen</th><th>Item</th><th>Status</th><th>Aksi</th></tr></thead><tbody>${rows.map(r=>'<tr data-type="'+r.type+'" data-search="'+esc([r.date,r.party,r.target,r.doc,r.status,r.items.map(i=>i.name).join(' ')].join(' ').toLowerCase())+'"><td><span class="badge-soft '+(r.type==='MASUK'?'success':'')+'">'+r.type+'</span></td><td>'+fmtDate(r.date)+'</td><td>#'+r.id+'</td><td><strong>'+esc(r.party)+'</strong></td><td>'+esc(r.target)+'</td><td>'+esc(r.doc)+'</td><td>'+r.items.length+'</td><td><span class="badge-soft '+(r.status==='AKTIF'?'success':'')+'">'+r.status+'</span></td><td><button class="btn-sm history-detail" data-key="'+key(r.type,r.id)+'">Detail</button></td></tr>').join('')||emptyRow(9)}</tbody></table></div></section>`;
+  return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">AUDIT PERSEDIAAN</span><h2>Riwayat Transaksi</h2><p>Gabungan penerimaan dan pengeluaran barang, termasuk rincian item dan nomor seri Kuasi.</p></div><span class="status-pill">${rows.length} transaksi</span></div><div class="filter-bar"><div class="search-box">⌕<input id="historySearch" placeholder="Cari tanggal, penerima, barang, atau tujuan..."></div><select id="historyType"><option value="">Semua transaksi</option><option value="MASUK">Barang Masuk</option><option value="KELUAR">Barang Keluar</option></select></div><div class="table-wrap"><table id="historyTable"><thead><tr><th>Jenis</th><th>Tanggal</th><th>No.</th><th>Pihak</th><th>Tujuan/Penerima</th><th>Dokumen</th><th>Item</th><th>Status</th><th>Aksi</th></tr></thead><tbody>${rows.map(r=>'<tr data-type="'+r.type+'" data-search="'+esc([r.date,r.party,r.target,r.doc,r.status,r.items.map(i=>i.name).join(' ')].join(' ').toLowerCase())+'"><td><span class="badge-soft '+(r.type==='MASUK'?'success':'')+'">'+r.type+'</span></td><td>'+fmtDate(r.date)+'</td><td>#'+r.id+'</td><td><strong>'+esc(r.party)+'</strong></td><td>'+esc(r.target)+'</td><td>'+esc(r.doc)+'</td><td>'+r.items.length+'</td><td><span class="badge-soft '+(r.status==='AKTIF'?'success':'')+'">'+r.status+'</span></td><td><div class="actions"><button class="btn-sm history-detail" data-key="'+key(r.type,r.id)+'">Detail</button>${profile?.role==='admin'&&r.type==='KELUAR'&&r.status==='AKTIF'?'<button class="btn-sm danger history-cancel" data-id="'+r.id+'">Batalkan</button>':''}${r.type==='KELUAR'?'<button class="btn-sm sipb-inline-print" data-id="'+r.id+'">Cetak</button>':''}</div></td></tr>').join('')||emptyRow(9)}</tbody></table></div></section>`;
 }
 function showHistoryDetail(k){
   const r=window.__sipbHistory?.[k];if(!r)return;
@@ -158,6 +158,17 @@ function bind(page){
     const apply=()=>{const q=$('historySearch').value.toLowerCase().trim(),t=$('historyType').value;document.querySelectorAll('#historyTable tbody tr[data-search]').forEach(r=>{r.style.display=(!q||r.dataset.search.includes(q))&&(!t||r.dataset.type===t)?'':'none'})};
     $('historySearch').oninput=apply;$('historyType').onchange=apply;
     document.querySelectorAll('.history-detail').forEach(b=>b.onclick=()=>showHistoryDetail(b.dataset.key));
+    document.querySelectorAll('.history-cancel').forEach(btn=>btn.onclick=async()=>{
+      const id=Number(btn.dataset.id); if(!id)return;
+      if(!confirm('Batalkan transaksi barang keluar #'+id+'? Stok akan dikembalikan dan transaksi tetap tercatat sebagai DIBATALKAN.'))return;
+      btn.disabled=true; btn.textContent='Memproses...';
+      try{
+        const result=await client.rpc('cancel_barang_keluar',{p_transaksi_id:id});
+        if(result.error)throw result.error;
+        toast('Transaksi #'+id+' dibatalkan. Stok telah dikembalikan.');
+        renderApp('riwayat');
+      }catch(e){btn.disabled=false;btn.textContent='Batalkan';fail(e)}
+    });
   }
   if(page==='dashboard') document.querySelectorAll('[data-page="barang_keluar"]').forEach(b=>b.onclick=()=>renderApp('barang_keluar'));
   if(page==='barang'){
