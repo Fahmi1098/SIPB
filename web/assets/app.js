@@ -629,7 +629,7 @@ function bind(page){
       btn.disabled=true;
       btn.textContent='Menyimpan...';
       try{
-        const {error}=await client.rpc('manage_user_profile',{p_user_id:id,p_role:role,p_is_active:active});
+        const {error}=await client.from('user_profiles').update({role,is_active:active}).eq('id',id);
         if(error)throw error;
         toast('Profil pengguna diperbarui.');
         renderApp('pengguna');
@@ -669,11 +669,6 @@ function bind(page){
       catch(e){fail(e)}
       finally{btn.disabled=false;btn.textContent='Detail'}
     });
-    const table=$('kuasiTable');
-    if(table)table.onclick=e=>{
-      const row=e.target.closest('.kuasi-batch-row'),detail=e.target.closest('.view-kuasi');
-      if(row&&detail?.dataset.id)showKuasiDetail(Number(detail.dataset.id)).catch(fail);
-    };
   }
   if(page==='riwayat'){
     const apply=()=>{const q=$('historySearch').value.toLowerCase().trim(),t=$('historyType').value;document.querySelectorAll('#historyTable tbody tr[data-search]').forEach(r=>{r.style.display=(!q||r.dataset.search.includes(q))&&(!t||r.dataset.type===t)?'':'none'})};
@@ -691,7 +686,7 @@ function bind(page){
       btn.disabled=true;btn.textContent='Memproses...';
       try{
         await cancelAndDeleteOutgoing(id);
-        toast('Transaksi #'+id+' dibatalkan dan riwayatnya dihapus. Stok telah dikembalikan.');
+        toast('Transaksi #'+id+' dibatalkan. Stok telah dikembalikan.');
         renderApp('riwayat');
       }catch(e){btn.disabled=false;btn.textContent='Batalkan';fail(e)}
     });
@@ -707,9 +702,9 @@ function bind(page){
       if(!(await sipbConfirm('Hapus barang ini dari Master Barang? Penghapusan hanya diizinkan jika barang sudah tidak memiliki riwayat Barang Keluar. Data terkait barang yang memang masih tersimpan akan ikut mengikuti aturan database.')))return;
       btn.disabled=true;
       try{
-        const {data,error}=await client.rpc('delete_barang_if_no_outgoing',{p_barang_id:id});
+        const {error}=await client.from('barang').delete().eq('id',id);
         if(error)throw error;
-        toast(data?.message||'Barang berhasil dihapus.');
+        toast('Barang berhasil dihapus.');
         renderApp('barang');
       }catch(e){
         btn.disabled=false;
