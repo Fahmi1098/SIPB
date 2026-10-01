@@ -765,10 +765,10 @@ tbody tr:hover{background:rgba(229,154,22,.045)}
 }
 
 /* Dashboard / header refinement */
+.main{transition:width .34s var(--ease),margin-left .34s var(--ease)}
 .dashboard.menu-open .main{
   width:calc(100% - 278px);
   margin-left:278px;
-  transition:width .34s var(--ease),margin-left .34s var(--ease);
 }
 .top{
   background:linear-gradient(180deg,var(--blue-950),var(--blue-900));
