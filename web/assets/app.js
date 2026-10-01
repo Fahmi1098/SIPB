@@ -13,6 +13,127 @@ document.documentElement.dataset.theme=uiTheme;
 const toast=(message,type='success')=>{let box=$('toastBox');if(!box){box=document.createElement('div');box.id='toastBox';box.className='toast-box';document.body.appendChild(box)}const el=document.createElement('div');el.className='toast '+type;el.textContent=message;box.appendChild(el);setTimeout(()=>el.remove(),3500)};
 const fail=e=>{console.error(e);toast(e?.message||'Terjadi kesalahan.','error')};
 const loading=label=>'<div class="loading-state"><div class="spinner"></div><span>'+esc(label||'Memuat...')+'</span></div>';
+
+function sortableValue(text){
+  const raw=String(text||'').trim();
+  if(!raw)return '';
+  const normalized=raw.toLowerCase().replace(/\s+/g,' ');
+  const months={jan:0,feb:1,mar:2,apr:3,mei:4,jun:5,jul:6,agu:7,sep:8,okt:9,nov:10,des:11};
+  const dm=normalized.match(/^(\d{1,2})\s+(jan|feb|mar|apr|mei|jun|jul|agu|sep|okt|nov|des)\s+(\d{4})$/i);
+  if(dm)return new Date(Number(dm[3]),months[dm[2]],Number(dm[1])).getTime();
+  if(/^\d{4}-\d{2}-\d{2}(?:[T ][\d:.+-]*)?$/.test(raw))return new Date(raw).getTime();
+  const numeric=raw.replace(/[^\d,.-]/g,'').replace(/\.(?=\d{3}(?:\.|$))/g,'').replace(',','.');
+  if(numeric&&/^-?\d+(?:\.\d+)?$/.test(numeric))return Number(numeric);
+  return normalized;
+}
+function sortTable(table,col,dir=1){
+  const tbody=table.tBodies[0]; if(!tbody)return;
+  const rows=[...tbody.rows];
+  rows.sort((a,b)=>{
+    const av=sortableValue(a.cells[col]?.textContent||''),bv=sortableValue(b.cells[col]?.textContent||'');
+    if(typeof av==='number'&&typeof bv==='number')return (av-bv)*dir;
+    return String(av).localeCompare(String(bv),'id',{numeric:true,sensitivity:'base'})*dir;
+  });
+  rows.forEach(r=>tbody.appendChild(r));
+  [...table.tHead.rows[0].cells].forEach((th,i)=>{
+    const indicator=th.querySelector('.sort-indicator');
+    if(indicator)indicator.textContent=i===col?(dir===1?'↑':'↓'):'↕';
+  });
+}
+function enhanceTables(scope=document){
+  const rootScope=scope?.querySelectorAll?scope:document;
+  rootScope.querySelectorAll('#content table').forEach(table=>{
+    if(table.dataset.sortReady!=='1'){
+      [...(table.tHead?.rows?.[0]?.cells||[])].forEach((th,col)=>{
+        const label=th.textContent.trim();
+        if(!label||label==='Aksi')return;
+        th.classList.add('sortable-th');
+        th.dataset.sortCol=String(col);
+        const indicator=document.createElement('span');
+        indicator.className='sort-indicator';
+        indicator.textContent='↕';
+        th.appendChild(indicator);
+        th.addEventListener('click',()=>{
+          const currentCol=Number(table.dataset.sortCol??'-1');
+          const currentDir=Number(table.dataset.sortDir||'1');
+          const nextDir=currentCol===col?-currentDir:1;
+          table.dataset.sortCol=String(col);
+          table.dataset.sortDir=String(nextDir);
+          sortTable(table,col,nextDir);
+          const card=table.closest('.page-card');
+          const sel=card?.querySelector('.table-sort-select');
+          const dir=card?.querySelector('.table-sort-direction');
+          if(sel)sel.value=String(col);
+          if(dir)dir.value=nextDir===1?'asc':'desc';
+        });
+      });
+      table.dataset.sortReady='1';
+    }
+    const card=table.closest('.page-card');
+    if(!card)return;
+    let toolbar=card.querySelector(':scope > .table-tools');
+    if(!toolbar){
+      const tableWrap=table.closest('.table-wrap');
+      const existing=tableWrap?.previousElementSibling?.classList?.contains('filter-bar')
+        ?tableWrap.previousElementSibling:null;
+      if(existing)toolbar=existing;
+      else{
+        toolbar=document.createElement('div');
+        toolbar.className='filter-bar table-tools';
+        tableWrap?.parentNode?.insertBefore(toolbar,tableWrap);
+      }
+    }
+    if(!toolbar.querySelector('.table-sort-select')){
+      const sortWrap=document.createElement('label');
+      sortWrap.className='table-sort-control';
+      sortWrap.innerHTML='<span>Urutkan</span><select class="table-sort-select"><option value="">Kolom…</option></select>';
+      const sortSel=sortWrap.querySelector('select');
+      [...(table.tHead?.rows?.[0]?.cells||[])].forEach((th,col)=>{
+        const label=th.textContent.replace(/[↑↓↕]/g,'').trim();
+        if(!label||label==='Aksi')return;
+        const opt=document.createElement('option');
+        opt.value=String(col);opt.textContent=label;sortSel.appendChild(opt);
+      });
+      const dirWrap=document.createElement('label');
+      dirWrap.className='table-sort-control';
+      dirWrap.innerHTML='<span>Arah</span><select class="table-sort-direction"><option value="asc">Naik</option><option value="desc">Turun</option></select>';
+      toolbar.appendChild(sortWrap);
+      toolbar.appendChild(dirWrap);
+      sortSel.addEventListener('change',()=>{
+        if(sortSel.value==='')return;
+        const direction=dirWrap.querySelector('select').value==='desc'?-1:1;
+        table.dataset.sortCol=sortSel.value;
+        table.dataset.sortDir=String(direction);
+        sortTable(table,Number(sortSel.value),direction);
+      });
+      dirWrap.querySelector('select').addEventListener('change',()=>{
+        if(sortSel.value==='')return;
+        const direction=dirWrap.querySelector('select').value==='desc'?-1:1;
+        table.dataset.sortCol=sortSel.value;
+        table.dataset.sortDir=String(direction);
+        sortTable(table,Number(sortSel.value),direction);
+      });
+    }
+    if(!toolbar.querySelector('.table-filter-search') && !toolbar.querySelector('.search-box')){
+      const search=document.createElement('div');
+      search.className='search-box table-filter-search-box';
+      search.innerHTML='<span aria-hidden="true">⌕</span><input class="table-filter-search" type="search" placeholder="Cari di tabel...">';
+      toolbar.insertBefore(search,toolbar.firstChild);
+      search.querySelector('input').addEventListener('input',e=>{
+        const q=e.target.value.toLowerCase().trim();
+        table.querySelectorAll('tbody tr').forEach(row=>{
+          if(row.querySelector('.empty'))return;
+          row.style.display=!q||row.textContent.toLowerCase().includes(q)?'':'none';
+        });
+      });
+    }
+  });
+}
+async function cancelAndDeleteOutgoing(id){
+  const result=await client.rpc('cancel_and_delete_barang_keluar',{p_transaksi_id:Number(id)});
+  if(result.error)throw result.error;
+  return result.data;
+}
 function showLogin(message=''){
  root.innerHTML=`<main class="login"><button class="login-theme-toggle theme-toggle" id="loginThemeToggle" type="button"><span class="theme-icon">${uiTheme==='dark'?'☀':'☾'}</span><span>${uiTheme==='dark'?'Mode terang':'Mode gelap'}</span></button><section class="login-shell"><aside class="login-aside"><div class="login-emblem"><img src="${BANTEN_LOGO}" alt="Lambang Provinsi Banten"></div><div class="login-org">PEMERINTAH PROVINSI BANTEN</div><h1>UPTD PENGELOLAAN PENDAPATAN DAERAH MALINGPING</h1><p>Sistem Informasi Pengurus Barang</p><div class="login-rule"></div><small>Portal internal pengelolaan persediaan barang.</small></aside><section class="login-card"><div class="brand"><div><h2>Sistem Informasi Pengurus Barang</h2><p>UPTD PPD Malingping</p></div></div><div class="login-title">Masuk ke sistem</div><p class="login-desc">Gunakan akun yang terdaftar untuk melanjutkan.</p><form id="loginForm"><label for="email">Email</label><input id="email" type="email" required autocomplete="username" placeholder="akun@instansi.go.id"><label for="password">Password</label><div class="password-wrap"><input id="password" type="password" required autocomplete="current-password" placeholder="••••••••"><button type="button" class="password-toggle" id="togglePassword">Lihat</button></div><button class="primary login-btn" type="submit"><span>Masuk</span><span aria-hidden="true">→</span></button>${message?`<div class="alert">${esc(message)}</div>`:''}</form><div class="login-footer">© ${new Date().getFullYear()} UPTD PPD Malingping</div></section></section></main>`;
  $('togglePassword').onclick=()=>{const p=$('password');p.type=p.type==='password'?'text':'password';$('togglePassword').textContent=p.type==='password'?'Lihat':'Sembunyikan'};
@@ -44,6 +165,7 @@ async function dashboard(){
   const totalMasuk=masukData.reduce((n,r)=>n+(Number(r.jumlah)||0),0);
   const nominalMasuk=masukData.reduce((n,r)=>n+((Number(r.jumlah)||0)*(Number(r.harga_satuan)||0)),0);
   const totalKeluar=keluarData.length;
+  const recentData=(recentQ.data||[]).filter(r=>(r.status||'AKTIF')==='AKTIF');
 
   const catMap={};
   (catQ.data||[]).forEach(x=>{const n=x.kategori?.nama_kategori||'Tanpa Kategori';catMap[n]=(catMap[n]||0)+1});
@@ -56,7 +178,7 @@ async function dashboard(){
 
   window.SIPB_DASHBOARD_CHARTS={categoryLabels:catEntries.map(x=>x[0]),categoryData:catEntries.map(x=>x[1]),monthLabels,monthData:Object.values(monthMap)};
 
-  return `<section class="welcome card"><div class="welcome-copy"><span class="eyebrow">DASHBOARD</span><h2>Selamat Datang</h2><p>Sistem Informasi Pengurus Barang untuk administrasi persediaan UPTD PPD Malingping.</p><div class="welcome-meta"><span class="status-pill"><i></i> Sistem Online</span><span>•</span><span>${new Intl.DateTimeFormat('id-ID',{dateStyle:'full'}).format(now)}</span></div></div><div class="welcome-actions"><button type="button" class="dashboard-cta" data-page="barang_keluar"><span aria-hidden="true">＋</span><span>Tambah Transaksi</span></button></div><div class="welcome-emblem"><img src="${BANTEN_LOGO}" alt="Lambang Provinsi Banten"><div><strong>PEMERINTAH PROVINSI BANTEN</strong><span>UPTD PPD MALINGPING</span></div></div></section><section class="stats-grid"><div class="stat-card blue"><span class="stat-icon">${navSvg('barang')}</span><div><small>Total Barang</small><strong>${totalBarang}</strong><em>Master barang</em></div></div><div class="stat-card orange"><span class="stat-icon">${navSvg('barang_masuk')}</span><div><small>Nilai Barang Masuk</small><strong>${rupiah(nominalMasuk)}</strong><em>Total nilai penerimaan</em></div></div><div class="stat-card green"><span class="stat-icon">${navSvg('barang_masuk')}</span><div><small>Jumlah Barang Masuk</small><strong>${totalMasuk.toLocaleString('id-ID')}</strong><em>Total kuantitas masuk</em></div></div><div class="stat-card red"><span class="stat-icon">${navSvg('barang_keluar')}</span><div><small>Barang Keluar</small><strong>${totalKeluar}</strong><em>Transaksi aktif</em></div></div><div class="stat-card purple"><span class="stat-icon">${navSvg('stock_opname')}</span><div><small>Sisa Stok</small><strong>${totalSisa.toLocaleString('id-ID')}</strong><em>Total stok saat ini</em></div></div></section><section class="charts-grid"><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h3>Barang berdasarkan kategori</h3><p>Delapan kategori dengan jumlah barang terbanyak.</p></div></div><div class="chart-wrap"><canvas id="categoryChart"></canvas></div></article><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">AKTIVITAS</span><h3>Barang keluar per bulan</h3><p>Enam bulan terakhir, transaksi aktif.</p></div></div><div class="chart-wrap"><canvas id="outgoingChart"></canvas></div></article></section><section class="card recent"><div class="section-head"><div><span class="eyebrow">AKTIVITAS TERKINI</span><h3>Transaksi terbaru</h3><p>Enam transaksi barang keluar terakhir.</p></div><button class="ghost" data-page="barang_keluar">Lihat semua <span aria-hidden="true">→</span></button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Penerima</th><th>Tujuan</th></tr></thead><tbody>${(recentQ.data||[]).map(r=>`<tr><td>${fmtDate(r.tanggal_keluar)}</td><td><strong>${esc(r.penerima_nama||'-')}</strong></td><td>${esc(r.tujuan_ruangan||'-')}</td></tr>`).join('')||'<tr><td colspan="3" class="empty">Belum ada transaksi.</td></tr>'}</tbody></table></div></section>`}
+  return `<section class="welcome card"><div class="welcome-copy"><span class="eyebrow">DASHBOARD</span><h2>Selamat Datang</h2><p>Sistem Informasi Pengurus Barang untuk administrasi persediaan UPTD PPD Malingping.</p><div class="welcome-meta"><span class="status-pill"><i></i> Sistem Online</span><span>•</span><span>${new Intl.DateTimeFormat('id-ID',{dateStyle:'full'}).format(now)}</span></div></div><div class="welcome-actions"><button type="button" class="dashboard-cta" data-page="barang_keluar"><span aria-hidden="true">＋</span><span>Tambah Transaksi</span></button></div><div class="welcome-emblem"><img src="${BANTEN_LOGO}" alt="Lambang Provinsi Banten"><div><strong>PEMERINTAH PROVINSI BANTEN</strong><span>UPTD PPD MALINGPING</span></div></div></section><section class="stats-grid"><div class="stat-card blue"><span class="stat-icon">${navSvg('barang')}</span><div><small>Total Barang</small><strong>${totalBarang}</strong><em>Master barang</em></div></div><div class="stat-card orange"><span class="stat-icon">${navSvg('barang_masuk')}</span><div><small>Nilai Barang Masuk</small><strong>${rupiah(nominalMasuk)}</strong><em>Total nilai penerimaan</em></div></div><div class="stat-card green"><span class="stat-icon">${navSvg('barang_masuk')}</span><div><small>Jumlah Barang Masuk</small><strong>${totalMasuk.toLocaleString('id-ID')}</strong><em>Total kuantitas masuk</em></div></div><div class="stat-card red"><span class="stat-icon">${navSvg('barang_keluar')}</span><div><small>Barang Keluar</small><strong>${totalKeluar}</strong><em>Transaksi aktif</em></div></div><div class="stat-card purple"><span class="stat-icon">${navSvg('stock_opname')}</span><div><small>Sisa Stok</small><strong>${totalSisa.toLocaleString('id-ID')}</strong><em>Total stok saat ini</em></div></div></section><section class="charts-grid"><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h3>Barang berdasarkan kategori</h3><p>Delapan kategori dengan jumlah barang terbanyak.</p></div></div><div class="chart-wrap"><canvas id="categoryChart"></canvas></div></article><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">AKTIVITAS</span><h3>Barang keluar per bulan</h3><p>Enam bulan terakhir, transaksi aktif.</p></div></div><div class="chart-wrap"><canvas id="outgoingChart"></canvas></div></article></section><section class="card recent"><div class="section-head"><div><span class="eyebrow">AKTIVITAS TERKINI</span><h3>Transaksi terbaru</h3><p>Enam transaksi barang keluar terakhir.</p></div><button class="ghost" data-page="barang_keluar">Lihat semua <span aria-hidden="true">→</span></button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Penerima</th><th>Tujuan</th></tr></thead><tbody>${recentData.map(r=>`<tr><td>${fmtDate(r.tanggal_keluar)}</td><td><strong>${esc(r.penerima_nama||'-')}</strong></td><td>${esc(r.tujuan_ruangan||'-')}</td></tr>`).join('')||'<tr><td colspan="3" class="empty">Belum ada transaksi.</td></tr>'}</tbody></table></div></section>`}
 
 async function barangPage(){const [{data,error},{data:k,error:ke}]=await Promise.all([client.from('barang').select('*, kategori:kategori_id(nama_kategori)').order('id'),client.from('kategori').select('*').order('nama_kategori')]);if(error)throw error;if(ke)throw ke;return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER DATA</span><h2>Master Barang</h2><p>Kelola data barang dan informasi stok tanpa field LKI.</p></div>${profile?.role==='admin'?'<button class="primary" id="addBarang">＋ Tambah Barang</button>':''}</div><div class="filter-bar"><div class="search-box">⌕<input id="barangSearch" placeholder="Cari nama, tipe, merk, atau satuan..."></div><select id="barangFilter"><option value="">Semua kategori</option>${(k||[]).map(x=>`<option value="${x.id}">${esc(x.nama_kategori)}</option>`).join('')}</select><span id="barangCount" class="result-count">${data?.length||0} data</span></div><div class="table-wrap"><table id="barangTable"><thead><tr><th>ID</th><th>Nama Barang</th><th>Kategori</th><th>Tipe</th><th>Merk</th><th>Satuan</th><th>Harga Terakhir</th><th>Stok</th><th>Aksi</th></tr></thead><tbody>${(data||[]).map(barangRow).join('')||emptyRow(9)}</tbody></table></div></section>`}
 function barangRow(r){const low=Number(r.sisa??0)<=Number(r.stok_minimum??0);return `<tr data-search="${esc([r.nama_barang,r.tipe,r.merk,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())}" data-kategori="${r.kategori_id||''}"><td class="id-cell">#${r.id}</td><td><strong>${esc(r.nama_barang)}</strong></td><td>${esc(r.kategori?.nama_kategori||'-')}</td><td>${esc(r.tipe||'-')}</td><td>${esc(r.merk||'-')}</td><td>${esc(r.satuan||'-')}</td><td>${rupiah(r.harga_terakhir)}</td><td><span class="stock ${low?'low':''}">${r.sisa??0}</span></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-barang" data-id="'+r.id+'">Edit</button><button class="btn-sm danger delete-barang" data-id="'+r.id+'">Hapus</button></div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`}
@@ -87,7 +209,8 @@ async function barangMasukForm(){
 async function barangKeluarPage(){
   const {data,error}=await client.from('transaksi_keluar').select('*,detail_barang_keluar(count)').order('id',{ascending:false}).limit(200);
   if(error)throw error;
-  return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">TRANSAKSI PERSEDIAAN</span><h2>Barang Keluar</h2><p>Pengeluaran akan memvalidasi stok sebelum transaksi direkam.</p></div><button class="primary" id="addKeluar">＋ Rekam Barang Keluar</button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Penyerah</th><th>Penerima</th><th>Tujuan</th><th>Item</th><th>Status</th><th>Aksi</th></tr></thead><tbody>${(data||[]).map(r=>{const active=(r.status||'AKTIF')==='AKTIF';return '<tr><td>'+fmtDate(r.tanggal_keluar)+'</td><td>'+esc(r.penyerah_nama||'-')+'</td><td><strong>'+esc(r.penerima_nama||'-')+'</strong></td><td>'+esc(r.tujuan_ruangan||'-')+'</td><td>'+(r.detail_barang_keluar?.[0]?.count??0)+'</td><td><span class="badge-soft '+(active?'success':'')+'">'+(active?'AKTIF':'DIBATALKAN')+'</span></td><td>'+'<div class="row-actions"><button class="btn-sm sipb-inline-print" data-id="'+r.id+'">Cetak</button>'+(active&&profile?.role==='admin'?'<button class="btn-sm danger cancel-keluar" data-id="'+r.id+'">Batalkan</button>':'')+'</div>'+'</td></tr>'}).join('')||emptyRow(7)}</tbody></table></div></section>`;
+  const activeData=(data||[]).filter(r=>(r.status||'AKTIF')==='AKTIF');
+  return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">TRANSAKSI PERSEDIAAN</span><h2>Barang Keluar</h2><p>Hanya transaksi aktif ditampilkan; transaksi yang dibatalkan langsung dihapus.</p></div><button class="primary" id="addKeluar">＋ Rekam Barang Keluar</button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Penyerah</th><th>Penerima</th><th>Tujuan</th><th>Item</th><th>Status</th><th>Aksi</th></tr></thead><tbody>${activeData.map(r=>{const active=(r.status||'AKTIF')==='AKTIF';return '<tr><td>'+fmtDate(r.tanggal_keluar)+'</td><td>'+esc(r.penyerah_nama||'-')+'</td><td><strong>'+esc(r.penerima_nama||'-')+'</strong></td><td>'+esc(r.tujuan_ruangan||'-')+'</td><td>'+(r.detail_barang_keluar?.[0]?.count??0)+'</td><td><span class="badge-soft '+(active?'success':'')+'">'+(active?'AKTIF':'DIBATALKAN')+'</span></td><td>'+'<div class="row-actions"><button class="btn-sm sipb-inline-print" data-id="'+r.id+'">Cetak</button>'+(active&&profile?.role==='admin'?'<button class="btn-sm danger cancel-keluar" data-id="'+r.id+'">Batalkan</button>':'')+'</div>'+'</td></tr>'}).join('')||emptyRow(7)}</tbody></table></div></section>`;
 }
 
 async function barangKeluarForm(){const [{data:items,error},{data:pegawai,error:pe}]=await Promise.all([client.from('barang').select('id,nama_barang,satuan,sisa,kategori:kategori_id(id,nama_kategori)').order('nama_barang'),client.from('pegawai').select('id,nama_pegawai,nip,status_pegawai,jabatan').order('nama_pegawai')]);if(error||pe)throw(error||pe);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h2>Rekam Barang Keluar</h2><p>Stok akan dikurangi setelah seluruh item lolos validasi.</p></div><button class="ghost" id="backKeluar">← Kembali</button></div><div class="form-grid"><label>Tanggal Keluar <input id="k_tanggal" type="date" value="${localDate()}"></label><label>Penyerah (Gudang) <select id="k_penyerah"><option value="">- Pilih penyerah -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penyerah <input id="k_penyerah_jabatan" readonly></label><label>NIP Penyerah <input id="k_penyerah_nip" readonly></label><label>Penerima (Pemohon) <select id="k_penerima"><option value="">- Pilih pegawai -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penerima <input id="k_jabatan" readonly></label><label>NIP Penerima <input id="k_nip" readonly></label><label>Tujuan / Ruangan <input id="k_tujuan" placeholder="Contoh: Subag Tata Usaha" required></label></div><div class="section-head compact"><div><h3>Daftar Barang</h3><p>Tambahkan satu atau beberapa item.</p></div><button class="ghost" id="addItemKeluar">＋ Tambah Item</button></div><div id="keluarItems"></div><div class="form-actions"><button class="primary" id="saveKeluar">Rekam Transaksi & Kurangi Stok</button><button class="ghost" id="cancelKeluar">Batal</button></div></section>`}
@@ -129,6 +252,7 @@ async function loadKartuDetail(id){
   const nilai=(Number(item.sisa)||0)*(Number(item.harga_terakhir)||0);
   $('kartuDetail').innerHTML=`<section class="card page-card kartu-detail-card" data-barang-id="${id}"><div class="section-head"><div><span class="eyebrow">BUKU GUDANG</span><h3>${esc(item.nama_barang)}</h3><p>${esc(item.kategori?.nama_kategori||'-')} · ${esc(item.merk||'-')} / ${esc(item.tipe||'-')}</p></div><div class="detail-grid"><div><small>Saldo Fisik</small><strong>${item.sisa||0} ${esc(item.satuan||'')}</strong></div><div><small>Harga Terakhir</small><strong>${rupiah(item.harga_terakhir)}</strong></div><div><small>Nilai Sisa</small><strong>${rupiah(nilai)}</strong></div><div><small>Mutasi</small><strong>${rows.length} transaksi</strong></div></div></div><div class="table-wrap"><table><thead><tr><th>No</th><th>Tanggal</th><th>Jenis</th><th>Uraian / Kronologi</th><th>Harga Beli</th><th>Masuk</th><th>Keluar</th><th>Sisa Saldo</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${fmtDate(r.date)}</td><td><span class="badge-soft ${r.type==='MASUK'||r.type==='OPNAME IN'?'success':''}">${r.type}</span></td><td>${esc(r.desc)}</td><td>${r.price?rupiah(r.price):'-'}</td><td>${r.qtyIn||'-'}</td><td>${r.qtyOut||'-'}</td><td><strong>${r.saldo}</strong></td></tr>`).join('')||emptyRow(8)}</tbody></table></div><div class="form-actions"><button class="ghost" id="closeKartu">Tutup Detail</button></div></section>`;
   $('closeKartu').onclick=()=>$('kartuDetail').innerHTML='';
+  enhanceTables($('kartuDetail'));
 }
 async function kategoriPage(){const {data,error}=await client.from('kategori').select('*').order('id');if(error)throw error;return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DATA REFERENSI</span><h2>Kategori</h2><p>Kelola klasifikasi barang.</p></div>${profile?.role==='admin'?'<button class="primary" id="addKategori">＋ Tambah Kategori</button>':''}</div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Nama Kategori</th><th>Aksi</th></tr></thead><tbody>${data.map(r=>`<tr><td>#${r.id}</td><td><strong>${esc(r.nama_kategori)}</strong></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-kat" data-id="'+r.id+'">Edit</button><button class="btn-sm danger delete-kat" data-id="'+r.id+'">Hapus</button></div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`).join('')||emptyRow(3)}</tbody></table></div></section>`}
 async function penggunaPage(){
@@ -173,7 +297,7 @@ async function riwayatPage(){
       target:r.nama_penerima||'-',doc:'Penerimaan',status:'AKTIF',
       items:[{name:r.barang?.nama_barang||'-',unit:r.barang?.satuan||'',qty:r.jumlah,serial:r.nomor_awal&&r.nomor_akhir?r.nomor_awal+' → '+r.nomor_akhir:''}]
     })),
-    ...(keluar||[]).map(r=>({
+    ...(keluar||[]).filter(r=>(r.status||'AKTIF')==='AKTIF').map(r=>({
       type:'KELUAR',date:r.tanggal_keluar,id:r.id,party:r.penerima_nama||'-',
       target:r.tujuan_ruangan||'-',doc:r.jenis_dokumen||'Nota Dinas',status:r.status||'AKTIF',
       items:(r.detail_barang_keluar||[]).map(d=>({
@@ -194,9 +318,6 @@ async function riwayatPage(){
     const cancelAction=profile?.role==='admin'&&r.type==='KELUAR'&&r.status==='AKTIF'
       ? '<button class="btn-sm danger history-cancel" data-id="'+r.id+'">Batalkan</button>'
       : '';
-    const deleteHistoryAction=profile?.role==='admin'&&r.type==='KELUAR'&&r.status==='DIBATALKAN'
-      ? '<button class="btn-sm danger history-delete" data-id="'+r.id+'">Hapus Riwayat</button>'
-      : '';
     const printAction=r.type==='KELUAR'
       ? '<button class="btn-sm sipb-inline-print" data-id="'+r.id+'">Cetak</button>'
       : '';
@@ -206,7 +327,7 @@ async function riwayatPage(){
       '<td>'+esc(r.target)+'</td><td>'+esc(r.doc)+'</td><td>'+r.items.length+'</td>'+
       '<td><span class="badge-soft '+(r.status==='AKTIF'?'success':'')+'">'+r.status+'</span></td>'+
       '<td><div class="actions"><button class="btn-sm history-detail" data-key="'+key(r.type,r.id)+'">Detail</button>'+
-      cancelAction+deleteHistoryAction+printAction+'</div></td></tr>';
+      cancelAction+printAction+'</div></td></tr>';
   }).join('');
   return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">AUDIT PERSEDIAAN</span><h2>Riwayat Transaksi</h2><p>Gabungan penerimaan dan pengeluaran barang, termasuk rincian item dan nomor seri Kuasi.</p></div><span class="status-pill">'+rows.length+' transaksi</span></div>'+
     '<div class="filter-bar"><div class="search-box">⌕<input id="historySearch" placeholder="Cari tanggal, penerima, barang, atau tujuan..."></div>'+
@@ -218,7 +339,7 @@ function showHistoryDetail(k){
   const r=window.__sipbHistory?.[k];if(!r)return;
   const box=document.createElement('div');box.className='modal-backdrop';
   box.innerHTML=`<div class="modal-card"><div class="modal-head"><div><span class="eyebrow">${r.type==='MASUK'?'PENERIMAAN':r.type==='OPNAME'?'STOCK OPNAME':'PENGELUARAN'}</span><h2>Detail Transaksi #${r.id}</h2></div><button class="modal-close" aria-label="Tutup">×</button></div><div class="detail-grid"><div><small>Tanggal</small><strong>${fmtDate(r.date)}</strong></div><div><small>Pihak</small><strong>${esc(r.party)}</strong></div><div><small>Tujuan/Penerima</small><strong>${esc(r.target)}</strong></div><div><small>Status</small><strong><span class="badge-soft ${r.status==='AKTIF'?'success':''}">${r.status}</span></strong></div></div><div class="table-wrap"><table><thead><tr><th>Barang</th><th>Satuan</th><th>Jumlah</th><th>Nomor Seri</th></tr></thead><tbody>${r.items.map(i=>'<tr><td><strong>'+esc(i.name)+'</strong></td><td>'+esc(i.unit||'-')+'</td><td>'+i.qty+'</td><td>'+esc(i.serial||'-')+'</td></tr>').join('')}</tbody></table></div></div>`;
-  document.body.appendChild(box);const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.onclick=e=>{if(e.target===box)close()};
+  document.body.appendChild(box);enhanceTables(box);const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.onclick=e=>{if(e.target===box)close()};
 }
 const menu=[['dashboard','Dashboard'],['barang_masuk','Barang Masuk'],['barang_keluar','Barang Keluar'],['stock_opname','Stock Opname'],['barang','Master Barang'],['kategori','Kategori'],['pegawai','Pegawai'],['kartu','Kartu Persediaan'],['kuasi','Stok Kuasi'],['riwayat','Riwayat Transaksi'],['pengguna','Kelola Pengguna']];
 async function renderApp(page='dashboard', restoreScrollY=null){
@@ -254,6 +375,7 @@ async function renderApp(page='dashboard', restoreScrollY=null){
     let html=page==='dashboard'?await dashboard():page==='barang'?await barangPage():page==='kategori'?await kategoriPage():page==='pegawai'?await pegawaiPage():page==='barang_masuk'?await barangMasukPage():page==='barang_keluar'?await barangKeluarPage():page==='stock_opname'?await stockOpnamePage():page==='kartu'?await kartuPage():page==='kuasi'?await kuasiPage():page==='riwayat'?await riwayatPage():page==='pengguna'?await penggunaPage():await dashboard();
     $('content').innerHTML=html;
     bind(page);
+    enhanceTables(document.getElementById('content'));
     if(page==='dashboard')renderDashboardCharts();
     if(Number.isFinite(restoreScrollY)){
       requestAnimationFrame(()=>requestAnimationFrame(()=>{
@@ -335,22 +457,10 @@ function bind(page){
       if(!confirm('Batalkan transaksi barang keluar #'+id+'? Stok akan dikembalikan dan transaksi tetap tercatat sebagai DIBATALKAN.'))return;
       btn.disabled=true; btn.textContent='Memproses...';
       try{
-        const result=await client.rpc('cancel_barang_keluar',{p_transaksi_id:id});
-        if(result.error)throw result.error;
-        toast('Transaksi #'+id+' dibatalkan. Stok telah dikembalikan.');
+        await cancelAndDeleteOutgoing(id);
+        toast('Transaksi #'+id+' dibatalkan dan riwayatnya dihapus. Stok telah dikembalikan.');
         renderApp('riwayat');
       }catch(e){btn.disabled=false;btn.textContent='Batalkan';fail(e)}
-    });
-    document.querySelectorAll('.history-delete').forEach(btn=>btn.onclick=async()=>{
-      const id=Number(btn.dataset.id); if(!id)return;
-      if(!confirm('Hapus permanen riwayat Barang Keluar #'+id+'? Data transaksi dan rincian pengeluarannya tidak dapat dikembalikan.'))return;
-      btn.disabled=true; btn.textContent='Menghapus...';
-      try{
-        const result=await client.rpc('delete_cancelled_barang_keluar',{p_transaksi_id:id});
-        if(result.error)throw result.error;
-        toast('Riwayat Barang Keluar #'+id+' berhasil dihapus.');
-        renderApp('riwayat');
-      }catch(e){btn.disabled=false;btn.textContent='Hapus Riwayat';fail(e)}
     });
   }
   if(page==='barang'){
@@ -388,7 +498,7 @@ function bind(page){
     document.querySelectorAll('.delete-kat').forEach(btn=>btn.onclick=async()=>{if(!confirm('Hapus kategori ini? Barang yang masih memakai kategori ini dapat mencegah penghapusan.'))return;const {error}=await client.from('kategori').delete().eq('id',+btn.dataset.id);if(error)return fail(error);toast('Kategori dihapus');renderApp('kategori')});
   }
   if(page==='barang_masuk') $('addMasuk').onclick=async()=>{$('content').innerHTML=await barangMasukForm();bindMasukForm()};
-  if(page==='barang_keluar') { const add=$('addKeluar'); if(add) add.onclick=async()=>{$('content').innerHTML=await barangKeluarForm();bindKeluarForm()}; document.querySelectorAll('.cancel-keluar').forEach(btn=>btn.onclick=async()=>{const id=Number(btn.dataset.id);if(!id)return;if(!confirm('Batalkan transaksi barang keluar #'+id+'? Stok akan dikembalikan dan transaksi tetap tercatat sebagai DIBATALKAN.'))return;btn.disabled=true;btn.textContent='Membatalkan...';try{const result=await client.rpc('cancel_barang_keluar',{p_transaksi_id:id});if(result.error)throw result.error;toast('Transaksi #'+id+' dibatalkan. Stok telah dikembalikan.');renderApp('barang_keluar')}catch(e){btn.disabled=false;btn.textContent='Batalkan';fail(e)}}); }  if(page==='stock_opname') $('addOpname').onclick=async()=>{$('content').innerHTML=await stockOpnameForm();bindOpnameForm()};
+  if(page==='barang_keluar') { const add=$('addKeluar'); if(add) add.onclick=async()=>{$('content').innerHTML=await barangKeluarForm();bindKeluarForm()}; document.querySelectorAll('.cancel-keluar').forEach(btn=>btn.onclick=async()=>{const id=Number(btn.dataset.id);if(!id)return;if(!confirm('Batalkan transaksi barang keluar #'+id+'? Stok akan dikembalikan dan transaksi tetap tercatat sebagai DIBATALKAN.'))return;btn.disabled=true;btn.textContent='Membatalkan...';try{await cancelAndDeleteOutgoing(id);toast('Transaksi #'+id+' dibatalkan dan riwayatnya dihapus. Stok telah dikembalikan.');renderApp('barang_keluar')}catch(e){btn.disabled=false;btn.textContent='Batalkan';fail(e)}}); }  if(page==='stock_opname') $('addOpname').onclick=async()=>{$('content').innerHTML=await stockOpnameForm();bindOpnameForm()};
 }
 function bindForm(id){$('backBarang').onclick=()=>renderApp('barang');$('cancelBarang').onclick=()=>renderApp('barang');$('saveBarang').onclick=async()=>{const payload={nama_barang:$('b_nama').value.trim(),kategori_id:$('b_kat').value?+$('b_kat').value:null,tipe:$('b_tipe').value.trim()||'-',merk:$('b_merk').value.trim()||'-',satuan:$('b_satuan').value.trim(),stok_minimum:+$('b_min').value||0};if(!payload.nama_barang)return toast('Nama barang wajib diisi.','error');const btn=$('saveBarang');btn.disabled=true;btn.textContent='Menyimpan...';const q=id?client.from('barang').update(payload).eq('id',id):client.from('barang').insert(payload);const {error}=await q;if(error){btn.disabled=false;btn.textContent=id?'Simpan Perubahan':'Simpan Barang';return fail(error)}toast(id?'Barang diperbarui':'Barang ditambahkan');renderApp('barang')}}
 document.addEventListener('click',e=>{
