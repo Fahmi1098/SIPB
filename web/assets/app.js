@@ -96,7 +96,29 @@ async function penggunaPage(){
   if(error)throw error;
   return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">ADMINISTRASI</span><h2>Kelola Pengguna</h2><p>Atur peran dan status akun SIPB. Pembuatan akun Auth dilakukan melalui Supabase Auth.</p></div><span class="status-pill">'+(data?.length||0)+' pengguna</span></div><div class="alert-box"><strong>Catatan:</strong> perubahan di sini berlaku pada hak akses database. Jangan menonaktifkan akun admin terakhir.</div><div class="table-wrap"><table><thead><tr><th>Pengguna</th><th>Username</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead><tbody>'+(data||[]).map(u=>'<tr data-user="'+esc(u.id)+'"><td><strong>'+esc(u.nama_lengkap||'-')+'</strong><br><small>'+esc(u.id)+'</small></td><td>'+esc(u.username||'-')+'</td><td><select class="user-role" data-id="'+u.id+'"><option value="admin" '+(u.role==='admin'?'selected':'')+'>Admin</option><option value="user" '+(u.role==='user'?'selected':'')+'>User</option></select></td><td><button type="button" class="status-toggle '+(u.is_active?'on':'')+'" data-id="'+u.id+'" data-active="'+(u.is_active?'1':'0')+'"><span></span>'+(u.is_active?'Aktif':'Nonaktif')+'</button></td><td><button class="btn-sm user-save" data-id="'+u.id+'">Simpan</button></td></tr>').join('')||emptyRow(5)+'</tbody></table></div></section>';
 }
-async function pegawaiPage(){return simple('Pegawai','pegawai',[['id','ID'],['nama_pegawai','Nama'],['nip','NIP'],['status_pegawai','Status'],['jabatan','Jabatan']])}
+async function pegawaiPage(){
+  const {data,error}=await client.from('pegawai').select('*').order('nama_pegawai');
+  if(error)throw error;
+  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DATA REFERENSI</span><h2>Pegawai</h2><p>Kelola data pegawai untuk kebutuhan penyerah dan penerima barang.</p></div>'+
+    (profile?.role==='admin'?'<button class="primary" id="addPegawai">＋ Tambah Pegawai</button>':'')+
+    '</div><div class="filter-bar"><div class="search-box">⌕<input id="pegawaiSearch" placeholder="Cari nama, NIP, status, atau jabatan..."></div><span id="pegawaiCount" class="result-count">'+(data?.length||0)+' data</span></div>'+
+    '<div class="table-wrap"><table id="pegawaiTable"><thead><tr><th>ID</th><th>Nama</th><th>NIP</th><th>Status</th><th>Jabatan</th><th>Aksi</th></tr></thead><tbody>'+
+    (data||[]).map(r=>'<tr data-search="'+esc([r.nama_pegawai,r.nip,r.status_pegawai,r.jabatan].join(' ').toLowerCase())+'"><td class="id-cell">#'+r.id+'</td><td><strong>'+esc(r.nama_pegawai)+'</strong></td><td>'+esc(r.nip||'-')+'</td><td>'+esc(r.status_pegawai||'-')+'</td><td>'+esc(r.jabatan||'-')+'</td><td>'+(profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-pegawai" data-id="'+r.id+'">Edit</button><button class="btn-sm danger delete-pegawai" data-id="'+r.id+'">Hapus</button></div>':'<span class="badge-soft">Lihat</span>')+'</td></tr>').join('')||emptyRow(6)+
+    '</tbody></table></div></section>';
+}
+async function pegawaiForm(id=null){
+  let row={nama_pegawai:'',nip:'',status_pegawai:'Non-ASN',jabatan:''};
+  if(id){
+    const {data,error}=await client.from('pegawai').select('*').eq('id',id).single();
+    if(error)throw error; row=data;
+  }
+  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DATA REFERENSI</span><h2>'+ (id?'Edit Pegawai':'Tambah Pegawai') +'</h2><p>Data ini digunakan pada transaksi barang masuk dan barang keluar.</p></div><button class="ghost" id="backPegawai">← Kembali</button></div>'+
+    '<div class="form-grid"><label>Nama Pegawai <input id="p_nama" maxlength="100" value="'+esc(row.nama_pegawai||'')+'"></label>'+
+    '<label>NIP <input id="p_nip" maxlength="50" value="'+esc(row.nip||'')+'"></label>'+
+    '<label>Status Kepegawaian <select id="p_status"><option value="ASN" '+(row.status_pegawai==='ASN'?'selected':'')+'>ASN</option><option value="PPPK" '+(row.status_pegawai==='PPPK'?'selected':'')+'>PPPK</option><option value="PNS" '+(row.status_pegawai==='PNS'?'selected':'')+'>PNS</option><option value="Non-ASN" '+(row.status_pegawai==='Non-ASN'||!row.status_pegawai?'selected':'')+'>Non-ASN</option></select></label>'+
+    '<label>Jabatan <input id="p_jabatan" maxlength="100" value="'+esc(row.jabatan||'')+'"></label></div>'+
+    '<div class="form-actions"><button class="primary" id="savePegawai">'+(id?'Simpan Perubahan':'Simpan Pegawai')+'</button><button class="ghost" id="cancelPegawai">Batal</button></div></section>';
+}
 async function riwayatPage(){
   const [{data:keluar,error:ke},{data:masuk,error:me},{data:opname,error:oe}]=await Promise.all([
     client.from('transaksi_keluar').select('*,detail_barang_keluar(id,jumlah,nomor_awal,nomor_akhir,nomor_dus,barang:barang_id(nama_barang,satuan))').order('tanggal_keluar',{ascending:false}).order('id',{ascending:false}).limit(200),
@@ -216,6 +238,14 @@ function bind(page){
     $('barangSearch').oninput=apply;$('barangFilter').onchange=apply;
     document.querySelectorAll('.edit-barang').forEach(btn=>btn.onclick=async()=>{$('content').innerHTML=loading('Memuat barang...');$('content').innerHTML=await barangForm(+btn.dataset.id);bindForm(+btn.dataset.id)});
     document.querySelectorAll('.delete-barang').forEach(btn=>btn.onclick=async()=>{if(!confirm('Hapus barang ini?'))return;const {error}=await client.from('barang').delete().eq('id',+btn.dataset.id);if(error)return fail(error);toast('Barang berhasil dihapus');renderApp('barang')});
+  }
+  if(page==='pegawai'){
+    const add=$('addPegawai');
+    if(add) add.onclick=async()=>{try{$('content').innerHTML=await pegawaiForm();bindPegawaiForm()}catch(e){fail(e)}};
+    const apply=()=>{const q=$('pegawaiSearch').value.toLowerCase().trim();let shown=0;document.querySelectorAll('#pegawaiTable tbody tr[data-search]').forEach(r=>{const ok=!q||r.dataset.search.includes(q);r.style.display=ok?'':'none';if(ok)shown++});$('pegawaiCount').textContent=shown+' data'};
+    $('pegawaiSearch').oninput=apply;
+    document.querySelectorAll('.edit-pegawai').forEach(btn=>btn.onclick=async()=>{try{$('content').innerHTML=loading('Memuat pegawai...');$('content').innerHTML=await pegawaiForm(Number(btn.dataset.id));bindPegawaiForm(Number(btn.dataset.id))}catch(e){fail(e)}});
+    document.querySelectorAll('.delete-pegawai').forEach(btn=>btn.onclick=async()=>{if(!confirm('Hapus data pegawai ini? Data historis transaksi tetap tersimpan.'))return;btn.disabled=true;const {error}=await client.from('pegawai').delete().eq('id',Number(btn.dataset.id));if(error){btn.disabled=false;return fail(error)}toast('Pegawai berhasil dihapus.');renderApp('pegawai')});
   }
   if(page==='kategori'){
     const addKategori=$('addKategori'); if(addKategori) addKategori.onclick=async()=>{const n=prompt('Nama kategori baru:');if(!n?.trim())return;const {error}=await client.from('kategori').insert({nama_kategori:n.trim()});if(error)return fail(error);toast('Kategori ditambahkan');renderApp('kategori')};
@@ -372,3 +402,18 @@ async function bindMasukForm(){
   };
 }
 
+
+async function bindPegawaiForm(id=null){
+  $('backPegawai').onclick=()=>renderApp('pegawai');
+  $('cancelPegawai').onclick=()=>renderApp('pegawai');
+  $('savePegawai').onclick=async()=>{
+    const payload={nama_pegawai:$('p_nama').value.trim(),nip:$('p_nip').value.trim()||null,status_pegawai:$('p_status').value,jabatan:$('p_jabatan').value.trim()||null};
+    if(!payload.nama_pegawai)return toast('Nama pegawai wajib diisi.','error');
+    const btn=$('savePegawai');btn.disabled=true;btn.textContent='Menyimpan...';
+    try{
+      const q=id?client.from('pegawai').update(payload).eq('id',id):client.from('pegawai').insert(payload);
+      const {error}=await q;if(error)throw error;
+      toast(id?'Data pegawai diperbarui.':'Pegawai berhasil ditambahkan.');renderApp('pegawai');
+    }catch(e){btn.disabled=false;btn.textContent=id?'Simpan Perubahan':'Simpan Pegawai';fail(e)}
+  };
+}
