@@ -217,6 +217,23 @@ function bind(page){
 function bindForm(id){$('backBarang').onclick=()=>renderApp('barang');$('cancelBarang').onclick=()=>renderApp('barang');$('saveBarang').onclick=async()=>{const payload={nama_barang:$('b_nama').value.trim(),kategori_id:$('b_kat').value?+$('b_kat').value:null,tipe:$('b_tipe').value.trim()||'-',merk:$('b_merk').value.trim()||'-',satuan:$('b_satuan').value.trim(),stok_minimum:+$('b_min').value||0};if(!payload.nama_barang)return toast('Nama barang wajib diisi.','error');const btn=$('saveBarang');btn.disabled=true;btn.textContent='Menyimpan...';const q=id?client.from('barang').update(payload).eq('id',id):client.from('barang').insert(payload);const {error}=await q;if(error){btn.disabled=false;btn.textContent=id?'Simpan Perubahan':'Simpan Barang';return fail(error)}toast(id?'Barang diperbarui':'Barang ditambahkan');renderApp('barang')}}
 async function init(){if(!cfg||!cfg.supabaseUrl||!cfg.supabaseAnonKey||cfg.supabaseUrl.includes('YOUR-PROJECT'))return showLogin('Konfigurasi Supabase belum tersedia.');client=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});client.auth.onAuthStateChange(e=>{if(e==='SIGNED_OUT')showLogin()});const r=await client.auth.getSession();session=r.data.session;if(session)renderApp();else showLogin()}
 init()
+async function stockOpnameForm(){
+  const {data:items,error}=await client.from('barang')
+    .select('id,nama_barang,satuan,sisa,stok_minimum,kategori:kategori_id(nama_kategori)')
+    .order('nama_barang');
+  if(error)throw error;
+  const eligible=(items||[]).filter(x=>!String(x.kategori?.nama_kategori||'').toLowerCase().includes('kuasi'));
+  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PERSEDIAAN</span><h2>Rekam Stock Opname</h2><p>Catat stok fisik dan biarkan database menghitung selisih serta memperbarui saldo secara atomik.</p></div><button class="ghost" id="backOpname">← Kembali</button></div>'+
+    '<div class="alert-box"><strong>Catatan:</strong> barang Kuasi tidak ditampilkan karena saldo Kuasi harus direkonsiliasi melalui batch/serial FIFO.</div>'+
+    '<div class="form-grid"><label>Barang <select id="o_barang"><option value="">- Pilih barang -</option>'+
+    eligible.map(x=>'<option value="'+x.id+'" data-stock="'+(x.sisa??0)+'">'+esc(x.nama_barang)+' — stok '+(x.sisa??0)+' '+esc(x.satuan||'')+'</option>').join('')+
+    '</select></label><label>Stok Sistem <input id="o_sistem" type="number" value="0" readonly></label>'+
+    '<label>Stok Fisik <input id="o_fisik" type="number" min="0" step="1" value="0"></label>'+
+    '<label>Tanggal Opname <input id="o_tanggal" type="date" value="'+localDate()+'"></label>'+
+    '<label>Petugas <input id="o_petugas" value="'+esc(profile?.nama_lengkap||session?.user?.email||'')+'" required></label>'+
+    '<label style="grid-column:1/-1">Keterangan <textarea id="o_keterangan" rows="3" placeholder="Contoh: Hasil pemeriksaan fisik gudang"></textarea></label></div>'+
+    '<div class="form-actions"><button class="primary" id="saveOpname">Simpan Stock Opname</button><button class="ghost" id="cancelOpname">Batal</button></div></section>';
+}
 async function bindOpnameForm(){
   $('backOpname').onclick=()=>renderApp('stock_opname');
   $('cancelOpname').onclick=()=>renderApp('stock_opname');
