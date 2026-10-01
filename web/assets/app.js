@@ -98,11 +98,12 @@ async function penggunaPage(){
 }
 async function pegawaiPage(){return simple('Pegawai','pegawai',[['id','ID'],['nama_pegawai','Nama'],['nip','NIP'],['status_pegawai','Status'],['jabatan','Jabatan']])}
 async function riwayatPage(){
-  const [{data:keluar,error:ke},{data:masuk,error:me}]=await Promise.all([
+  const [{data:keluar,error:ke},{data:masuk,error:me},{data:opname,error:oe}]=await Promise.all([
     client.from('transaksi_keluar').select('*,detail_barang_keluar(id,jumlah,nomor_awal,nomor_akhir,nomor_dus,barang:barang_id(nama_barang,satuan))').order('tanggal_keluar',{ascending:false}).order('id',{ascending:false}).limit(200),
-    client.from('barang_masuk').select('*,barang:barang_id(nama_barang,satuan)').order('tanggal_masuk',{ascending:false}).order('id',{ascending:false}).limit(200)
+    client.from('barang_masuk').select('*,barang:barang_id(nama_barang,satuan)').order('tanggal_masuk',{ascending:false}).order('id',{ascending:false}).limit(200),
+    client.from('riwayat_opname').select('*,barang:barang_id(nama_barang,satuan)').order('tanggal_opname',{ascending:false}).order('id',{ascending:false}).limit(200)
   ]);
-  if(ke||me)throw(ke||me);
+  if(ke||me||oe)throw(ke||me||oe);
   const rows=[
     ...(masuk||[]).map(r=>({
       type:'MASUK',date:r.tanggal_masuk,id:r.id,party:r.nama_penyerah||'-',
@@ -116,6 +117,12 @@ async function riwayatPage(){
         name:d.barang?.nama_barang||'-',unit:d.barang?.satuan||'',qty:d.jumlah,
         serial:d.nomor_awal&&d.nomor_akhir?d.nomor_awal+' → '+d.nomor_akhir:''
       }))
+    })),
+    ...(opname||[]).map(r=>({
+      type:'OPNAME',date:r.tanggal_opname,id:r.id,party:r.petugas||'-',
+      target:r.barang?.nama_barang||'-',doc:'Stock Opname',status:'DICATAT',
+      items:[{name:r.barang?.nama_barang||'-',unit:r.barang?.satuan||'',qty:r.stok_fisik,
+        serial:'Sistem '+(r.stok_sistem??0)+' → Fisik '+(r.stok_fisik??0)+' (Selisih '+(r.selisih??0)+')'}]
     }))
   ].sort((a,b)=>String(b.date).localeCompare(String(a.date))||Number(b.id)-Number(a.id));
   const key=(type,id)=>type+'_'+id;
@@ -137,14 +144,14 @@ async function riwayatPage(){
   }).join('');
   return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">AUDIT PERSEDIAAN</span><h2>Riwayat Transaksi</h2><p>Gabungan penerimaan dan pengeluaran barang, termasuk rincian item dan nomor seri Kuasi.</p></div><span class="status-pill">'+rows.length+' transaksi</span></div>'+
     '<div class="filter-bar"><div class="search-box">⌕<input id="historySearch" placeholder="Cari tanggal, penerima, barang, atau tujuan..."></div>'+
-    '<select id="historyType"><option value="">Semua transaksi</option><option value="MASUK">Barang Masuk</option><option value="KELUAR">Barang Keluar</option></select></div>'+
+    '<select id="historyType"><option value="">Semua transaksi</option><option value="MASUK">Barang Masuk</option><option value="KELUAR">Barang Keluar</option><option value="OPNAME">Stock Opname</option></select></div>'+
     '<div class="table-wrap"><table id="historyTable"><thead><tr><th>Jenis</th><th>Tanggal</th><th>No.</th><th>Pihak</th><th>Tujuan/Penerima</th><th>Dokumen</th><th>Item</th><th>Status</th><th>Aksi</th></tr></thead>'+
     '<tbody>'+tableRows+(tableRows?'':emptyRow(9))+'</tbody></table></div></section>';
 }
 function showHistoryDetail(k){
   const r=window.__sipbHistory?.[k];if(!r)return;
   const box=document.createElement('div');box.className='modal-backdrop';
-  box.innerHTML=`<div class="modal-card"><div class="modal-head"><div><span class="eyebrow">${r.type==='MASUK'?'PENERIMAAN':'PENGELUARAN'}</span><h2>Detail Transaksi #${r.id}</h2></div><button class="modal-close" aria-label="Tutup">×</button></div><div class="detail-grid"><div><small>Tanggal</small><strong>${fmtDate(r.date)}</strong></div><div><small>Pihak</small><strong>${esc(r.party)}</strong></div><div><small>Tujuan/Penerima</small><strong>${esc(r.target)}</strong></div><div><small>Status</small><strong><span class="badge-soft ${r.status==='AKTIF'?'success':''}">${r.status}</span></strong></div></div><div class="table-wrap"><table><thead><tr><th>Barang</th><th>Satuan</th><th>Jumlah</th><th>Nomor Seri</th></tr></thead><tbody>${r.items.map(i=>'<tr><td><strong>'+esc(i.name)+'</strong></td><td>'+esc(i.unit||'-')+'</td><td>'+i.qty+'</td><td>'+esc(i.serial||'-')+'</td></tr>').join('')}</tbody></table></div></div>`;
+  box.innerHTML=`<div class="modal-card"><div class="modal-head"><div><span class="eyebrow">${r.type==='MASUK'?'PENERIMAAN':r.type==='OPNAME'?'STOCK OPNAME':'PENGELUARAN'}</span><h2>Detail Transaksi #${r.id}</h2></div><button class="modal-close" aria-label="Tutup">×</button></div><div class="detail-grid"><div><small>Tanggal</small><strong>${fmtDate(r.date)}</strong></div><div><small>Pihak</small><strong>${esc(r.party)}</strong></div><div><small>Tujuan/Penerima</small><strong>${esc(r.target)}</strong></div><div><small>Status</small><strong><span class="badge-soft ${r.status==='AKTIF'?'success':''}">${r.status}</span></strong></div></div><div class="table-wrap"><table><thead><tr><th>Barang</th><th>Satuan</th><th>Jumlah</th><th>Nomor Seri</th></tr></thead><tbody>${r.items.map(i=>'<tr><td><strong>'+esc(i.name)+'</strong></td><td>'+esc(i.unit||'-')+'</td><td>'+i.qty+'</td><td>'+esc(i.serial||'-')+'</td></tr>').join('')}</tbody></table></div></div>`;
   document.body.appendChild(box);const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.onclick=e=>{if(e.target===box)close()};
 }
 const menu=[['dashboard','Dashboard','⌂'],['barang_masuk','Barang Masuk','↓'],['barang_keluar','Barang Keluar','↑'],['stock_opname','Stock Opname','✓'],['barang','Master Barang','▣'],['kategori','Kategori','◇'],['pegawai','Pegawai','♙'],['kartu','Kartu Persediaan','▤'],['kuasi','Stok Kuasi','#'],['riwayat','Riwayat Transaksi','◷'],['pengguna','Kelola Pengguna','⚙']];
