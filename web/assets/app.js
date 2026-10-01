@@ -41,8 +41,10 @@ function sortTable(table,col,dir=1){
   });
 }
 function enhanceTables(scope=document){
+  const isDocument=scope===document;
   const rootScope=scope?.querySelectorAll?scope:document;
-  rootScope.querySelectorAll('#content table').forEach(table=>{
+  const tables=isDocument?document.querySelectorAll('#content table'):rootScope.querySelectorAll('table');
+  tables.forEach(table=>{
     if(table.dataset.sortReady!=='1'){
       [...(table.tHead?.rows?.[0]?.cells||[])].forEach((th,col)=>{
         const label=th.textContent.trim();
