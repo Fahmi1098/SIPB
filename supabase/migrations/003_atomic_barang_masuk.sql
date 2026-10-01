@@ -79,6 +79,10 @@ BEGIN
     FROM public.kategori
     WHERE id=p_kategori_id;
   ELSE
+    IF NOT public.sipb_is_admin() THEN
+      RAISE EXCEPTION 'Membuat master barang baru hanya dapat dilakukan oleh admin.';
+    END IF;
+
     IF COALESCE(trim(p_nama_barang),'') = '' THEN
       RAISE EXCEPTION 'Nama barang baru wajib diisi';
     END IF;
