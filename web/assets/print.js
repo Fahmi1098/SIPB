@@ -66,7 +66,7 @@
         *{box-sizing:border-box}
         html,body{margin:0;padding:0}
         body{background:#eee;font-family:Arial,Helvetica,sans-serif;color:#111;font-size:12pt;line-height:1.45}
-        .sheet{width:21cm;min-height:29.7cm;margin:0 auto;background:#fff;padding:1.2cm 2cm 2.5cm 3cm}
+        .sheet{width:21cm;min-height:29.7cm;margin:0 auto;background:#fff;padding:1.2cm 2.5cm 2.5cm 2.5cm}
         .sheet.landscape{width:29.7cm;min-height:21cm;padding:1.2cm 2cm 2.5cm 2cm;page:landscape}
         .sheet.folio{width:21.5cm;min-height:33cm;padding:1.35cm 1.5cm 2.5cm 2cm;page:folio}
         .sheet + .sheet{break-before:page}
