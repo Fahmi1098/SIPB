@@ -3760,3 +3760,108 @@ tbody tr:hover{
 .top-nav-group:focus-within::before{
   display:block;
 }
+
+/* =========================================================
+   SIPB NATIVE-DIALOG REPLACEMENT
+   ========================================================= */
+.sipb-dialog-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:10000;
+  display:grid;
+  place-items:center;
+  padding:18px;
+  background:rgba(5,24,42,.48);
+  backdrop-filter:blur(4px);
+  animation:sipbDialogFade .16s ease both;
+}
+.sipb-dialog{
+  width:min(440px,100%);
+  display:grid;
+  grid-template-columns:48px minmax(0,1fr);
+  column-gap:13px;
+  padding:20px;
+  border:1px solid var(--sipb-line,#DFE7EF);
+  border-radius:17px;
+  background:var(--sipb-white,#fff);
+  color:var(--sipb-text,#182B42);
+  box-shadow:0 24px 70px rgba(4,32,56,.24);
+  animation:sipbDialogPop .18s cubic-bezier(.2,.8,.2,1) both;
+}
+.sipb-dialog-icon{
+  width:42px;
+  height:42px;
+  display:grid;
+  place-items:center;
+  border-radius:12px;
+  background:rgba(11,92,171,.10);
+  color:var(--sipb-blue,#0B5CAB);
+  font-size:1.05rem;
+  font-weight:900;
+}
+.sipb-dialog-body{
+  min-width:0;
+}
+.sipb-dialog-body h3{
+  margin:2px 0 6px;
+  font-size:.92rem;
+  font-weight:850;
+}
+.sipb-dialog-body p{
+  margin:0;
+  color:var(--sipb-muted,#6B7D90);
+  font-size:.72rem;
+  line-height:1.55;
+  text-align:left;
+}
+.sipb-dialog-input{
+  width:100%;
+  min-height:42px;
+  margin-top:12px;
+  padding:9px 11px;
+  border:1px solid var(--sipb-line,#DFE7EF);
+  border-radius:10px;
+  outline:none;
+  background:var(--sipb-white,#fff);
+  color:var(--sipb-text,#182B42);
+  font:inherit;
+  font-size:.74rem;
+}
+.sipb-dialog-input:focus{
+  border-color:#6DA7D8;
+  box-shadow:0 0 0 4px rgba(11,92,171,.08);
+}
+.sipb-dialog-actions{
+  grid-column:1 / -1;
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  margin-top:18px;
+}
+.sipb-dialog-actions button{
+  min-height:38px;
+  padding:8px 14px;
+}
+@keyframes sipbDialogFade{from{opacity:0}to{opacity:1}}
+@keyframes sipbDialogPop{from{opacity:0;transform:translateY(7px) scale(.98)}to{opacity:1;transform:none}}
+:root[data-theme="dark"] .sipb-dialog{
+  background:#17232E;
+  border-color:#34495B;
+  box-shadow:0 24px 70px rgba(0,0,0,.42);
+}
+:root[data-theme="dark"] .sipb-dialog-body p{
+  color:#A6B4C2;
+}
+:root[data-theme="dark"] .sipb-dialog-input{
+  background:#14222E;
+  color:#EDF3F8;
+  border-color:#34495B;
+}
+@media(max-width:520px){
+  .sipb-dialog{
+    grid-template-columns:42px minmax(0,1fr);
+    padding:17px;
+    border-radius:15px;
+  }
+  .sipb-dialog-icon{width:38px;height:38px}
+}
