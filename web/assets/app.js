@@ -948,10 +948,45 @@ function bind(page){
     });
   }
   if(page==='barang'){
-    const addBarang=$('addBarang'); if(addBarang) addBarang.onclick=async()=>{$('content').innerHTML=await barangForm();bindForm()};
-    const apply=()=>{const q=$('barangSearch').value.toLowerCase().trim(),cat=$('barangFilter').value;let shown=0;document.querySelectorAll('#barangTable tbody tr[data-search]').forEach(r=>{const ok=(!q||r.dataset.search.includes(q))&&(!cat||r.dataset.kategori===cat);r.style.display=ok?'':'none';if(ok)shown++});$('barangCount').textContent=shown+' data'};
-    $('barangSearch').oninput=apply;$('barangFilter').onchange=apply;
-    document.querySelectorAll('.edit-barang').forEach(btn=>btn.onclick=async()=>{$('content').innerHTML=loading('Memuat barang...');$('content').innerHTML=await barangForm(+btn.dataset.id);bindForm(+btn.dataset.id)});
+    const addBarang=$('addBarang');
+    if(addBarang) addBarang.onclick=async e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      try{
+        $('content').innerHTML=await barangForm();
+        bindForm();
+      }catch(err){fail(err)}
+    };
+    const apply=()=>{
+      const q=$('barangSearch').value.toLowerCase().trim(),cat=$('barangFilter').value;
+      let shown=0;
+      document.querySelectorAll('#barangTable tbody tr[data-search]').forEach(r=>{
+        const ok=(!q||r.dataset.search.includes(q))&&(!cat||r.dataset.kategori===cat);
+        r.style.display=ok?'':'none';
+        if(ok)shown++;
+      });
+      $('barangCount').textContent=shown+' data';
+    };
+    $('barangSearch').oninput=apply;
+    $('barangFilter').onchange=apply;
+    document.querySelectorAll('.edit-barang').forEach(btn=>btn.onclick=async e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      const id=Number(btn.dataset.id);
+      if(!id)return;
+      btn.disabled=true;
+      try{
+        $('content').innerHTML=loading('Memuat data barang...');
+        const html=await barangForm(id);
+        $('content').innerHTML=html;
+        bindForm(id);
+        window.scrollTo({top:0,behavior:'smooth'});
+      }catch(err){
+        fail(err);
+      }finally{
+        btn.disabled=false;
+      }
+    });
     document.querySelectorAll('.delete-barang').forEach(btn=>btn.onclick=async()=>{
       const id=Number(btn.dataset.id);
       if(!id)return;
@@ -989,7 +1024,37 @@ function bind(page){
   }  if(page==='stock_opname') $('addOpname').onclick=async()=>{$('content').innerHTML=await stockOpnameForm();bindOpnameForm()};
 }
 
-function bindForm(id){$('backBarang').onclick=()=>renderApp('barang');$('cancelBarang').onclick=()=>renderApp('barang');$('saveBarang').onclick=async()=>{const payload={nama_barang:$('b_nama').value.trim(),kategori_id:$('b_kat').value?+$('b_kat').value:null,tipe:$('b_tipe').value.trim()||'-',merk:$('b_merk').value.trim()||'-',satuan:$('b_satuan').value.trim(),stok_minimum:+$('b_min').value||0};if(!payload.nama_barang)return toast('Nama barang wajib diisi.','error');const btn=$('saveBarang');btn.disabled=true;btn.textContent='Menyimpan...';const q=id?client.from('barang').update(payload).eq('id',id):client.from('barang').insert(payload);const {error}=await q;if(error){btn.disabled=false;btn.textContent=id?'Simpan Perubahan':'Simpan Barang';return fail(error)}toast(id?'Barang diperbarui':'Barang ditambahkan');renderApp('barang')}}
+function bindForm(id){
+  const back=$('backBarang'),cancel=$('cancelBarang'),save=$('saveBarang');
+  if(back)back.onclick=e=>{e.preventDefault();e.stopPropagation();renderApp('barang')};
+  if(cancel)cancel.onclick=e=>{e.preventDefault();e.stopPropagation();renderApp('barang')};
+  if(save)save.onclick=async e=>{
+    e.preventDefault();
+    e.stopPropagation();
+    const payload={
+      nama_barang:$('b_nama').value.trim(),
+      kategori_id:$('b_kat').value?+$('b_kat').value:null,
+      tipe:$('b_tipe').value.trim()||'-',
+      merk:$('b_merk').value.trim()||'-',
+      satuan:$('b_satuan').value.trim(),
+      stok_minimum:+$('b_min').value||0
+    };
+    if(!payload.nama_barang)return toast('Nama barang wajib diisi.','error');
+    save.disabled=true;
+    save.textContent='Menyimpan...';
+    try{
+      const q=id?client.from('barang').update(payload).eq('id',id):client.from('barang').insert(payload);
+      const {error}=await q;
+      if(error)throw error;
+      toast(id?'Barang diperbarui':'Barang ditambahkan');
+      renderApp('barang');
+    }catch(err){
+      save.disabled=false;
+      save.textContent=id?'Simpan Perubahan':'Simpan Barang';
+      fail(err);
+    }
+  };
+}
 document.addEventListener('click',e=>{
   const target=e.target.closest('[data-page]');
   if(!target)return;
