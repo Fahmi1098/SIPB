@@ -71,7 +71,7 @@ function enhanceTables(scope=document){
       });
       table.dataset.sortReady='1';
     }
-    const card=table.closest('.page-card');
+    const card=table.closest('.page-card,.recent');
     if(!card)return;
     let toolbar=card.querySelector(':scope > .table-tools');
     if(!toolbar){
