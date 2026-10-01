@@ -23,6 +23,8 @@ jobs:
         uses: actions/configure-pages@v5
       - name: Copy official Banten logo into static site
         run: cp inventory/logo_banten.png web/assets/logo_banten.png
+      - name: Copy official Banten logo into static site
+        run: cp inventory/logo_banten.png web/assets/logo_banten.png
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
