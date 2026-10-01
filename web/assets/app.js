@@ -153,6 +153,9 @@ async function riwayatPage(){
     const cancelAction=profile?.role==='admin'&&r.type==='KELUAR'&&r.status==='AKTIF'
       ? '<button class="btn-sm danger history-cancel" data-id="'+r.id+'">Batalkan</button>'
       : '';
+    const deleteHistoryAction=profile?.role==='admin'&&r.type==='KELUAR'&&r.status==='DIBATALKAN'
+      ? '<button class="btn-sm danger history-delete" data-id="'+r.id+'">Hapus Riwayat</button>'
+      : '';
     const printAction=r.type==='KELUAR'
       ? '<button class="btn-sm sipb-inline-print" data-id="'+r.id+'">Cetak</button>'
       : '';
@@ -162,7 +165,7 @@ async function riwayatPage(){
       '<td>'+esc(r.target)+'</td><td>'+esc(r.doc)+'</td><td>'+r.items.length+'</td>'+
       '<td><span class="badge-soft '+(r.status==='AKTIF'?'success':'')+'">'+r.status+'</span></td>'+
       '<td><div class="actions"><button class="btn-sm history-detail" data-key="'+key(r.type,r.id)+'">Detail</button>'+
-      cancelAction+printAction+'</div></td></tr>';
+      cancelAction+deleteHistoryAction+printAction+'</div></td></tr>';
   }).join('');
   return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">AUDIT PERSEDIAAN</span><h2>Riwayat Transaksi</h2><p>Gabungan penerimaan dan pengeluaran barang, termasuk rincian item dan nomor seri Kuasi.</p></div><span class="status-pill">'+rows.length+' transaksi</span></div>'+
     '<div class="filter-bar"><div class="search-box">⌕<input id="historySearch" placeholder="Cari tanggal, penerima, barang, atau tujuan..."></div>'+
@@ -229,6 +232,17 @@ function bind(page){
         toast('Transaksi #'+id+' dibatalkan. Stok telah dikembalikan.');
         renderApp('riwayat');
       }catch(e){btn.disabled=false;btn.textContent='Batalkan';fail(e)}
+    });
+    document.querySelectorAll('.history-delete').forEach(btn=>btn.onclick=async()=>{
+      const id=Number(btn.dataset.id); if(!id)return;
+      if(!confirm('Hapus permanen riwayat Barang Keluar #'+id+'? Data transaksi dan rincian pengeluarannya tidak dapat dikembalikan.'))return;
+      btn.disabled=true; btn.textContent='Menghapus...';
+      try{
+        const result=await client.rpc('delete_cancelled_barang_keluar',{p_transaksi_id:id});
+        if(result.error)throw result.error;
+        toast('Riwayat Barang Keluar #'+id+' berhasil dihapus.');
+        renderApp('riwayat');
+      }catch(e){btn.disabled=false;btn.textContent='Hapus Riwayat';fail(e)}
     });
   }
   if(page==='dashboard') document.querySelectorAll('[data-page="barang_keluar"]').forEach(b=>b.onclick=()=>renderApp('barang_keluar'));
