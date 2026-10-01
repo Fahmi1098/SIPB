@@ -1068,8 +1068,18 @@ function bindForm(id){
 }
 document.addEventListener('click',e=>{
   const target=e.target.closest('[data-page]');
-  if(!target||!target.closest('.top-nav, #content'))return;
+  if(!target)return;
+
+  // Router hanya boleh menangani navigasi yang memang ditujukan untuk pindah halaman.
+  // Input/select/filter/tabel dan tombol aksi halaman tidak boleh pernah diroute ke Dashboard.
+  const isTopNav=!!target.closest('.top-nav');
+  const isRetry=target.classList.contains('retry');
+  const insidePageControls=!!target.closest('.table-tools,.filter-bar,.table-wrap,form,table');
+  const isActionButton=!!target.closest('button:not(.retry)');
+  if(insidePageControls||isActionButton||(!isTopNav&&!isRetry))return;
+
   e.preventDefault();
+  e.stopPropagation();
   const page=target.dataset.page;
   if(page){
     document.querySelectorAll('.top-nav-group .top-submenu').forEach(menu=>{
