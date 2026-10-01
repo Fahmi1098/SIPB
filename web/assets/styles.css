@@ -3726,3 +3726,37 @@ tbody tr:hover{
   color:inherit;
   border-color:var(--line-strong);
 }
+
+/* FINAL: continuous hover corridor for grouped top navigation. */
+.top-nav-layout .top{
+  overflow:visible !important;
+}
+.top-nav-layout .top-nav{
+  overflow:visible !important;
+  position:relative;
+  z-index:500;
+}
+.top-nav-group{
+  position:relative;
+  z-index:510;
+}
+.top-nav-group::before{
+  content:"";
+  position:absolute;
+  left:-10px;
+  right:-10px;
+  top:100%;
+  height:18px;
+  background:transparent;
+  z-index:511;
+  pointer-events:auto;
+}
+.top-nav-group .top-submenu{
+  top:100% !important;
+  margin-top:0 !important;
+  z-index:512;
+}
+.top-nav-group:hover::before,
+.top-nav-group:focus-within::before{
+  display:block;
+}
