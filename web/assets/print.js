@@ -290,7 +290,6 @@
       const bastKuasi=kuasi.length?`<section class="sheet">${kop()}
         <div class="title">BERITA ACARA</div>
         <div class="title no-underline" style="font-size:12pt;margin-top:-8px;margin-bottom:3px">SERAH TERIMA BARANG</div>
-        <div class="title no-underline" style="font-size:11pt;margin-top:-4px;margin-bottom:4px">BARANG BERSERI / KUASI</div>
         <div class="title no-underline" style="font-size:12pt;margin-top:-8px;margin-bottom:6px">BARANG BERSERI / KUASI</div>
         <div class="doc-number">NOMOR : ${no}/BAST-K/UPTD.PPD.MLP/${new Date(head.tanggal_keluar).getFullYear()}</div>
         ${statusMark}
