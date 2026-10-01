@@ -5007,3 +5007,129 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
     animation:none !important;
   }
 }
+
+
+/* FINAL 20261002-14 — real labels for main topbar actions + login theme button */
+.top-nav-layout .top-actions .top-action-icon::after{
+  display:none !important;
+  content:none !important;
+}
+.top-nav-layout .top-actions .top-action-label{
+  display:block !important;
+  flex:0 0 auto !important;
+  width:auto !important;
+  max-width:0 !important;
+  min-width:0 !important;
+  margin-left:0 !important;
+  padding:0 !important;
+  overflow:hidden !important;
+  opacity:0 !important;
+  visibility:hidden !important;
+  color:#fff !important;
+  font-size:.66rem !important;
+  font-weight:800 !important;
+  line-height:1.1 !important;
+  white-space:nowrap !important;
+  transition:max-width .22s cubic-bezier(.2,.7,.2,1),margin-left .16s ease,opacity .14s ease !important;
+}
+.top-nav-layout .top-actions .top-action-icon:hover .top-action-label,
+.top-nav-layout .top-actions .top-action-icon:focus-visible .top-action-label{
+  max-width:104px !important;
+  margin-left:9px !important;
+  opacity:1 !important;
+  visibility:visible !important;
+}
+
+/* Login theme button uses the exact same expansion pattern. */
+.login-theme-toggle{
+  width:42px !important;
+  min-width:42px !important;
+  height:42px !important;
+  min-height:42px !important;
+  display:flex !important;
+  flex-direction:row !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:0 !important;
+  padding:0 11px !important;
+  overflow:hidden !important;
+  border-radius:12px !important;
+  white-space:nowrap !important;
+  background:rgba(255,255,255,.90) !important;
+  border:1px solid var(--sipb-line,#DFE7EF) !important;
+  color:var(--sipb-text,#182B42) !important;
+  box-shadow:0 8px 22px rgba(20,50,82,.10) !important;
+  transition:width .22s cubic-bezier(.2,.7,.2,1),min-width .22s cubic-bezier(.2,.7,.2,1),background .16s ease,color .16s ease,border-color .16s ease,box-shadow .16s ease !important;
+}
+.login-theme-toggle .theme-icon{
+  flex:0 0 20px !important;
+  width:20px !important;
+  min-width:20px !important;
+  height:20px !important;
+  display:grid !important;
+  place-items:center !important;
+  font-size:1rem !important;
+  line-height:1 !important;
+}
+.login-theme-toggle .top-action-label{
+  display:block !important;
+  flex:0 0 auto !important;
+  max-width:0 !important;
+  min-width:0 !important;
+  margin-left:0 !important;
+  overflow:hidden !important;
+  opacity:0 !important;
+  visibility:hidden !important;
+  white-space:nowrap !important;
+  color:var(--sipb-text,#182B42) !important;
+  font-size:.66rem !important;
+  font-weight:800 !important;
+  line-height:1.1 !important;
+  transition:max-width .22s cubic-bezier(.2,.7,.2,1),margin-left .16s ease,opacity .14s ease !important;
+}
+.login-theme-toggle:hover,
+.login-theme-toggle:focus-visible{
+  width:136px !important;
+  min-width:136px !important;
+  background:var(--sipb-white,#fff) !important;
+  border-color:#BFD8EC !important;
+  color:var(--sipb-blue,#0B5CAB) !important;
+  box-shadow:0 11px 26px rgba(20,50,82,.14) !important;
+  outline:none !important;
+}
+.login-theme-toggle:hover .top-action-label,
+.login-theme-toggle:focus-visible .top-action-label{
+  max-width:103px !important;
+  margin-left:9px !important;
+  opacity:1 !important;
+  visibility:visible !important;
+}
+:root[data-theme="dark"] .login-theme-toggle{
+  background:rgba(23,35,46,.94) !important;
+  color:#fff !important;
+  border-color:#34495B !important;
+}
+:root[data-theme="dark"] .login-theme-toggle .top-action-label{
+  color:#fff !important;
+}
+:root[data-theme="dark"] .login-theme-toggle:hover,
+:root[data-theme="dark"] .login-theme-toggle:focus-visible{
+  background:#17232E !important;
+  border-color:#49647A !important;
+  color:#fff !important;
+}
+@media(max-width:520px){
+  .login-theme-toggle{
+    top:10px !important;
+    right:10px !important;
+  }
+  .login-theme-toggle:hover,
+  .login-theme-toggle:focus-visible{
+    width:128px !important;
+    min-width:128px !important;
+  }
+  .login-theme-toggle:hover .top-action-label,
+  .login-theme-toggle:focus-visible .top-action-label{
+    max-width:94px !important;
+  }
+}
