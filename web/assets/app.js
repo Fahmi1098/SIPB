@@ -1076,7 +1076,11 @@ document.addEventListener('click',e=>{
   const isRetry=target.classList.contains('retry');
   const insidePageControls=!!target.closest('.table-tools,.filter-bar,.table-wrap,form,table');
   const isActionButton=!!target.closest('button:not(.retry)');
-  if(insidePageControls||isActionButton||(!isTopNav&&!isRetry))return;
+  const isExplicitPageButton=isActionButton&&!!target.dataset.page;
+
+  // Tombol yang sengaja diberi data-page boleh bernavigasi.
+  // Tombol aksi tabel/form dan seluruh filter tetap tidak boleh diroute.
+  if(insidePageControls||(!isTopNav&&!isRetry&&!isExplicitPageButton))return;
 
   e.preventDefault();
   e.stopPropagation();
