@@ -209,7 +209,7 @@
   }
 
   function serial(d) {
-    if (d.nomor_awal && d.nomor_akhir) return esc(d.nomor_awal)+' → '+esc(d.nomor_akhir);
+    if (d.nomor_awal && d.nomor_akhir) return esc(d.nomor_awal)+' s/d '+esc(d.nomor_akhir);
     return d.nomor_dus ? 'Dus '+esc(d.nomor_dus) : '-';
   }
 
@@ -237,7 +237,7 @@
         <td>${esc([d.barang?.merk,d.barang?.tipe].filter(Boolean).join(' ')||'-')}</td>
         <td class="center">${d.jumlah}</td><td class="center">${esc(d.barang?.satuan||'-')}</td>
         ${withPrice?'<td class="right">'+rupiah(d.barang?.harga_terakhir)+'</td>':''}
-        <td>${serial(d)}</td></tr>`).join('');
+        <td class="center">${serial(d)}</td></tr>`).join('');
 
       const nota=`<section class="sheet">${kop()}
         <div class="title no-underline">NOTA DINAS</div>
@@ -255,7 +255,7 @@
         ${statusMark}
         <p class="intro">Sehubungan dengan kebutuhan barang habis pakai untuk mendukung kelancaran pelaksanaan tugas pada <b>${esc(head.tujuan_ruangan||'Umum')}</b>, dengan ini disampaikan permintaan barang sebagai berikut:</p>
         <table class="data"><thead><tr><th style="width:7%">NO</th><th>NAMA BARANG</th><th style="width:15%">JUMLAH</th><th style="width:15%">SATUAN</th><th>KETERANGAN</th></tr></thead>
-        <tbody>${details.map((d,i)=>`<tr><td class="center">${i+1}</td><td>${esc(d.barang?.nama_barang||'-')}</td><td class="center">${d.jumlah}</td><td class="center">${esc(d.barang?.satuan||'-')}</td><td>${serial(d)}</td></tr>`).join('')}</tbody></table>
+        <tbody>${details.map((d,i)=>`<tr><td class="center">${i+1}</td><td>${esc(d.barang?.nama_barang||'-')}</td><td class="center">${d.jumlah}</td><td class="center">${esc(d.barang?.satuan||'-')}</td><td class="center">${serial(d)}</td></tr>`).join('')}</tbody></table>
         <p>Demikian Nota Dinas ini disampaikan untuk dapat dipergunakan sebagaimana mestinya. Atas perhatian dan tindak lanjutnya, diucapkan terima kasih.</p>
         <table class="sign"><tr><td></td><td>${esc(receiverJob)}</td></tr><tr><td></td><td class="space"></td></tr>
         <tr><td></td><td><span class="name">${esc(receiver.toUpperCase())}</span><br>NIP. ${esc(head.penerima_nip||'-')}</td></tr></table>
@@ -300,7 +300,7 @@
         </ol>
         <p>Rincian barang berseri/kuasi yang diserahterimakan:</p>
         <table class="data"><thead><tr><th style="width:7%">NO</th><th>NAMA BARANG</th><th style="width:14%">JUMLAH</th><th style="width:14%">SATUAN</th><th>NOMOR SERI / DUS</th></tr></thead>
-        <tbody>${kuasi.map((d,i)=>`<tr><td class="center">${i+1}</td><td>${esc(d.barang?.nama_barang||'-')}</td><td class="center">${d.jumlah}</td><td class="center">${esc(d.barang?.satuan||'-')}</td><td>${serial(d)}</td></tr>`).join('')}</tbody></table>
+        <tbody>${kuasi.map((d,i)=>`<tr><td class="center">${i+1}</td><td>${esc(d.barang?.nama_barang||'-')}</td><td class="center">${d.jumlah}</td><td class="center">${esc(d.barang?.satuan||'-')}</td><td class="center">${serial(d)}</td></tr>`).join('')}</tbody></table>
         <p>Barang berseri/kuasi tersebut telah diterima dalam keadaan baik dan dicatat sebagai bagian dari administrasi persediaan SIPB. Berita Acara ini dibuat dengan sebenarnya untuk dipergunakan sebagaimana mestinya.</p>
         <p class="made">Dibuat di Malingping<br>Tanggal ${dateWithDay(head.tanggal_keluar)}</p>
         <table class="sign"><tr><td>Yang Menerima,</td><td>Yang Menyerahkan,</td></tr>
@@ -318,7 +318,7 @@
         const price=Number(d.barang?.harga_terakhir||0);
         const qty=Number(d.jumlah||0);
         const totalRow=price*qty;
-        return '<tr><td class="center">'+(i+1)+'</td><td>'+esc(d.barang?.nama_barang||'-')+'</td><td class="center">'+esc(d.barang?.satuan||'-')+'</td><td class="right">'+qty+'</td><td class="center terbilang">'+esc(terbilang(qty))+'</td><td class="right">'+(price?rupiah(price):'-')+'</td><td class="right">'+(totalRow?rupiah(totalRow):'-')+'</td></tr>'
+        return '<tr><td class="center">'+(i+1)+'</td><td>'+esc(d.barang?.nama_barang||'-')+'</td><td class="center">'+esc(d.barang?.satuan||'-')+'</td><td class="center">'+qty+'</td><td class="center">'+serial(d)+'</td><td class="right">'+(price?rupiah(price):'-')+'</td><td class="right">'+(totalRow?rupiah(totalRow):'-')+'</td></tr>'
       }).join('');
       const bend29=`<section class='sheet bend29-landscape'>${kop()}
         <table class='bend-head'>
@@ -345,8 +345,8 @@
             <th style='width:6%'>NO</th>
             <th>NAMA BARANG</th>
             <th style='width:13%'>SATUAN</th>
-            <th style='width:11%'>JUMLAH<br>ANGKA</th>
-            <th style='width:18%'>JUMLAH<br>HURUF</th>
+            <th style='width:11%'>JUMLAH</th>
+            <th style='width:18%'>NOMOR SERI</th>
             <th style='width:15%'>HARGA SATUAN</th>
             <th style='width:17%'>JUMLAH HARGA</th>
           </tr></thead>
