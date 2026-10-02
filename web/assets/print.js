@@ -2,9 +2,10 @@
   const cfg = window.SIPB_CONFIG;
   if (!cfg || !window.supabase) return;
 
-  const printClient = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
+  const printClient = window.SIPB_SUPABASE_CLIENT || window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
   });
+  window.SIPB_SUPABASE_CLIENT = printClient;
 
   const esc = v => String(v ?? '').replace(/[&<>"']/g, m => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
