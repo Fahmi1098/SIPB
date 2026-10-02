@@ -689,7 +689,14 @@ function showUserCreateModal(){
       renderApp('pengguna');
     }catch(err){
       save.disabled=false;save.textContent='Simpan Pengguna';
-      fail(err);
+      let message=err?.message||'Gagal membuat pengguna.';
+      try{
+        if(err?.context){
+          const payload=await err.context.json();
+          message=payload?.error||payload?.message||message;
+        }
+      }catch(_){}
+      toast(message,'error');
     }
   });
   setTimeout(()=>wrap.querySelector('#newUserName')?.focus(),20);
