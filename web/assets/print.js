@@ -257,8 +257,8 @@
         <table class="data"><thead><tr><th style="width:7%">NO</th><th>NAMA BARANG</th><th style="width:15%">JUMLAH</th><th style="width:15%">SATUAN</th><th>KETERANGAN</th></tr></thead>
         <tbody>${details.map((d,i)=>`<tr><td class="center">${i+1}</td><td>${esc(d.barang?.nama_barang||'-')}</td><td class="center">${d.jumlah}</td><td class="center">${esc(d.barang?.satuan||'-')}</td><td>${serial(d)}</td></tr>`).join('')}</tbody></table>
         <p>Demikian Nota Dinas ini disampaikan untuk dapat dipergunakan sebagaimana mestinya. Atas perhatian dan tindak lanjutnya, diucapkan terima kasih.</p>
-        <table class="sign"><tr><td></td><td>${esc(fromJob)}</td></tr><tr><td></td><td class="space"></td></tr>
-        <tr><td></td><td><span class="name">${esc(from.toUpperCase())}</span><br>NIP. ${esc(head.penyerah_nip||'-')}</td></tr></table>
+        <table class="sign"><tr><td></td><td>${esc(receiverJob)}</td></tr><tr><td></td><td class="space"></td></tr>
+        <tr><td></td><td><span class="name">${esc(receiver.toUpperCase())}</span><br>NIP. ${esc(head.penerima_nip||'-')}</td></tr></table>
       </section>`;
 
 
