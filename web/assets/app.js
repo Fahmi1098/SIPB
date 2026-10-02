@@ -640,13 +640,59 @@ async function penggunaPage(){
   const rows=data||[];
   const active=rows.filter(u=>u.is_active).length;
   const admins=rows.filter(u=>u.is_active&&u.role==='admin').length;
-  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">ADMINISTRASI</span><h2>Kelola Pengguna</h2><p>Kelola peran dan status akun dengan pemisahan yang jelas antara Admin dan User.</p></div><div class="kartu-head-actions"><span class="status-pill">'+rows.length+' pengguna</span></div></div>'+
+  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">ADMINISTRASI</span><h2>Kelola Pengguna</h2><p>Kelola akun SIPB, peran, dan status pengguna.</p></div><div class="kartu-head-actions"><span class="status-pill">'+rows.length+' pengguna</span><button class="primary" id="addUser">＋ Tambah Pengguna</button></div></div>'+
   '<div class="user-summary-grid"><div class="kartu-summary"><span class="kartu-summary-icon">'+navSvg('pengguna')+'</span><div><small>Total Pengguna</small><strong>'+rows.length+'</strong></div></div><div class="kartu-summary"><span class="kartu-summary-icon">'+navSvg('stock_opname')+'</span><div><small>Aktif</small><strong>'+active+'</strong></div></div><div class="kartu-summary"><span class="kartu-summary-icon">'+navSvg('dashboard')+'</span><div><small>Admin Aktif</small><strong>'+admins+'</strong></div></div></div>'+
-  '<div class="alert-box"><strong>Keamanan:</strong> akun admin yang sedang digunakan tidak dapat diturunkan atau dinonaktifkan dari halaman ini. Database juga harus menjaga agar selalu ada minimal satu admin aktif.</div>'+
+  '<div class="alert-box"><strong>Keamanan:</strong> akun baru otomatis dibuat sebagai <b>User</b>. Pembuatan akun Auth dilakukan di server agar password tidak tersimpan atau diproses sebagai kredensial admin di browser.</div>'+
   '<div class="filter-bar"><div class="search-box">⌕<input id="userSearch" placeholder="Cari nama atau username..."></div><select id="userRoleFilter"><option value="">Semua role</option><option value="admin">Admin</option><option value="user">User</option></select><select id="userStatusFilter"><option value="">Semua status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select><span id="userCount" class="result-count">'+rows.length+' data</span></div>'+
   '<div class="table-wrap"><table id="userTable"><thead><tr><th>Pengguna</th><th>Username</th><th>Dibuat</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead><tbody>'+
   (rows.map(u=>'<tr data-search="'+esc([u.nama_lengkap,u.username,u.id].join(' ').toLowerCase())+'" data-role="'+esc(u.role||'user')+'" data-status="'+(u.is_active?'active':'inactive')+'"><td><strong>'+esc(u.nama_lengkap||'-')+'</strong><br><small>'+esc(u.id)+'</small></td><td>'+esc(u.username||'-')+'</td><td>'+fmtDate(u.created_at)+'</td><td><select class="user-role" data-id="'+u.id+'"><option value="admin" '+(u.role==='admin'?'selected':'')+'>Admin</option><option value="user" '+(u.role==='user'?'selected':'')+'>User</option></select></td><td><button type="button" class="status-toggle '+(u.is_active?'on':'')+'" data-id="'+u.id+'" data-active="'+(u.is_active?'1':'0')+'"><span></span>'+(u.is_active?'Aktif':'Nonaktif')+'</button></td><td><button class="btn-sm user-save" data-id="'+u.id+'">Simpan</button></td></tr>').join('')||emptyRow(7))+
   '</tbody></table></div></section>';
+}
+
+function showUserCreateModal(){
+  const old=document.getElementById('createUserModal');
+  if(old)old.remove();
+  const wrap=document.createElement('div');
+  wrap.id='createUserModal';
+  wrap.className='modal-backdrop';
+  wrap.innerHTML='<div class="modal-card user-create-modal"><div class="modal-head"><div><span class="eyebrow">ADMINISTRASI</span><h2>Tambah Pengguna</h2><p>Buat akun partner Pengurus Barang baru.</p></div><button type="button" class="modal-close" aria-label="Tutup">×</button></div>'+
+    '<form id="createUserForm"><div class="form-grid">'+
+    '<label>Nama Lengkap <input id="newUserName" required maxlength="120" autocomplete="name" placeholder="Nama partner"></label>'+
+    '<label>Username <input id="newUserUsername" required maxlength="50" autocomplete="username" placeholder="partner_barang"></label>'+
+    '<label>Email <input id="newUserEmail" type="email" required maxlength="160" autocomplete="email" placeholder="partner@instansi.go.id"></label>'+
+    '<label>Password <input id="newUserPassword" type="password" required minlength="8" autocomplete="new-password" placeholder="Minimal 8 karakter"></label>'+
+    '<label>Konfirmasi Password <input id="newUserPassword2" type="password" required minlength="8" autocomplete="new-password" placeholder="Ulangi password"></label>'+
+    '<label>Role <input value="User" readonly></label>'+
+    '</div><div class="alert-box"><strong>Info:</strong> akun akan dibuat <b>Aktif</b> dan partner dapat langsung masuk menggunakan email serta password yang Anda tetapkan.</div>'+
+    '<div class="form-actions"><button type="submit" class="primary" id="saveNewUser">Simpan Pengguna</button><button type="button" class="ghost modal-cancel">Batal</button></div></form></div>';
+  document.body.appendChild(wrap);
+  const close=()=>wrap.remove();
+  wrap.querySelector('.modal-close').onclick=close;
+  wrap.querySelector('.modal-cancel').onclick=close;
+  wrap.onclick=e=>{if(e.target===wrap)close()};
+  wrap.querySelector('#createUserForm').addEventListener('submit',async e=>{
+    e.preventDefault();e.stopPropagation();
+    const name=$('newUserName').value.trim();
+    const username=$('newUserUsername').value.trim();
+    const email=$('newUserEmail').value.trim().toLowerCase();
+    const password=$('newUserPassword').value;
+    const password2=$('newUserPassword2').value;
+    const save=$('saveNewUser');
+    if(password!==password2)return toast('Konfirmasi password tidak sama.','error');
+    if(password.length<8)return toast('Password minimal 8 karakter.','error');
+    save.disabled=true;save.textContent='Membuat akun...';
+    try{
+      const {data,error}=await client.functions.invoke('create-user',{body:{name,username,email,password}});
+      if(error)throw error;
+      toast(data?.message||'Pengguna baru berhasil dibuat.');
+      close();
+      renderApp('pengguna');
+    }catch(err){
+      save.disabled=false;save.textContent='Simpan Pengguna';
+      fail(err);
+    }
+  });
+  setTimeout(()=>wrap.querySelector('#newUserName')?.focus(),20);
 }
 
 async function pegawaiPage(){
@@ -855,6 +901,8 @@ function bind(page){
     });
   }
   if(page==='pengguna'){
+    $('addUser')?.addEventListener('click',evt=>{evt.preventDefault();evt.stopPropagation();showUserCreateModal()});
+
     const apply=()=>{
       const q=$('userSearch').value.toLowerCase().trim();
       const role=$('userRoleFilter').value;
