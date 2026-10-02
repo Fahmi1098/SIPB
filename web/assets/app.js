@@ -405,7 +405,7 @@ async function barangMasukForm(){
   <label>Nama Penyerah <input id="m_penyerah" required placeholder="Pihak ke Tiga"></label><label>Nama Penerima <input id="m_penerima" value="${esc(profile?.nama_lengkap||'')}"></label>
   </div><div id="masukKuasi" class="kuasi-box" style="display:none"><strong>📑 Batch Kuasi</strong><span>Isi rentang nomor seri yang diterima. Jumlah harus sama dengan rentang.</span><div class="form-grid"><label>No. Dus <input id="m_dus" placeholder="Contoh: 411"></label><label>No. Seri Awal <input id="m_awal" placeholder="A-001"></label><label>No. Seri Akhir <input id="m_akhir" placeholder="A-100"></label></div></div><div class="form-actions"><button class="primary" id="saveMasuk">Rekam & Tambah Stok</button><button class="ghost" id="cancelMasuk">Batal</button></div></section>`;
 }
-async function barangKeluarForm(){const [{data:items,error},{data:pegawai,error:pe}]=await Promise.all([client.from('barang').select('id,nama_barang,satuan,sisa,kategori:kategori_id(id,nama_kategori)').order('nama_barang'),client.from('pegawai').select('id,nama_pegawai,nip,status_pegawai,jabatan').order('nama_pegawai')]);if(error||pe)throw(error||pe);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h2>Rekam Barang Keluar</h2><p>Stok akan dikurangi setelah seluruh item lolos validasi.</p></div><button class="ghost" id="backKeluar">← Kembali</button></div><div class="form-grid"><label>Tanggal Keluar <input id="k_tanggal" type="date" value="${localDate()}"></label><label>Penyerah (Gudang) <select id="k_penyerah"><option value="">- Pilih penyerah -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penyerah <input id="k_penyerah_jabatan" readonly></label><label>NIP Penyerah <input id="k_penyerah_nip" readonly></label><label>Penerima (Pemohon) <select id="k_penerima"><option value="">- Pilih pegawai -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penerima <input id="k_jabatan" readonly></label><label>NIP Penerima <input id="k_nip" readonly></label><label>Tujuan / Ruangan <input id="k_tujuan" placeholder="Contoh: Subag Tata Usaha" required></label></div><div class="section-head compact"><div><h3>Daftar Barang</h3><p>Tambahkan satu atau beberapa item.</p></div><button class="ghost" id="addItemKeluar">＋ Tambah Item</button></div><div id="keluarItems"></div><div class="form-actions"><button class="primary" id="saveKeluar">Rekam Transaksi & Kurangi Stok</button><button class="ghost" id="cancelKeluar">Batal</button></div></section>`}
+async function barangKeluarForm(){const [{data:items,error},{data:pegawai,error:pe}]=await Promise.all([client.from('barang').select('id,nama_barang,satuan,sisa,kategori:kategori_id(id,nama_kategori)').order('nama_barang'),client.from('pegawai').select('id,nama_pegawai,nip,status_pegawai,jabatan,unit_kerja').order('nama_pegawai')]);if(error||pe)throw(error||pe);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h2>Rekam Barang Keluar</h2><p>Stok akan dikurangi setelah seluruh item lolos validasi.</p></div><button class="ghost" id="backKeluar">← Kembali</button></div><div class="form-grid"><label>Tanggal Keluar <input id="k_tanggal" type="date" value="${localDate()}"></label><label>Penyerah (Gudang) <select id="k_penyerah"><option value="">- Pilih penyerah -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penyerah <input id="k_penyerah_jabatan" readonly></label><label>NIP Penyerah <input id="k_penyerah_nip" readonly></label><label>Penerima (Pemohon) <select id="k_penerima"><option value="">- Pilih pegawai -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penerima <input id="k_jabatan" readonly></label><label>NIP Penerima <input id="k_nip" readonly></label><label>Tujuan / Ruangan <input id="k_tujuan" placeholder="Otomatis dari Unit Kerja/Ruangan Penerima; dapat diedit" required></label></div><div class="section-head compact"><div><h3>Daftar Barang</h3><p>Tambahkan satu atau beberapa item.</p></div><button class="ghost" id="addItemKeluar">＋ Tambah Item</button></div><div id="keluarItems"></div><div class="form-actions"><button class="primary" id="saveKeluar">Rekam Transaksi & Kurangi Stok</button><button class="ghost" id="cancelKeluar">Batal</button></div></section>`}
 
 function keluarItemRow(items){
   const id='ki_'+Math.random().toString(36).slice(2,9);
@@ -645,7 +645,7 @@ async function penggunaPage(){
   '<div class="alert-box"><strong>Keamanan:</strong> akun admin yang sedang digunakan tidak dapat diturunkan atau dinonaktifkan dari halaman ini. Database juga harus menjaga agar selalu ada minimal satu admin aktif.</div>'+
   '<div class="filter-bar"><div class="search-box">⌕<input id="userSearch" placeholder="Cari nama atau username..."></div><select id="userRoleFilter"><option value="">Semua role</option><option value="admin">Admin</option><option value="user">User</option></select><select id="userStatusFilter"><option value="">Semua status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select><span id="userCount" class="result-count">'+rows.length+' data</span></div>'+
   '<div class="table-wrap"><table id="userTable"><thead><tr><th>Pengguna</th><th>Username</th><th>Dibuat</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead><tbody>'+
-  (rows.map(u=>'<tr data-search="'+esc([u.nama_lengkap,u.username,u.id].join(' ').toLowerCase())+'" data-role="'+esc(u.role||'user')+'" data-status="'+(u.is_active?'active':'inactive')+'"><td><strong>'+esc(u.nama_lengkap||'-')+'</strong><br><small>'+esc(u.id)+'</small></td><td>'+esc(u.username||'-')+'</td><td>'+fmtDate(u.created_at)+'</td><td><select class="user-role" data-id="'+u.id+'"><option value="admin" '+(u.role==='admin'?'selected':'')+'>Admin</option><option value="user" '+(u.role==='user'?'selected':'')+'>User</option></select></td><td><button type="button" class="status-toggle '+(u.is_active?'on':'')+'" data-id="'+u.id+'" data-active="'+(u.is_active?'1':'0')+'"><span></span>'+(u.is_active?'Aktif':'Nonaktif')+'</button></td><td><button class="btn-sm user-save" data-id="'+u.id+'">Simpan</button></td></tr>').join('')||emptyRow(6))+
+  (rows.map(u=>'<tr data-search="'+esc([u.nama_lengkap,u.username,u.id].join(' ').toLowerCase())+'" data-role="'+esc(u.role||'user')+'" data-status="'+(u.is_active?'active':'inactive')+'"><td><strong>'+esc(u.nama_lengkap||'-')+'</strong><br><small>'+esc(u.id)+'</small></td><td>'+esc(u.username||'-')+'</td><td>'+fmtDate(u.created_at)+'</td><td><select class="user-role" data-id="'+u.id+'"><option value="admin" '+(u.role==='admin'?'selected':'')+'>Admin</option><option value="user" '+(u.role==='user'?'selected':'')+'>User</option></select></td><td><button type="button" class="status-toggle '+(u.is_active?'on':'')+'" data-id="'+u.id+'" data-active="'+(u.is_active?'1':'0')+'"><span></span>'+(u.is_active?'Aktif':'Nonaktif')+'</button></td><td><button class="btn-sm user-save" data-id="'+u.id+'">Simpan</button></td></tr>').join('')||emptyRow(7))+
   '</tbody></table></div></section>';
 }
 
@@ -655,12 +655,12 @@ async function pegawaiPage(){
   return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DATA REFERENSI</span><h2>Pegawai</h2><p>Kelola data pegawai untuk kebutuhan penyerah dan penerima barang.</p></div>'+
     (profile?.role==='admin'?'<button class="primary" id="addPegawai">＋ Tambah Pegawai</button>':'')+
     '</div><div class="filter-bar"><div class="search-box">⌕<input id="pegawaiSearch" placeholder="Cari nama, NIP, status, atau jabatan..."></div><span id="pegawaiCount" class="result-count">'+(data?.length||0)+' data</span></div>'+
-    '<div class="table-wrap"><table id="pegawaiTable"><thead><tr><th>ID</th><th>Nama</th><th>NIP</th><th>Status</th><th>Jabatan</th><th>Aksi</th></tr></thead><tbody>'+
-    ((data||[]).map(r=>'<tr data-search="'+esc([r.nama_pegawai,r.nip,r.status_pegawai,r.jabatan].join(' ').toLowerCase())+'"><td class="id-cell">#'+r.id+'</td><td><strong>'+esc(r.nama_pegawai)+'</strong></td><td>'+esc(r.nip||'-')+'</td><td>'+esc(r.status_pegawai||'-')+'</td><td>'+esc(r.jabatan||'-')+'</td><td>'+(profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-pegawai" data-id="'+r.id+'">Edit</button><button class="btn-sm danger delete-pegawai" data-id="'+r.id+'">Hapus</button></div>':'<span class="badge-soft">Lihat</span>')+'</td></tr>').join('')||emptyRow(6))+
+    '<div class="table-wrap"><table id="pegawaiTable"><thead><tr><th>ID</th><th>Nama</th><th>NIP</th><th>Status</th><th>Jabatan</th><th>Unit Kerja / Ruangan</th><th>Aksi</th></tr></thead><tbody>'+
+    ((data||[]).map(r=>'<tr data-search="'+esc([r.nama_pegawai,r.nip,r.status_pegawai,r.jabatan,r.unit_kerja].join(' ').toLowerCase())+'"><td class="id-cell">#'+r.id+'</td><td><strong>'+esc(r.nama_pegawai)+'</strong></td><td>'+esc(r.nip||'-')+'</td><td>'+esc(r.status_pegawai||'-')+'</td><td>'+esc(r.jabatan||'-')+'</td><td>'+esc(r.unit_kerja||'-')+'</td><td>'+(profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-pegawai" data-id="'+r.id+'">Edit</button><button class="btn-sm danger delete-pegawai" data-id="'+r.id+'">Hapus</button></div>':'<span class="badge-soft">Lihat</span>')+'</td></tr>').join('')||emptyRow(6))+
     '</tbody></table></div></section>';
 }
 async function pegawaiForm(id=null){
-  let row={nama_pegawai:'',nip:'',status_pegawai:'Non-ASN',jabatan:''};
+  let row={nama_pegawai:'',nip:'',status_pegawai:'Non-ASN',jabatan:'',unit_kerja:''};
   if(id){
     const {data,error}=await client.from('pegawai').select('*').eq('id',id).single();
     if(error)throw error; row=data;
@@ -669,7 +669,7 @@ async function pegawaiForm(id=null){
     '<div class="form-grid"><label>Nama Pegawai <input id="p_nama" maxlength="100" value="'+esc(row.nama_pegawai||'')+'"></label>'+
     '<label>NIP <input id="p_nip" maxlength="50" value="'+esc(row.nip||'')+'"></label>'+
     '<label>Status Kepegawaian <select id="p_status"><option value="ASN" '+(row.status_pegawai==='ASN'?'selected':'')+'>ASN</option><option value="PPPK" '+(row.status_pegawai==='PPPK'?'selected':'')+'>PPPK</option><option value="PNS" '+(row.status_pegawai==='PNS'?'selected':'')+'>PNS</option><option value="Non-ASN" '+(row.status_pegawai==='Non-ASN'||!row.status_pegawai?'selected':'')+'>Non-ASN</option></select></label>'+
-    '<label>Jabatan <input id="p_jabatan" maxlength="100" value="'+esc(row.jabatan||'')+'"></label></div>'+
+    '<label>Jabatan <input id="p_jabatan" maxlength="100" value="'+esc(row.jabatan||'')+'"></label><label>Unit Kerja / Ruangan <input id="p_unit" maxlength="150" value="'+esc(row.unit_kerja||'')+'" placeholder="Contoh: Subbag Tata Usaha"></label></div>'+
     '<div class="form-actions"><button class="primary" id="savePegawai">'+(id?'Simpan Perubahan':'Simpan Pegawai')+'</button><button class="ghost" id="cancelPegawai">Batal</button></div></section>';
 }
 async function riwayatPage(){
@@ -1145,21 +1145,24 @@ async function bindKeluarForm(){
   const result=await client.from('barang').select('id,nama_barang,satuan,sisa,kategori:kategori_id(id,nama_kategori)').order('nama_barang');
   if(result.error)throw result.error;
   const items=result.data||[];
-  const pegawaiQ=await client.from('pegawai').select('id,nama_pegawai,nip,status_pegawai,jabatan').order('nama_pegawai');
+  const pegawaiQ=await client.from('pegawai').select('id,nama_pegawai,nip,status_pegawai,jabatan,unit_kerja').order('nama_pegawai');
   if(pegawaiQ.error)throw pegawaiQ.error;
   const pegawai=pegawaiQ.data||[];
   $('backKeluar').onclick=()=>renderApp('dashboard');
   $('cancelKeluar').onclick=()=>renderApp('dashboard');
 
-  const fillPegawai=(selectId,jabatanId,nipId)=>{
-    const select=$(selectId), jabatan=$(jabatanId), nip=$(nipId);
+  const fillPegawai=(selectId,jabatanId,nipId,tujuanId=null)=>{
+    const select=$(selectId), jabatan=$(jabatanId), nip=$(nipId), tujuan=tujuanId?$(tujuanId):null;
     if(!select)return;
     const opt=select.selectedOptions[0];
-    jabatan.value=opt?.dataset.jabatan||'';
-    nip.value=opt?.dataset.nip||'';
+    const person=pegawai.find(p=>String(p.nama_pegawai||'')===String(select.value||''));
+    jabatan.value=opt?.dataset.jabatan||person?.jabatan||'';
+    nip.value=opt?.dataset.nip||person?.nip||'';
+    if(tujuan){tujuan.value=person?.unit_kerja||'';tujuan.dataset.auto=person?.unit_kerja?'1':'0';}
   };
   $('k_penyerah').onchange=()=>fillPegawai('k_penyerah','k_penyerah_jabatan','k_penyerah_nip');
-  $('k_penerima').onchange=()=>fillPegawai('k_penerima','k_jabatan','k_nip');
+  $('k_penerima').onchange=()=>fillPegawai('k_penerima','k_jabatan','k_nip','k_tujuan');
+  $('k_tujuan').oninput=()=>{$('k_tujuan').dataset.auto='0';};
   const preferred=pegawai.find(p=>String(p.nama_pegawai||'').trim().toLowerCase()===String(profile?.nama_lengkap||'').trim().toLowerCase());
   if(preferred){$('k_penyerah').value=preferred.nama_pegawai;fillPegawai('k_penyerah','k_penyerah_jabatan','k_penyerah_nip');}
 
@@ -1292,7 +1295,7 @@ async function bindPegawaiForm(id=null){
   $('backPegawai').onclick=()=>renderApp('pegawai');
   $('cancelPegawai').onclick=()=>renderApp('pegawai');
   $('savePegawai').onclick=async()=>{
-    const payload={nama_pegawai:$('p_nama').value.trim(),nip:$('p_nip').value.trim()||null,status_pegawai:$('p_status').value,jabatan:$('p_jabatan').value.trim()||null};
+    const payload={nama_pegawai:$('p_nama').value.trim(),nip:$('p_nip').value.trim()||null,status_pegawai:$('p_status').value,jabatan:$('p_jabatan').value.trim()||null,unit_kerja:$('p_unit').value.trim()||null};
     if(!payload.nama_pegawai)return toast('Nama pegawai wajib diisi.','error');
     const btn=$('savePegawai');btn.disabled=true;btn.textContent='Menyimpan...';
     try{
