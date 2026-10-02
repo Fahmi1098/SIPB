@@ -228,7 +228,7 @@
       const kuasi=details.filter(d=>String(d.barang?.kategori?.nama_kategori||'').toLowerCase().includes('kuasi'));
       const no=String(id).padStart(3,'0');
       const from=head.penyerah_nama||'-', receiver=head.penerima_nama||'-';
-      const fromJob=head.penyerah_jabatan||'Pengurus Barang';
+      const fromRoom=head.tujuan_ruangan||'Umum';
       const receiverJob=head.penerima_jabatan||'Penerima Barang';
       const statusMark=active?'':'<p><span class="status">DIBATALKAN</span></p>';
 
@@ -243,7 +243,7 @@
         <div class="title no-underline">NOTA DINAS</div>
         <table class="meta meta-tight">
           <tr><td>Yth.</td><td>:</td><td>${esc(kepala?.jabatan||'Kepala UPTD PPD Malingping')}</td></tr>
-          <tr><td>Dari</td><td>:</td><td>${esc(fromJob)}</td></tr>
+          <tr><td>Dari</td><td>:</td><td>${esc(fromRoom)}</td></tr>
           <tr><td>Tembusan</td><td>:</td><td>Pengurus Barang Pembantu</td></tr>
           <tr><td>Tanggal</td><td>:</td><td>${dateWithDay(head.tanggal_keluar)}</td></tr>
           <tr><td>Nomor</td><td>:</td><td>000.2.3.1/${no}/UPTD.PPD.MLP/${new Date(head.tanggal_keluar).getFullYear()}</td></tr>
@@ -267,7 +267,7 @@
         <div class="title no-underline" style="font-size:12pt;margin-top:-8px;margin-bottom:4px">SERAH TERIMA BARANG</div>
         <div class="doc-number">NOMOR : ${no}/BAST/UPTD.PPD.MLP/${new Date(head.tanggal_keluar).getFullYear()}</div>
         ${statusMark}
-        <p><b>${dateFormalBAST(head.tanggal_keluar)}</b>, telah dilaksanakan serah terima barang habis pakai untuk <b>${esc(head.tujuan_ruangan||'Umum')}</b>. Para pihak yang melaksanakan serah terima adalah sebagai berikut:</p>
+        <p>${dateFormalBAST(head.tanggal_keluar)}, telah dilaksanakan serah terima barang habis pakai untuk <b>${esc(head.tujuan_ruangan||'Umum')}</b>. Para pihak yang melaksanakan serah terima adalah sebagai berikut:</p>
         <ol style="font-size:12pt;line-height:1.5;margin:0 0 12px 22px;padding:0">
           <li style="padding-left:5px;margin-bottom:6px"><b>${esc(from)}</b>, selaku Pengurus Barang, selanjutnya disebut <b>Yang Menyerahkan</b>.</li>
           <li style="padding-left:5px;margin-bottom:6px"><b>${esc(receiver)}</b>, selaku penerima barang, selanjutnya disebut <b>Yang Menerima</b>.</li>
@@ -293,7 +293,7 @@
         <div class="title no-underline" style="font-size:12pt;margin-top:-8px;margin-bottom:6px">BARANG BERSERI / KUASI</div>
         <div class="doc-number">NOMOR : ${no}/BAST-K/UPTD.PPD.MLP/${new Date(head.tanggal_keluar).getFullYear()}</div>
         ${statusMark}
-        <p><b>${dateFormalBAST(head.tanggal_keluar)}</b>, telah dilaksanakan serah terima barang berseri/kuasi untuk <b>${esc(head.tujuan_ruangan||'Umum')}</b>. Para pihak yang melaksanakan serah terima adalah sebagai berikut:</p>
+        <p>${dateFormalBAST(head.tanggal_keluar)}, telah dilaksanakan serah terima barang berseri/kuasi untuk <b>${esc(head.tujuan_ruangan||'Umum')}</b>. Para pihak yang melaksanakan serah terima adalah sebagai berikut:</p>
         <ol style="font-size:12pt;line-height:1.5;margin:0 0 12px 22px;padding:0">
           <li style="padding-left:5px;margin-bottom:6px"><b>${esc(from)}</b>, selaku Pengurus Barang, selanjutnya disebut <b>Yang Menyerahkan</b>.</li>
           <li style="padding-left:5px;margin-bottom:6px"><b>${esc(receiver)}</b>, selaku penerima barang, selanjutnya disebut <b>Yang Menerima</b>.</li>
