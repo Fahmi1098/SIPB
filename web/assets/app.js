@@ -662,8 +662,68 @@ async function penggunaPage(){
   '<div class="alert-box"><strong>Keamanan:</strong> akun baru otomatis dibuat sebagai <b>User</b>. Pembuatan akun Auth dilakukan di server agar password tidak tersimpan atau diproses sebagai kredensial admin di browser.</div>'+
   '<div class="filter-bar"><div class="search-box">⌕<input id="userSearch" placeholder="Cari nama atau username..."></div><select id="userRoleFilter"><option value="">Semua role</option><option value="admin">Admin</option><option value="user">User</option></select><select id="userStatusFilter"><option value="">Semua status</option><option value="active">Aktif</option><option value="inactive">Nonaktif</option></select><span id="userCount" class="result-count">'+rows.length+' data</span></div>'+
   '<div class="table-wrap"><table id="userTable"><thead><tr><th>Pengguna</th><th>Username</th><th>Dibuat</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead><tbody>'+
-  (rows.map(u=>'<tr data-search="'+esc([u.nama_lengkap,u.username,u.id].join(' ').toLowerCase())+'" data-role="'+esc(u.role||'user')+'" data-status="'+(u.is_active?'active':'inactive')+'"><td><strong>'+esc(u.nama_lengkap||'-')+'</strong><br><small>'+esc(u.id)+'</small></td><td>'+esc(u.username||'-')+'</td><td>'+fmtDate(u.created_at)+'</td><td><select class="user-role" data-id="'+u.id+'"><option value="admin" '+(u.role==='admin'?'selected':'')+'>Admin</option><option value="user" '+(u.role==='user'?'selected':'')+'>User</option></select></td><td><button type="button" class="status-toggle '+(u.is_active?'on':'')+'" data-id="'+u.id+'" data-active="'+(u.is_active?'1':'0')+'"><span></span>'+(u.is_active?'Aktif':'Nonaktif')+'</button></td><td><button class="btn-sm user-save" data-id="'+u.id+'">Simpan</button></td></tr>').join('')||emptyRow(7))+
+  (rows.map(u=>'<tr data-search="'+esc([u.nama_lengkap,u.username,u.id].join(' ').toLowerCase())+'" data-role="'+esc(u.role||'user')+'" data-status="'+(u.is_active?'active':'inactive')+'"><td><strong>'+esc(u.nama_lengkap||'-')+'</strong><br><small>'+esc(u.id)+'</small></td><td>'+esc(u.username||'-')+'</td><td>'+fmtDate(u.created_at)+'</td><td><select class="user-role" data-id="'+u.id+'"><option value="admin" '+(u.role==='admin'?'selected':'')+'>Admin</option><option value="user" '+(u.role==='user'?'selected':'')+'>User</option></select></td><td><button type="button" class="status-toggle '+(u.is_active?'on':'')+'" data-id="'+u.id+'" data-active="'+(u.is_active?'1':'0')+'"><span></span>'+(u.is_active?'Aktif':'Nonaktif')+'</button></td><td><div class="actions"><button type="button" class="btn-sm edit-user" data-id="'+u.id+'">Edit Profil</button><button class="btn-sm user-save" data-id="'+u.id+'">Simpan</button></div></td></tr>').join('')||emptyRow(7))+
   '</tbody></table></div></section>';
+}
+
+async function showUserEditModal(id){
+  const target=String(id||'');
+  if(!target)return;
+  const {data:user,error}=await client.from('user_profiles')
+    .select('id,username,nama_lengkap,role,is_active')
+    .eq('id',target)
+    .maybeSingle();
+  if(error)throw error;
+  if(!user)return toast('Profil pengguna tidak ditemukan.','error');
+
+  const old=document.getElementById('editUserModal');
+  if(old)old.remove();
+  const wrap=document.createElement('div');
+  wrap.id='editUserModal';
+  wrap.className='modal-backdrop';
+  wrap.innerHTML='<div class="modal-card user-create-modal"><div class="modal-head"><div><span class="eyebrow">ADMINISTRASI</span><h2>Edit Profil User</h2><p>Perbarui identitas dan kredensial akun pengguna.</p></div><button type="button" class="modal-close" aria-label="Tutup">×</button></div>'+
+    '<form id="editUserForm"><div class="form-grid">'+
+    '<label>Nama Lengkap <input id="editUserName" required maxlength="120" value="'+esc(user.nama_lengkap||'')+'"></label>'+
+    '<label>Username <input id="editUserUsername" required maxlength="50" value="'+esc(user.username||'')+'"></label>'+
+    '<label>Email Baru <input id="editUserEmail" type="email" maxlength="160" placeholder="Biarkan kosong jika tidak diubah"></label>'+
+    '<label>Password Baru <input id="editUserPassword" type="password" minlength="8" autocomplete="new-password" placeholder="Kosongkan jika tidak diubah"></label>'+
+    '<label>Status <input value="'+(user.is_active?'Aktif':'Nonaktif')+'" readonly></label>'+
+    '<label>Role <input value="'+(user.role==='admin'?'Admin':'User')+'" readonly></label>'+
+    '</div><div class="alert-box"><strong>Catatan:</strong> password hanya perlu diisi apabila ingin menggantinya. Role dan status tetap dikelola melalui kontrol pada tabel.</div>'+
+    '<div class="form-actions"><button type="submit" class="primary" id="saveEditUser">Simpan Perubahan</button><button type="button" class="ghost modal-cancel">Batal</button></div></form></div>';
+  document.body.appendChild(wrap);
+
+  const close=()=>wrap.remove();
+  wrap.querySelector('.modal-close').onclick=close;
+  wrap.querySelector('.modal-cancel').onclick=close;
+  wrap.onclick=e=>{if(e.target===wrap)close()};
+
+  wrap.querySelector('#editUserForm').addEventListener('submit',async e=>{
+    e.preventDefault();e.stopPropagation();
+    const name=$('editUserName').value.trim();
+    const username=$('editUserUsername').value.trim();
+    const email=$('editUserEmail').value.trim().toLowerCase();
+    const password=$('editUserPassword').value;
+    const save=$('saveEditUser');
+    if(!name||!username)return toast('Nama dan username wajib diisi.','error');
+    if(password && password.length<8)return toast('Password baru minimal 8 karakter.','error');
+    save.disabled=true;save.textContent='Menyimpan...';
+    try{
+      const {data,error}=await client.functions.invoke('update-user',{body:{user_id:target,name,username,email,password}});
+      if(error){
+        let msg=error.message||'Gagal memperbarui profil.';
+        try{const payload=await error.context?.json();msg=payload?.error||payload?.message||msg}catch(_){}
+        throw new Error(msg);
+      }
+      toast(data?.message||'Profil pengguna berhasil diperbarui.');
+      close();
+      renderApp('pengguna');
+    }catch(err){
+      save.disabled=false;save.textContent='Simpan Perubahan';
+      toast(err?.message||'Gagal memperbarui profil.','error');
+    }
+  });
+  setTimeout(()=>wrap.querySelector('#editUserName')?.focus(),20);
 }
 
 function showUserCreateModal(){
@@ -954,6 +1014,13 @@ function bind(page){
       toggle.innerHTML='<span></span>'+(!active?'Aktif':'Nonaktif');
       row.dataset.status=!active?'active':'inactive';
       apply();
+    });
+    document.querySelectorAll('.edit-user').forEach(btn=>btn.onclick=async evt=>{
+      evt.preventDefault();evt.stopPropagation();
+      btn.disabled=true;btn.textContent='Memuat...';
+      try{await showUserEditModal(btn.dataset.id)}
+      catch(e){toast(e?.message||'Gagal memuat profil pengguna.','error')}
+      finally{btn.disabled=false;btn.textContent='Edit Profil'}
     });
     document.querySelectorAll('.user-save').forEach(btn=>btn.onclick=async evt=>{evt.preventDefault();evt.stopPropagation();
       const id=btn.dataset.id;
