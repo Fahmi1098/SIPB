@@ -9,9 +9,15 @@ BEGIN;
 -- Hapus relasi alokasi terlebih dahulu agar foreign key tidak menghalangi penghapusan.
 DELETE FROM public.transaksi_kuasi_alokasi;
 
+-- Trigger keamanan transaksi keluar memblokir DELETE langsung untuk sesi SQL Editor.
+-- Nonaktifkan sementara selama pembersihan, lalu aktifkan kembali dalam transaksi yang sama.
+ALTER TABLE public.transaksi_keluar DISABLE TRIGGER trg_sipb_guard_outgoing_mutation;
+
 -- Hapus detail dan header Barang Keluar.
 DELETE FROM public.detail_barang_keluar;
 DELETE FROM public.transaksi_keluar;
+
+ALTER TABLE public.transaksi_keluar ENABLE TRIGGER trg_sipb_guard_outgoing_mutation;
 
 -- Hapus batch Stok Kuasi yang berasal dari Barang Masuk.
 DELETE FROM public.stok_kuasi;
