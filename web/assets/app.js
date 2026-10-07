@@ -467,7 +467,7 @@ async function simple(title,table,cols){const {data,error}=await client.from(tab
 async function barangMasukForm(){
   const canCreate=profile?.role==='admin';
   const [{data:items,error},{data:kats,error:ke}]=await Promise.all([
-    client.from('barang').select('id,nama_barang,satuan,kategori_id,tipe,merk,kategori:kategori_id(id,nama_kategori)').order('nama_barang'),
+    client.from('barang').select('id,nama_barang,satuan,kategori_id,tipe,merk,kode_barang,kategori:kategori_id(id,nama_kategori)').order('nama_barang'),
     client.from('kategori').select('*').order('nama_kategori')
   ]);
   if(error||ke)throw(error||ke);
@@ -480,6 +480,7 @@ async function barangMasukForm(){
   <label>Sumber Dana <select id="m_sumber"><option>APBD</option><option>APBN</option><option>Lainnya</option></select></label>
   <label>Tanggal Masuk <input id="m_tanggal" type="date" value="${localDate()}"></label>
   <label>Nama Penyerah <input id="m_penyerah" required placeholder="Pihak ke Tiga"></label><label>Nama Penerima <input id="m_penerima" value="${esc(profile?.nama_lengkap||'')}"></label>
+  <label class="field-wide">Keterangan / Spesifikasi <textarea id="m_keterangan" rows="3" maxlength="500" placeholder="Contoh: ukuran, warna, model, jenis, bahan, atau keterangan lain untuk membedakan nama barang yang sama"></textarea><small class="field-hint">Keterangan ini melekat pada transaksi Barang Masuk, bukan Master Barang.</small></label>
   </div><div id="masukKuasi" class="kuasi-box" style="display:none"><strong>📑 Batch Kuasi</strong><span>Isi rentang nomor seri yang diterima. Jumlah harus sama dengan rentang.</span><div class="form-grid"><label>No. Dus <input id="m_dus" placeholder="Contoh: 411"></label><label>No. Seri Awal <input id="m_awal" placeholder="A-001"></label><label>No. Seri Akhir <input id="m_akhir" placeholder="A-100"></label></div></div><div class="form-actions"><button class="primary" id="saveMasuk">Rekam & Tambah Stok</button><button class="ghost" id="cancelMasuk">Batal</button></div></section>`;
 }
 async function barangKeluarForm(){const [{data:items,error},{data:pegawai,error:pe}]=await Promise.all([client.from('barang').select('id,nama_barang,satuan,sisa,kategori:kategori_id(id,nama_kategori)').order('nama_barang'),client.from('pegawai').select('id,nama_pegawai,nip,status_pegawai,jabatan,unit_kerja').order('nama_pegawai')]);if(error||pe)throw(error||pe);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h2>Rekam Barang Keluar</h2><p>Stok akan dikurangi setelah seluruh item lolos validasi.</p></div><button class="ghost" id="backKeluar">← Kembali</button></div><div class="form-grid"><label>Tanggal Keluar <input id="k_tanggal" type="date" value="${localDate()}"></label><label>Penyerah (Gudang) <select id="k_penyerah"><option value="">- Pilih penyerah -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penyerah <input id="k_penyerah_jabatan" readonly></label><label>NIP Penyerah <input id="k_penyerah_nip" readonly></label><label>Penerima (Pemohon) <select id="k_penerima"><option value="">- Pilih pegawai -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penerima <input id="k_jabatan" readonly></label><label>NIP Penerima <input id="k_nip" readonly></label><label>Tujuan / Ruangan <input id="k_tujuan" placeholder="Otomatis dari Unit Kerja/Ruangan Penerima; dapat diedit" required></label></div><div class="section-head compact"><div><h3>Daftar Barang</h3><p>Tambahkan satu atau beberapa item.</p></div><button class="ghost" id="addItemKeluar">＋ Tambah Item</button></div><div id="keluarItems"></div><div class="form-actions"><button class="primary" id="saveKeluar">Rekam Transaksi & Kurangi Stok</button><button class="ghost" id="cancelKeluar">Batal</button></div></section>`}
@@ -564,13 +565,13 @@ async function kartuPage(){
 async function loadKartuDetail(id){
   const [{data:item,error:ie},{data:masuk,error:me},{data:keluar,error:ke},{data:opname,error:oe}]=await Promise.all([
     client.from('barang').select('id,nama_barang,satuan,merk,tipe,sisa,stok_minimum,harga_terakhir,kategori:kategori_id(nama_kategori)').eq('id',id).single(),
-    client.from('barang_masuk').select('id,tanggal_masuk,jumlah,harga_satuan,nama_penyerah,nama_penerima,nomor_awal,nomor_akhir,nomor_dus').eq('barang_id',id).order('tanggal_masuk',{ascending:true}).order('id',{ascending:true}),
+    client.from('barang_masuk').select('id,tanggal_masuk,jumlah,harga_satuan,nama_penyerah,nama_penerima,keterangan,nomor_awal,nomor_akhir,nomor_dus').eq('barang_id',id).order('tanggal_masuk',{ascending:true}).order('id',{ascending:true}),
     client.from('detail_barang_keluar').select('id,transaksi_keluar_id,jumlah,nomor_awal,nomor_akhir,nomor_dus,transaksi:transaksi_keluar_id(id,tanggal_keluar,penerima_nama,penerima_jabatan,penerima_nip,tujuan_ruangan,status,jenis_dokumen)').eq('barang_id',id).order('id',{ascending:true}),
     client.from('riwayat_opname').select('id,tanggal_opname,stok_sistem,stok_fisik,selisih,keterangan,petugas').eq('barang_id',id).order('tanggal_opname',{ascending:true}).order('id',{ascending:true})
   ]);
   if(ie||me||ke||oe)throw(ie||me||ke||oe);
   const rows=[
-    ...(masuk||[]).map(r=>({date:r.tanggal_masuk,type:'MASUK',qtyIn:Number(r.jumlah)||0,qtyOut:0,price:Number(r.harga_satuan)||0,desc:'Penerimaan dari '+(r.nama_penyerah||'-')+(r.nomor_awal?' [Seri: '+r.nomor_awal+' - '+(r.nomor_akhir||'-')+']':'')+(r.nomor_dus?' [Dus: '+r.nomor_dus+']':''),id:r.id})),
+    ...(masuk||[]).map(r=>({date:r.tanggal_masuk,type:'MASUK',qtyIn:Number(r.jumlah)||0,qtyOut:0,price:Number(r.harga_satuan)||0,desc:'Penerimaan dari '+(r.nama_penyerah||'-')+(r.keterangan?' [Keterangan: '+r.keterangan+']':'')+(r.nomor_awal?' [Seri: '+r.nomor_awal+' - '+(r.nomor_akhir||'-')+']':'')+(r.nomor_dus?' [Dus: '+r.nomor_dus+']':''),id:r.id})),
     ...(keluar||[]).filter(r=>(r.transaksi?.status||'AKTIF')==='AKTIF').map(r=>({date:r.transaksi?.tanggal_keluar,type:'KELUAR',qtyIn:0,qtyOut:Number(r.jumlah)||0,price:0,desc:'Distribusi ke '+(r.transaksi?.penerima_nama||'-')+' ('+(r.transaksi?.tujuan_ruangan||'Umum')+')'+(r.nomor_awal?' [Seri: '+r.nomor_awal+(r.nomor_akhir?' - '+r.nomor_akhir:'')+']':'')+(r.nomor_dus?' [Dus '+r.nomor_dus+']':''),id:r.id})),
     ...(opname||[]).map(r=>({date:r.tanggal_opname,type:r.selisih>0?'OPNAME IN':r.selisih<0?'OPNAME OUT':'OPNAME',qtyIn:r.selisih>0?Number(r.selisih):0,qtyOut:r.selisih<0?Math.abs(Number(r.selisih)):0,price:0,desc:'Penyesuaian opname: '+(r.keterangan||'-')+' · Petugas '+(r.petugas||'-'),id:r.id}))
   ].filter(r=>r.date).sort((x,y)=>String(x.date).localeCompare(String(y.date))||Number(x.id)-Number(y.id));
@@ -648,7 +649,7 @@ function reportTypeLabel(type){
 async function laporanPage(){
   const [barang,masuk,keluar,opname,details]=await Promise.all([
     fetchAllSipbRows('barang','id,nama_barang,satuan,harga_terakhir,kategori:kategori_id(id,nama_kategori)'),
-    fetchAllSipbRows('barang_masuk','id,barang_id,jumlah,harga_satuan,tanggal_masuk,nama_penyerah,nama_penerima,sumber_dana,nomor_awal,nomor_akhir,nomor_dus'),
+    fetchAllSipbRows('barang_masuk','id,barang_id,jumlah,harga_satuan,tanggal_masuk,nama_penyerah,nama_penerima,sumber_dana,keterangan,nomor_awal,nomor_akhir,nomor_dus'),
     fetchAllSipbRows('transaksi_keluar','id,tanggal_keluar,penerima_nama,tujuan_ruangan,jenis_dokumen,status'),
     fetchAllSipbRows('riwayat_opname','id,tanggal_opname,barang_id,stok_sistem,stok_fisik,selisih,keterangan,petugas'),
     fetchAllSipbRows('detail_barang_keluar','id,transaksi_keluar_id,barang_id,jumlah,nomor_awal,nomor_akhir,nomor_dus')
@@ -658,7 +659,7 @@ async function laporanPage(){
   const rows=[
     ...(masuk||[]).map(r=>{
       const b=bmap[r.barang_id]||{};
-      return {id:'M'+r.id,type:'MASUK',date:r.tanggal_masuk,barang:b.nama_barang||'-',category:b.kategori?.nama_kategori||'Tanpa Kategori',unit:b.satuan||'-',qty:Number(r.jumlah)||0,value:(Number(r.jumlah)||0)*(Number(r.harga_satuan)||0),party:r.nama_penyerah||'-',target:r.nama_penerima||'-',note:(r.sumber_dana||'-')+(r.nomor_dus?' · Dus '+r.nomor_dus:'')+(r.nomor_awal?' · '+r.nomor_awal+' → '+(r.nomor_akhir||'-'):'')};
+      return {id:'M'+r.id,type:'MASUK',date:r.tanggal_masuk,barang:b.nama_barang||'-',category:b.kategori?.nama_kategori||'Tanpa Kategori',unit:b.satuan||'-',qty:Number(r.jumlah)||0,value:(Number(r.jumlah)||0)*(Number(r.harga_satuan)||0),party:r.nama_penyerah||'-',target:r.nama_penerima||'-',note:(r.sumber_dana||'-')+(r.keterangan?' · '+r.keterangan:'')+(r.nomor_dus?' · Dus '+r.nomor_dus:'')+(r.nomor_awal?' · '+r.nomor_awal+' → '+(r.nomor_akhir||'-'):'')};
     }),
     ...(details||[]).filter(d=>(txmap[d.transaksi_keluar_id]?.status||'AKTIF')==='AKTIF').map(d=>{
       const b=bmap[d.barang_id]||{},t=txmap[d.transaksi_keluar_id]||{};
@@ -873,7 +874,7 @@ async function riwayatPage(){
     ...(masuk||[]).map(r=>({
       type:'MASUK',date:r.tanggal_masuk,id:r.id,party:r.nama_penyerah||'-',
       target:r.nama_penerima||'-',doc:'Penerimaan',status:'AKTIF',
-      items:[{name:r.barang?.nama_barang||'-',unit:r.barang?.satuan||'',qty:r.jumlah,serial:r.nomor_awal&&r.nomor_akhir?r.nomor_awal+' → '+r.nomor_akhir:''}]
+      items:[{name:r.barang?.nama_barang||'-',unit:r.barang?.satuan||'',qty:r.jumlah,keterangan:r.keterangan||'',serial:r.nomor_awal&&r.nomor_akhir?r.nomor_awal+' → '+r.nomor_akhir:''}]
     })),
     ...(keluar||[]).filter(r=>(r.status||'AKTIF')==='AKTIF').map(r=>({
       type:'KELUAR',date:r.tanggal_keluar,id:r.id,party:r.penerima_nama||'-',
@@ -899,7 +900,7 @@ async function riwayatPage(){
     const printAction=r.type==='KELUAR'
       ? '<button class="btn-sm sipb-inline-print" data-id="'+r.id+'">Cetak</button>'
       : '';
-    return '<tr data-type="'+r.type+'" data-search="'+esc([r.date,r.party,r.target,r.doc,r.status,r.items.map(i=>i.name).join(' ')].join(' ').toLowerCase())+'">'+
+    return '<tr data-type="'+r.type+'" data-search="'+esc([r.date,r.party,r.target,r.doc,r.status,r.items.map(i=>[i.name,i.keterangan].filter(Boolean).join(' ')).join(' ')].join(' ').toLowerCase())+'">'+
       '<td><span class="badge-soft '+(r.type==='MASUK'?'success':'')+'">'+r.type+'</span></td>'+
       '<td>'+fmtDate(r.date)+'</td><td>#'+r.id+'</td><td><strong>'+esc(r.party)+'</strong></td>'+
       '<td>'+esc(r.target)+'</td><td>'+esc(r.doc)+'</td><td>'+r.items.length+'</td>'+
@@ -907,7 +908,7 @@ async function riwayatPage(){
       '<td><div class="actions"><button class="btn-sm history-detail" data-key="'+key(r.type,r.id)+'">Detail</button>'+
       cancelAction+printAction+'</div></td></tr>';
   }).join('');
-  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">AUDIT PERSEDIAAN</span><h2>Riwayat Transaksi</h2><p>Gabungan penerimaan dan pengeluaran barang, termasuk rincian item dan nomor seri Kuasi.</p></div><span class="status-pill">'+rows.length+' transaksi</span></div>'+
+  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">AUDIT PERSEDIAAN</span><h2>Riwayat Transaksi</h2><p>Gabungan penerimaan dan pengeluaran barang, termasuk keterangan item dan nomor seri Kuasi.</p></div><span class="status-pill">'+rows.length+' transaksi</span></div>'+
     '<div class="filter-bar"><div class="search-box">⌕<input id="historySearch" placeholder="Cari tanggal, penerima, barang, atau tujuan..."></div>'+
     '<select id="historyType"><option value="">Semua transaksi</option><option value="MASUK">Barang Masuk</option><option value="KELUAR">Barang Keluar</option><option value="OPNAME">Stock Opname</option></select></div>'+
     '<div class="table-wrap"><table id="historyTable"><thead><tr><th>Jenis</th><th>Tanggal</th><th>No.</th><th>Pihak</th><th>Tujuan/Penerima</th><th>Dokumen</th><th>Item</th><th>Status</th><th>Aksi</th></tr></thead>'+
@@ -916,7 +917,7 @@ async function riwayatPage(){
 function showHistoryDetail(k){
   const r=window.__sipbHistory?.[k];if(!r)return;
   const box=document.createElement('div');box.className='modal-backdrop';
-  box.innerHTML=`<div class="modal-card"><div class="modal-head"><div><span class="eyebrow">${r.type==='MASUK'?'PENERIMAAN':r.type==='OPNAME'?'STOCK OPNAME':'PENGELUARAN'}</span><h2>Detail Transaksi #${r.id}</h2></div><button class="modal-close" aria-label="Tutup">×</button></div><div class="detail-grid"><div><small>Tanggal</small><strong>${fmtDate(r.date)}</strong></div><div><small>Pihak</small><strong>${esc(r.party)}</strong></div><div><small>Tujuan/Penerima</small><strong>${esc(r.target)}</strong></div><div><small>Status</small><strong><span class="badge-soft ${r.status==='AKTIF'?'success':''}">${r.status}</span></strong></div></div><div class="table-wrap"><table><thead><tr><th>Barang</th><th>Satuan</th><th>Jumlah</th><th>Nomor Seri</th></tr></thead><tbody>${r.items.map(i=>'<tr><td><strong>'+esc(i.name)+'</strong></td><td>'+esc(i.unit||'-')+'</td><td>'+i.qty+'</td><td>'+esc(i.serial||'-')+'</td></tr>').join('')}</tbody></table></div></div>`;
+  box.innerHTML=`<div class="modal-card"><div class="modal-head"><div><span class="eyebrow">${r.type==='MASUK'?'PENERIMAAN':r.type==='OPNAME'?'STOCK OPNAME':'PENGELUARAN'}</span><h2>Detail Transaksi #${r.id}</h2></div><button class="modal-close" aria-label="Tutup">×</button></div><div class="detail-grid"><div><small>Tanggal</small><strong>${fmtDate(r.date)}</strong></div><div><small>Pihak</small><strong>${esc(r.party)}</strong></div><div><small>Tujuan/Penerima</small><strong>${esc(r.target)}</strong></div><div><small>Status</small><strong><span class="badge-soft ${r.status==='AKTIF'?'success':''}">${r.status}</span></strong></div></div><div class="table-wrap"><table><thead><tr><th>Barang</th><th>Keterangan</th><th>Satuan</th><th>Jumlah</th><th>Nomor Seri</th></tr></thead><tbody>${r.items.map(i=>'<tr><td><strong>'+esc(i.name)+'</strong></td><td>'+esc(i.keterangan||'-')+'</td><td>'+esc(i.unit||'-')+'</td><td>'+i.qty+'</td><td>'+esc(i.serial||'-')+'</td></tr>').join('')}</tbody></table></div></div>`;
   document.body.appendChild(box);enhanceTables(box);const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.onclick=e=>{if(e.target===box)close()};
 }
 const menu=[['dashboard','Dashboard'],['barang_masuk','Barang Masuk'],['barang_keluar','Barang Keluar'],['stock_opname','Stock Opname'],['barang','Master Barang'],['kategori','Kategori'],['pegawai','Pegawai'],['kartu','Kartu Persediaan'],['kuasi','Stok Kuasi'],['riwayat','Riwayat Transaksi'],['laporan','Laporan Persediaan'],['backup','Backup & Restore'],['pengguna','Kelola Pengguna']];
@@ -1483,6 +1484,7 @@ async function bindMasukForm(){
         p_sumber_dana:$('m_sumber').value,p_tanggal:$('m_tanggal').value,
         p_nama_penyerah:$('m_penyerah').value.trim()||'Pihak ke Tiga',
         p_nama_penerima:$('m_penerima').value.trim()||profile?.nama_lengkap||session.user.email,
+        p_keterangan:$('m_keterangan').value.trim()||null,
         p_nomor_dus:$('m_dus').value.trim()||null,p_nomor_awal:$('m_awal').value.trim()||null,p_nomor_akhir:$('m_akhir').value.trim()||null
       });
       if(result.error)throw result.error;
