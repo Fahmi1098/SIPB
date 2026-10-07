@@ -5,6 +5,10 @@ let currentPage='dashboard';
 let renderVersion=0;
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 const rupiah=v=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Number(v)||0);
+const formatAngka=v=>{const n=Number(v);return Number.isFinite(n)?Math.trunc(n).toLocaleString('id-ID'):''};
+const parseAngka=v=>{const s=String(v??'').replace(/[^0-9-]/g,'');return s?Number(s):0};
+const formatInputAngka=input=>{if(!input)return;const raw=String(input.value??'').replace(/[^0-9]/g,'');input.value=raw?Number(raw).toLocaleString('id-ID'):''};
+document.addEventListener('input',e=>{const el=e.target;if(el?.matches?.('[data-number-format="integer"]')){const before=el.value;formatInputAngka(el);if(before!==el.value){try{el.setSelectionRange(el.value.length,el.value.length)}catch(_){}}}});
 const fmtDate=v=>v?new Intl.DateTimeFormat('id-ID',{dateStyle:'medium'}).format(new Date(v)):'-';
 const localDate=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const $=id=>document.getElementById(id);
@@ -325,7 +329,7 @@ async function dashboard(){
     client.from('barang_masuk').select('jumlah,harga_satuan'),
     client.from('transaksi_keluar').select('id,status'),
     client.from('transaksi_keluar').select('*').order('id',{ascending:false}).limit(6),
-    client.from('barang').select('id,kategori:kategori_id(nama_kategori)'),
+    client.from('barang').select('id,sisa,harga_terakhir,kategori_id,kategori:kategori_id(nama_kategori)'),
     client.from('transaksi_keluar').select('tanggal_keluar,status').gte('tanggal_keluar',since).order('tanggal_keluar'),
     client.from('stok_kuasi').select('id,barang_id,sisa_lembar,barang:barang_id(nama_barang,satuan)').gt('sisa_lembar',0)
   ]);
@@ -356,8 +360,15 @@ async function dashboard(){
   const kuasiLow=Object.values(kuasiMap).filter(r=>r.sisa<=20).sort((a,b)=>a.sisa-b.sisa);
 
   const catMap={};
-  (catQ.data||[]).forEach(x=>{const n=x.kategori?.nama_kategori||'Tanpa Kategori';catMap[n]=(catMap[n]||0)+1});
-  const catEntries=Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  (catQ.data||[]).forEach(x=>{
+    const n=x.kategori?.nama_kategori||'Tanpa Kategori';
+    if(!catMap[n])catMap[n]={jenis:0,jumlah:0,nilai:0};
+    catMap[n].jenis++;
+    catMap[n].jumlah+=Number(x.sisa)||0;
+    catMap[n].nilai+=(Number(x.sisa)||0)*(Number(x.harga_terakhir)||0);
+  });
+  const catEntries=Object.entries(catMap).sort((a,b)=>b[1].nilai-a[1].nilai);
+  const catSummaryRows=catEntries.map(([name,v])=>'<tr><td><strong>'+esc(name)+'</strong></td><td class="right">'+v.jenis.toLocaleString('id-ID')+'</td><td class="right">'+v.jumlah.toLocaleString('id-ID')+'</td><td class="right">'+rupiah(v.nilai)+'</td></tr>').join('');
 
   const monthMap={};
   for(let i=5;i>=0;i--){
@@ -376,8 +387,8 @@ async function dashboard(){
   });
 
   window.SIPB_DASHBOARD_CHARTS={
-    categoryLabels:catEntries.map(x=>x[0]),
-    categoryData:catEntries.map(x=>x[1]),
+    categoryLabels:catEntries.slice(0,8).map(x=>x[0]),
+    categoryData:catEntries.slice(0,8).map(x=>x[1].jenis),
     monthLabels,
     monthData:Object.values(monthMap)
   };
@@ -394,12 +405,12 @@ async function dashboard(){
   '<section class="stats-grid"><div class="stat-card blue"><span class="stat-icon">'+navSvg('barang')+'</span><div><small>Total Barang</small><strong>'+totalBarang+'</strong><em>Master barang</em></div></div><div class="stat-card blue"><span class="stat-icon">'+navSvg('barang_masuk')+'</span><div><small>Nilai Barang Masuk</small><strong>'+rupiah(nominalMasuk)+'</strong><em>Total nilai penerimaan</em></div></div><div class="stat-card green"><span class="stat-icon">'+navSvg('barang_masuk')+'</span><div><small>Jumlah Barang Masuk</small><strong>'+totalMasuk.toLocaleString('id-ID')+'</strong><em>Total kuantitas masuk</em></div></div><div class="stat-card red"><span class="stat-icon">'+navSvg('barang_keluar')+'</span><div><small>Barang Keluar</small><strong>'+totalKeluar+'</strong><em>Transaksi aktif</em></div></div><div class="stat-card purple"><span class="stat-icon">'+navSvg('stock_opname')+'</span><div><small>Sisa Stok</small><strong>'+totalSisa.toLocaleString('id-ID')+'</strong><em>Total stok saat ini</em></div></div></section>'+
   '<section class="stock-alert-center card"><div class="section-head"><div><span class="eyebrow">PERINGATAN PERSEDIAAN</span><h3>Pusat Peringatan Stok</h3><p>Barang yang sudah habis atau berada di bawah batas stok minimum.</p></div><div class="stock-alert-counts"><span class="alert-count danger"><strong>'+outOfStock.length+'</strong><small>Habis</small></span><span class="alert-count warning"><strong>'+lowStock.length+'</strong><small>Menipis</small></span><span class="alert-count kuasi"><strong>'+kuasiLow.length+'</strong><small>Kuasi ≤ 20</small></span></div></div>'+
   '<div class="stock-alert-layout"><div class="stock-alert-list">'+(alertList||'<div class="stock-alert-empty"><span>✓</span><div><strong>Stok aman</strong><small>Tidak ada barang yang berada di bawah batas minimum.</small></div></div>')+'</div><div class="stock-alert-side"><div class="stock-alert-side-title">Ringkasan cepat</div><div class="stock-alert-metric"><span>Barang perlu perhatian</span><strong>'+stockAlerts.length+'</strong></div><div class="stock-alert-metric"><span>Batch Kuasi menipis</span><strong>'+kuasiLow.length+'</strong></div><button class="ghost" data-page="barang">Buka Master Barang <span aria-hidden="true">→</span></button></div></div></section>'+
-  '<section class="charts-grid"><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h3>Barang berdasarkan kategori</h3><p>Delapan kategori dengan jumlah barang terbanyak.</p></div></div><div class="chart-wrap"><canvas id="categoryChart"></canvas></div></article><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">AKTIVITAS</span><h3>Barang keluar per bulan</h3><p>Enam bulan terakhir, transaksi aktif.</p></div></div><div class="chart-wrap"><canvas id="outgoingChart"></canvas></div></article></section>'+
+  '<section class="card page-card category-summary-card"><div class="section-head"><div><span class="eyebrow">RINGKASAN KATEGORI</span><h3>Jumlah Barang dan Nominal Berdasarkan Kategori</h3><p>Rekap jenis barang, jumlah stok tersisa, dan nilai persediaan menurut kategori.</p></div></div><div class="table-wrap"><table><thead><tr><th>Kategori</th><th>Jenis Barang</th><th>Jumlah Stok</th><th>Nominal Persediaan</th></tr></thead><tbody>'+(catSummaryRows||emptyRow(4))+'</tbody></table></div></section>'+  '<section class="charts-grid"><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h3>Barang berdasarkan kategori</h3><p>Delapan kategori dengan jumlah barang terbanyak.</p></div></div><div class="chart-wrap"><canvas id="categoryChart"></canvas></div></article><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">AKTIVITAS</span><h3>Barang keluar per bulan</h3><p>Enam bulan terakhir, transaksi aktif.</p></div></div><div class="chart-wrap"><canvas id="outgoingChart"></canvas></div></article></section>'+
   '<section class="card recent"><div class="section-head"><div><span class="eyebrow">AKTIVITAS TERKINI</span><h3>Transaksi terbaru</h3><p>Enam transaksi barang keluar terakhir.</p></div><button class="ghost" data-page="barang_keluar">Lihat semua <span aria-hidden="true">→</span></button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Penerima</th><th>Tujuan</th></tr></thead><tbody>'+(recentData.map(r=>'<tr><td>'+fmtDate(r.tanggal_keluar)+'</td><td><strong>'+esc(r.penerima_nama||'-')+'</strong></td><td>'+esc(r.tujuan_ruangan||'-')+'</td></tr>').join('')||'<tr><td colspan="3" class="empty">Belum ada transaksi.</td></tr>')+'</tbody></table></div></section>';
 }
 
-async function barangPage(){const [{data,error},{data:k,error:ke}]=await Promise.all([client.from('barang').select('*, kategori:kategori_id(nama_kategori)').order('id'),client.from('kategori').select('*').order('nama_kategori')]);if(error)throw error;if(ke)throw ke;return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER DATA</span><h2>Master Barang</h2><p>Kelola data barang, kode sumber, dan stok persediaan.</p></div>${profile?.role==='admin'?'<div class="kartu-head-actions"><button type="button" class="ghost" id="importPersediaan">⇧ Import Persediaan</button><button class="primary" id="addBarang">＋ Tambah Barang</button></div>':''}</div><div class="filter-bar"><div class="search-box">⌕<input id="barangSearch" placeholder="Cari kode, nama, tipe, merk, atau satuan..."></div><select id="barangFilter"><option value="">Semua kategori</option>${(k||[]).map(x=>`<option value="${x.id}">${esc(x.nama_kategori)}</option>`).join('')}</select><span id="barangCount" class="result-count">${data?.length||0} data</span></div><div class="table-wrap"><table id="barangTable"><thead><tr><th>ID</th><th>Kode Barang</th><th>Nama Barang</th><th>Kategori</th><th>Tipe</th><th>Merk</th><th>Satuan</th><th>Harga Terakhir</th><th>Stok</th><th>Aksi</th></tr></thead><tbody>${(data||[]).map(barangRow).join('')||emptyRow(10)}</tbody></table></div></section>`}
-function barangRow(r){const low=Number(r.sisa??0)<=Number(r.stok_minimum??0);return `<tr data-search="${esc([r.kode_barang,r.nama_barang,r.tipe,r.merk,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())}" data-kategori="${r.kategori_id||''}"><td class="id-cell">#${r.id}</td><td><small>${esc(r.kode_barang||"-")}</small></td><td><strong>${esc(r.nama_barang)}</strong></td><td>${esc(r.kategori?.nama_kategori||'-')}</td><td>${esc(r.tipe||'-')}</td><td>${esc(r.merk||'-')}</td><td>${esc(r.satuan||'-')}</td><td>${rupiah(r.harga_terakhir)}</td><td><span class="stock ${low?'low':''}">${r.sisa??0}</span></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-barang" data-id="'+r.id+'">Edit</button><button class="btn-sm danger delete-barang" data-id="'+r.id+'">Hapus</button></div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`}
+async function barangPage(){const [{data,error},{data:k,error:ke}]=await Promise.all([client.from('barang').select('*, kategori:kategori_id(nama_kategori)').order('id'),client.from('kategori').select('*').order('nama_kategori')]);if(error)throw error;if(ke)throw ke;return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER DATA</span><h2>Master Barang</h2><p>Kelola data barang, kode sumber, dan stok persediaan.</p></div>${profile?.role==='admin'?'<div class="kartu-head-actions"><button type="button" class="ghost" id="importPersediaan">⇧ Import Persediaan</button><button class="primary" id="addBarang">＋ Tambah Barang</button></div>':''}</div><div class="filter-bar"><div class="search-box">⌕<input id="barangSearch" placeholder="Cari kode, nama, keterangan, tipe, merk, atau satuan..."></div><select id="barangFilter"><option value="">Semua kategori</option>${(k||[]).map(x=>`<option value="${x.id}">${esc(x.nama_kategori)}</option>`).join('')}</select><span id="barangCount" class="result-count">${data?.length||0} data</span></div><div class="table-wrap"><table id="barangTable"><thead><tr><th>ID</th><th>Kode Barang</th><th>Nama Barang</th><th>Keterangan</th><th>Kategori</th><th>Tipe</th><th>Merk</th><th>Satuan</th><th>Harga Terakhir</th><th>Stok</th><th>Aksi</th></tr></thead><tbody>${(data||[]).map(barangRow).join('')||emptyRow(10)}</tbody></table></div></section>`}
+function barangRow(r){const low=Number(r.sisa??0)<=Number(r.stok_minimum??0);return `<tr data-search="${esc([r.kode_barang,r.nama_barang,r.keterangan,r.tipe,r.merk,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())}" data-kategori="${r.kategori_id||''}"><td class="id-cell">#${r.id}</td><td><small>${esc(r.kode_barang||"-")}</small></td><td><strong>${esc(r.nama_barang)}</strong></td><td>${esc(r.keterangan||'-')}</td><td>${esc(r.kategori?.nama_kategori||'-')}</td><td>${esc(r.tipe||'-')}</td><td>${esc(r.merk||'-')}</td><td>${esc(r.satuan||'-')}</td><td>${rupiah(r.harga_terakhir)}</td><td><span class="stock ${low?'low':''}">${formatAngka(r.sisa??0)}</span></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-barang" data-id="'+r.id+'">Edit</button><button class="btn-sm danger delete-barang" data-id="'+r.id+'">Hapus</button></div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`}
 function emptyRow(n){return `<tr><td colspan="${n}" class="empty">Belum ada data.</td></tr>`}
 async function showImportPersediaanModal(){
   const old=document.getElementById('importPersediaanModal');if(old)old.remove();
@@ -461,7 +472,26 @@ async function showImportPersediaanModal(){
     }catch(err){run.disabled=false;run.textContent='Import ke SIPB';fail(err)}
   };
 }
-async function barangForm(id=null){let row={kode_barang:'',nama_barang:'',kategori_id:'',tipe:'',merk:'',satuan:'',stok_minimum:0};if(id){const {data,error}=await client.from('barang').select('*').eq('id',id).single();if(error)throw error;row=data}const {data:k,error}=await client.from('kategori').select('*').order('nama_kategori');if(error)throw error;return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER BARANG</span><h2>${id?'Edit Barang':'Tambah Barang'}</h2><p>Informasi operasional persediaan.</p></div><button class="ghost" id="backBarang">← Kembali</button></div><div class="form-grid"><label>Kode Barang <input id="b_kode" value="${esc(row.kode_barang||"")}" maxlength="80" placeholder="Kode barang sumber"></label><label>Nama Barang <input id="b_nama" value="${esc(row.nama_barang)}" maxlength="255"></label><label>Kategori <select id="b_kat"><option value="">- Pilih kategori -</option>${(k||[]).map(x=>`<option value="${x.id}" ${String(x.id)===String(row.kategori_id)?'selected':''}>${esc(x.nama_kategori)}</option>`).join('')}</select></label><label>Tipe <input id="b_tipe" value="${esc(row.tipe||'')}"></label><label>Merk <input id="b_merk" value="${esc(row.merk||'')}"></label><label>Satuan <input id="b_satuan" value="${esc(row.satuan||'')}"></label><label>Stok Minimum <input id="b_min" type="number" min="0" value="${row.stok_minimum||0}"></label></div><div class="form-actions"><button class="primary" id="saveBarang">${id?'Simpan Perubahan':'Simpan Barang'}</button><button class="ghost" id="cancelBarang">Batal</button></div></section>`}
+async function barangForm(id=null){
+  let row={kode_barang:'',nama_barang:'',keterangan:'',kategori_id:'',tipe:'',merk:'',satuan:'',stok_minimum:0};
+  if(id){
+    const {data,error}=await client.from('barang').select('*').eq('id',id).single();
+    if(error)throw error;
+    row=data;
+  }
+  const {data:k,error}=await client.from('kategori').select('*').order('nama_kategori');
+  if(error)throw error;
+  return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER BARANG</span><h2>${id?'Edit Barang':'Tambah Barang'}</h2><p>Informasi operasional persediaan.</p></div><button class="ghost" id="backBarang">← Kembali</button></div><div class="form-grid">
+  <label>Kode Barang <input id="b_kode" value="${esc(row.kode_barang||"")}" maxlength="80" placeholder="Kode barang sumber"></label>
+  <label>Nama Barang <input id="b_nama" value="${esc(row.nama_barang||'')}" maxlength="255"></label>
+  <label style="grid-column:1/-1">Keterangan <textarea id="b_keterangan" rows="3" maxlength="500" placeholder="Keterangan khusus barang, spesifikasi, atau pembeda barang dengan nama yang sama...">${esc(row.keterangan||'')}</textarea></label>
+  <label>Kategori <select id="b_kat"><option value="">- Pilih kategori -</option>${(k||[]).map(x=>`<option value="${x.id}" ${String(x.id)===String(row.kategori_id)?'selected':''}>${esc(x.nama_kategori)}</option>`).join('')}</select></label>
+  <label>Tipe <input id="b_tipe" value="${esc(row.tipe||'')}"></label>
+  <label>Merk <input id="b_merk" value="${esc(row.merk||'')}"></label>
+  <label>Satuan <input id="b_satuan" value="${esc(row.satuan||'')}"></label>
+  <label>Stok Minimum <input id="b_min" type="text" inputmode="numeric" data-number-format="integer" min="0" value="${formatAngka(row.stok_minimum||0)}"></label>
+  </div><div class="form-actions"><button class="primary" id="saveBarang">${id?'Simpan Perubahan':'Simpan Barang'}</button><button class="ghost" id="cancelBarang">Batal</button></div></section>`
+}
 async function simple(title,table,cols){const {data,error}=await client.from(table).select('*').order('id',{ascending:false}).limit(200);if(error)throw error;return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DATA SIPB</span><h2>${title}</h2><p>Maksimal 200 data terbaru.</p></div></div><div class="table-wrap"><table><thead><tr>${cols.map(x=>`<th>${x[1]}</th>`).join('')}</tr></thead><tbody>${(data||[]).map(row=>`<tr>${cols.map(x=>`<td>${esc(row[x[0]])}</td>`).join('')}</tr>`).join('')||emptyRow(cols.length)}</tbody></table></div></section>`}
 
 async function barangMasukForm(){
@@ -492,7 +522,7 @@ function keluarItemRow(items){
       const kat=String(x.kategori?.nama_kategori||'').toLowerCase(),isKuasi=kat.includes('kuasi');
       return '<option value="'+x.id+'" data-stock="'+x.sisa+'" data-unit="'+esc(x.satuan||'')+'" data-kuasi="'+(isKuasi?'kuasi':'')+'">'+esc(x.nama_barang)+' — stok '+x.sisa+' '+esc(x.satuan||'')+(isKuasi?' — FIFO Kuasi':'')+'</option>';
     }).join('')+
-    '</select><input class="ki-jumlah" type="number" min="1" value="1" placeholder="Jumlah"><span class="kuasi-hint" aria-live="polite"></span><button type="button" class="btn-sm danger remove-item" title="Hapus baris barang" aria-label="Hapus baris barang">×</button></div>';
+    '</select><input class="ki-jumlah" type="text" inputmode="numeric" data-number-format="integer" value="1" placeholder="Jumlah"><span class="kuasi-hint" aria-live="polite"></span><button type="button" class="btn-sm danger remove-item" title="Hapus baris barang" aria-label="Hapus baris barang">×</button></div>';
 }
 
 async function stockOpnamePage(){const [{data:rows,error},{data:items,error:ie}]=await Promise.all([client.from('riwayat_opname').select('*,barang:barang_id(nama_barang)').order('id',{ascending:false}).limit(200),client.from('barang').select('id,nama_barang,sisa,satuan').order('nama_barang')]);if(error||ie)throw(error||ie);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PERSEDIAAN</span><h2>Stock Opname</h2><p>Penyesuaian stok fisik terhadap stok sistem.</p></div><button class="primary" id="addOpname">＋ Rekam Stock Opname</button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Barang</th><th>Sistem</th><th>Fisik</th><th>Selisih</th><th>Petugas</th><th>Keterangan</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${fmtDate(r.tanggal_opname)}</td><td>${esc(r.barang?.nama_barang||'-')}</td><td>${r.stok_sistem}</td><td>${r.stok_fisik}</td><td><span class="stock ${r.selisih<0?'low':''}">${r.selisih>0?'+':''}${r.selisih}</span></td><td>${esc(r.petugas||'-')}</td><td>${esc(r.keterangan||'-')}</td></tr>`).join('')||emptyRow(7)}</tbody></table></div></section>`}
@@ -1248,10 +1278,11 @@ function bindForm(id){
       kode_barang:$('b_kode').value.trim()||null,
       nama_barang:$('b_nama').value.trim(),
       kategori_id:$('b_kat').value?+$('b_kat').value:null,
+      keterangan:$('b_keterangan').value.trim()||null,
       tipe:$('b_tipe').value.trim()||'-',
       merk:$('b_merk').value.trim()||'-',
       satuan:$('b_satuan').value.trim(),
-      stok_minimum:+$('b_min').value||0
+      stok_minimum:parseAngka($('b_min').value)
     };
     if(!payload.nama_barang)return toast('Nama barang wajib diisi.','error');
     save.disabled=true;
@@ -1314,8 +1345,8 @@ async function stockOpnameForm(){
     '<div class="alert-box"><strong>Catatan:</strong> barang Kuasi tidak ditampilkan karena saldo Kuasi harus direkonsiliasi melalui batch/serial FIFO.</div>'+
     '<div class="form-grid"><label>Barang <select id="o_barang"><option value="">- Pilih barang -</option>'+
     eligible.map(x=>'<option value="'+x.id+'" data-stock="'+(x.sisa??0)+'">'+esc(x.nama_barang)+' — stok '+(x.sisa??0)+' '+esc(x.satuan||'')+'</option>').join('')+
-    '</select></label><label>Stok Sistem <input id="o_sistem" type="number" value="0" readonly></label>'+
-    '<label>Stok Fisik <input id="o_fisik" type="number" min="0" step="1" value="0"></label>'+
+    '</select></label><label>Stok Sistem <input id="o_sistem" type="text" inputmode="numeric" data-number-format="integer" value="0" readonly></label>'+
+    '<label>Stok Fisik <input id="o_fisik" type="text" inputmode="numeric" data-number-format="integer" value="0"></label>'+
     '<label>Tanggal Opname <input id="o_tanggal" type="date" value="'+localDate()+'"></label>'+
     '<label>Petugas <input id="o_petugas" value="'+esc(profile?.nama_lengkap||session?.user?.email||'')+'" required></label>'+
     '<label style="grid-column:1/-1">Keterangan <textarea id="o_keterangan" rows="3" placeholder="Contoh: Hasil pemeriksaan fisik gudang"></textarea></label></div>'+
@@ -1324,9 +1355,9 @@ async function stockOpnameForm(){
 async function bindOpnameForm(){
   $('backOpname').onclick=()=>renderApp('stock_opname');
   $('cancelOpname').onclick=()=>renderApp('stock_opname');
-  $('o_barang').onchange=()=>{const o=$('o_barang').selectedOptions[0];$('o_sistem').value=o?o.dataset.stock||0:0};
+  $('o_barang').onchange=()=>{const o=$('o_barang').selectedOptions[0];$('o_sistem').value=o?formatAngka(o.dataset.stock||0):''};
   $('saveOpname').onclick=async()=>{
-    const id=Number($('o_barang').value),fisik=Number($('o_fisik').value);
+    const id=Number($('o_barang').value),fisik=parseAngka($('o_fisik').value);
     if(!id)return toast('Pilih barang.','error');
     if(!Number.isInteger(fisik)||fisik<0)return toast('Stok fisik harus bilangan bulat nol atau lebih.','error');
     const btn=$('saveOpname');btn.disabled=true;btn.textContent='Menyimpan...';
@@ -1407,7 +1438,7 @@ async function bindKeluarForm(){
     if(!penyerah)return toast('Pilih penyerah barang.','error');
     if(!penerima)return toast('Pilih penerima barang.','error');
     if(!tujuan)return toast('Tujuan/ruangan wajib diisi.','error');
-    const rows=[...box.querySelectorAll('.transaction-row')].map(row=>({barang_id:Number(row.querySelector('.ki-barang').value),jumlah:Number(row.querySelector('.ki-jumlah').value)})).filter(x=>x.barang_id);
+    const rows=[...box.querySelectorAll('.transaction-row')].map(row=>({barang_id:Number(row.querySelector('.ki-barang').value),jumlah:parseAngka(row.querySelector('.ki-jumlah').value)})).filter(x=>x.barang_id);
     if(!rows.length)return toast('Tambahkan minimal satu barang.','error');
     for(const x of rows)if(!Number.isInteger(x.jumlah)||x.jumlah<1)return toast('Jumlah barang harus bilangan bulat positif.','error');
     const totals={};rows.forEach(x=>{totals[x.barang_id]=(totals[x.barang_id]||0)+x.jumlah});
@@ -1470,7 +1501,7 @@ async function bindMasukForm(){
   };
   $('m_barang').onchange=toggle;$('m_kat').onchange=toggle;toggle();
   $('saveMasuk').onclick=async()=>{
-    const existing=Number($('m_barang').value)||null,nama=$('m_nama').value.trim(),jumlah=Number($('m_jumlah').value),harga=Number($('m_harga').value);
+    const existing=Number($('m_barang').value)||null,nama=$('m_nama').value.trim(),jumlah=parseAngka($('m_jumlah').value),harga=parseAngka($('m_harga').value);
     if(!jumlah||jumlah<1)return toast('Jumlah harus lebih dari 0.','error');
     if(harga<0||Number.isNaN(harga))return toast('Harga tidak valid.','error');
     if(!existing&&!nama)return toast('Pilih barang atau isi nama barang baru.','error');
