@@ -545,6 +545,7 @@ async function showImportPersediaanModal(){
         nama_barang:String(r['Nama Barang']||'').trim(),
         kategori:String(r['Kategori']||'').trim(),
         satuan:String(r['Satuan']||'').trim(),
+        keterangan:String(r['Keterangan']||r['Keterangan / Spesifikasi']||'').trim(),
         saldo_qty:Number(r['Saldo Awal (Qty)']||0),
         saldo_value:Number(r['Saldo Awal (Nilai)']||0),
         bertambah_qty:Number(r['Bertambah (Qty)']||0),
@@ -555,8 +556,8 @@ async function showImportPersediaanModal(){
       const seen=new Set();const dup=importRows.find(r=>{const k=r.kode_barang.toLowerCase();if(seen.has(k))return true;seen.add(k);return false});
       if(dup)throw new Error('Kode Barang duplikat di file: '+dup.kode_barang);
       const saldo=importRows.reduce((n,r)=>n+r.saldo_qty,0),tambah=importRows.reduce((n,r)=>n+r.bertambah_qty,0);
-      const sample=importRows.slice(0,6).map((r,i)=>'<tr><td>'+(i+1)+'</td><td><small>'+esc(r.kode_barang)+'</small></td><td>'+esc(r.nama_barang)+'</td><td class="right">'+r.saldo_qty.toLocaleString('id-ID')+'</td><td class="right">'+r.bertambah_qty.toLocaleString('id-ID')+'</td></tr>').join('');
-      preview.innerHTML='<div class="detail-grid"><div><small>Barang</small><strong>'+importRows.length+'</strong></div><div><small>Saldo Awal</small><strong>'+saldo.toLocaleString('id-ID')+'</strong></div><div><small>Bertambah</small><strong>'+tambah.toLocaleString('id-ID')+'</strong></div><div><small>Tanggal</small><strong>31/12/2025 → 02/01/2026</strong></div></div><div class="table-wrap"><table><thead><tr><th>No</th><th>Kode</th><th>Barang</th><th>Saldo Awal</th><th>Bertambah</th></tr></thead><tbody>'+sample+'</tbody></table></div><p class="note">Preview 6 baris pertama. Seluruh '+importRows.length+' barang akan diproses.</p>';
+      const sample=importRows.slice(0,6).map((r,i)=>'<tr><td>'+(i+1)+'</td><td><small>'+esc(r.kode_barang)+'</small></td><td>'+esc(r.nama_barang)+'</td><td>'+esc(r.keterangan||'-')+'</td><td class="right">'+r.saldo_qty.toLocaleString('id-ID')+'</td><td class="right">'+r.bertambah_qty.toLocaleString('id-ID')+'</td></tr>').join('');
+      preview.innerHTML='<div class="detail-grid"><div><small>Barang</small><strong>'+importRows.length+'</strong></div><div><small>Saldo Awal</small><strong>'+saldo.toLocaleString('id-ID')+'</strong></div><div><small>Bertambah</small><strong>'+tambah.toLocaleString('id-ID')+'</strong></div><div><small>Tanggal</small><strong>31/12/2025 → 02/01/2026</strong></div></div><div class="table-wrap"><table><thead><tr><th>No</th><th>Kode</th><th>Barang</th><th>Keterangan</th><th>Saldo Awal</th><th>Bertambah</th></tr></thead><tbody>'+sample+'</tbody></table></div><p class="note">Kolom Keterangan bersifat opsional. Preview 6 baris pertama. Seluruh '+importRows.length+' barang akan diproses.</p>';
       run.disabled=false;
     }catch(err){preview.innerHTML='<div class="alert">'+esc(err?.message||String(err))+'</div>'}
   };
