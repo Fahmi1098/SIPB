@@ -398,10 +398,70 @@ async function dashboard(){
   '<section class="card recent"><div class="section-head"><div><span class="eyebrow">AKTIVITAS TERKINI</span><h3>Transaksi terbaru</h3><p>Enam transaksi barang keluar terakhir.</p></div><button class="ghost" data-page="barang_keluar">Lihat semua <span aria-hidden="true">→</span></button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Penerima</th><th>Tujuan</th></tr></thead><tbody>'+(recentData.map(r=>'<tr><td>'+fmtDate(r.tanggal_keluar)+'</td><td><strong>'+esc(r.penerima_nama||'-')+'</strong></td><td>'+esc(r.tujuan_ruangan||'-')+'</td></tr>').join('')||'<tr><td colspan="3" class="empty">Belum ada transaksi.</td></tr>')+'</tbody></table></div></section>';
 }
 
-async function barangPage(){const [{data,error},{data:k,error:ke}]=await Promise.all([client.from('barang').select('*, kategori:kategori_id(nama_kategori)').order('id'),client.from('kategori').select('*').order('nama_kategori')]);if(error)throw error;if(ke)throw ke;return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER DATA</span><h2>Master Barang</h2><p>Kelola data barang dan informasi stok tanpa field LKI.</p></div>${profile?.role==='admin'?'<button class="primary" id="addBarang">＋ Tambah Barang</button>':''}</div><div class="filter-bar"><div class="search-box">⌕<input id="barangSearch" placeholder="Cari nama, tipe, merk, atau satuan..."></div><select id="barangFilter"><option value="">Semua kategori</option>${(k||[]).map(x=>`<option value="${x.id}">${esc(x.nama_kategori)}</option>`).join('')}</select><span id="barangCount" class="result-count">${data?.length||0} data</span></div><div class="table-wrap"><table id="barangTable"><thead><tr><th>ID</th><th>Nama Barang</th><th>Kategori</th><th>Tipe</th><th>Merk</th><th>Satuan</th><th>Harga Terakhir</th><th>Stok</th><th>Aksi</th></tr></thead><tbody>${(data||[]).map(barangRow).join('')||emptyRow(9)}</tbody></table></div></section>`}
-function barangRow(r){const low=Number(r.sisa??0)<=Number(r.stok_minimum??0);return `<tr data-search="${esc([r.nama_barang,r.tipe,r.merk,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())}" data-kategori="${r.kategori_id||''}"><td class="id-cell">#${r.id}</td><td><strong>${esc(r.nama_barang)}</strong></td><td>${esc(r.kategori?.nama_kategori||'-')}</td><td>${esc(r.tipe||'-')}</td><td>${esc(r.merk||'-')}</td><td>${esc(r.satuan||'-')}</td><td>${rupiah(r.harga_terakhir)}</td><td><span class="stock ${low?'low':''}">${r.sisa??0}</span></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-barang" data-id="'+r.id+'">Edit</button><button class="btn-sm danger delete-barang" data-id="'+r.id+'">Hapus</button></div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`}
+async function barangPage(){const [{data,error},{data:k,error:ke}]=await Promise.all([client.from('barang').select('*, kategori:kategori_id(nama_kategori)').order('id'),client.from('kategori').select('*').order('nama_kategori')]);if(error)throw error;if(ke)throw ke;return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER DATA</span><h2>Master Barang</h2><p>Kelola data barang, kode sumber, dan stok persediaan.</p></div>${profile?.role==='admin'?'<div class="kartu-head-actions"><button type="button" class="ghost" id="importPersediaan">⇧ Import Persediaan</button><button class="primary" id="addBarang">＋ Tambah Barang</button></div>':''}</div><div class="filter-bar"><div class="search-box">⌕<input id="barangSearch" placeholder="Cari kode, nama, tipe, merk, atau satuan..."></div><select id="barangFilter"><option value="">Semua kategori</option>${(k||[]).map(x=>`<option value="${x.id}">${esc(x.nama_kategori)}</option>`).join('')}</select><span id="barangCount" class="result-count">${data?.length||0} data</span></div><div class="table-wrap"><table id="barangTable"><thead><tr><th>ID</th><th>Kode Barang</th><th>Nama Barang</th><th>Kategori</th><th>Tipe</th><th>Merk</th><th>Satuan</th><th>Harga Terakhir</th><th>Stok</th><th>Aksi</th></tr></thead><tbody>${(data||[]).map(barangRow).join('')||emptyRow(10)}</tbody></table></div></section>`}
+function barangRow(r){const low=Number(r.sisa??0)<=Number(r.stok_minimum??0);return `<tr data-search="${esc([r.kode_barang,r.nama_barang,r.tipe,r.merk,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())}" data-kategori="${r.kategori_id||''}"><td class="id-cell">#${r.id}</td><td><small>${esc(r.kode_barang||"-")}</small></td><td><strong>${esc(r.nama_barang)}</strong></td><td>${esc(r.kategori?.nama_kategori||'-')}</td><td>${esc(r.tipe||'-')}</td><td>${esc(r.merk||'-')}</td><td>${esc(r.satuan||'-')}</td><td>${rupiah(r.harga_terakhir)}</td><td><span class="stock ${low?'low':''}">${r.sisa??0}</span></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-barang" data-id="'+r.id+'">Edit</button><button class="btn-sm danger delete-barang" data-id="'+r.id+'">Hapus</button></div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`}
 function emptyRow(n){return `<tr><td colspan="${n}" class="empty">Belum ada data.</td></tr>`}
-async function barangForm(id=null){let row={nama_barang:'',kategori_id:'',tipe:'',merk:'',satuan:'',stok_minimum:0};if(id){const {data,error}=await client.from('barang').select('*').eq('id',id).single();if(error)throw error;row=data}const {data:k,error}=await client.from('kategori').select('*').order('nama_kategori');if(error)throw error;return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER BARANG</span><h2>${id?'Edit Barang':'Tambah Barang'}</h2><p>Informasi operasional persediaan.</p></div><button class="ghost" id="backBarang">← Kembali</button></div><div class="form-grid"><label>Nama Barang <input id="b_nama" value="${esc(row.nama_barang)}" maxlength="255"></label><label>Kategori <select id="b_kat"><option value="">- Pilih kategori -</option>${(k||[]).map(x=>`<option value="${x.id}" ${String(x.id)===String(row.kategori_id)?'selected':''}>${esc(x.nama_kategori)}</option>`).join('')}</select></label><label>Tipe <input id="b_tipe" value="${esc(row.tipe||'')}"></label><label>Merk <input id="b_merk" value="${esc(row.merk||'')}"></label><label>Satuan <input id="b_satuan" value="${esc(row.satuan||'')}"></label><label>Stok Minimum <input id="b_min" type="number" min="0" value="${row.stok_minimum||0}"></label></div><div class="form-actions"><button class="primary" id="saveBarang">${id?'Simpan Perubahan':'Simpan Barang'}</button><button class="ghost" id="cancelBarang">Batal</button></div></section>`}
+async function showImportPersediaanModal(){
+  const old=document.getElementById('importPersediaanModal');if(old)old.remove();
+  const wrap=document.createElement('div');wrap.id='importPersediaanModal';wrap.className='modal-backdrop';
+  wrap.innerHTML='<div class="modal-card user-create-modal"><div class="modal-head"><div><span class="eyebrow">MASTER DATA</span><h2>Import Persediaan</h2><p>Import saldo awal dan penambahan barang dari Excel.</p></div><button type="button" class="modal-close" aria-label="Tutup">×</button></div>'+
+    '<div class="form-grid"><label>File Excel <input id="importPersediaanFile" type="file" accept=".xlsx,.xls"></label></div>'+
+    '<div class="alert-box"><strong>Tanggal otomatis:</strong> Saldo Awal <b>31 Desember 2025</b> · Bertambah <b>02 Januari 2026</b>. Baris subtotal/kelompok tidak diimpor.</div>'+
+    '<div id="importPersediaanPreview" class="import-preview"><div class="badge-soft">Belum ada file dipilih.</div></div>'+
+    '<div class="form-actions"><button type="button" class="primary" id="runImportPersediaan" disabled>Import ke SIPB</button><button type="button" class="ghost modal-cancel">Batal</button></div></div>';
+  document.body.appendChild(wrap);
+  const close=()=>wrap.remove();
+  wrap.querySelector('.modal-close').onclick=close;
+  wrap.querySelector('.modal-cancel').onclick=close;
+  wrap.onclick=e=>{if(e.target===wrap)close()};
+  const fileInput=wrap.querySelector('#importPersediaanFile'),preview=wrap.querySelector('#importPersediaanPreview'),run=wrap.querySelector('#runImportPersediaan');
+  let importRows=[];
+  fileInput.onchange=async()=>{
+    importRows=[];run.disabled=true;
+    const file=fileInput.files?.[0];
+    if(!file){preview.innerHTML='<div class="badge-soft">Belum ada file dipilih.</div>';return}
+    preview.innerHTML='<div class="loading-state"><div class="spinner"></div><span>Membaca file...</span></div>';
+    try{
+      if(!window.XLSX)throw new Error('Library Excel belum tersedia. Muat ulang SIPB.');
+      const wb=window.XLSX.read(await file.arrayBuffer(),{type:'array'});
+      const sheet=wb.Sheets['Import SIPB']||wb.Sheets[wb.SheetNames[0]];
+      if(!sheet)throw new Error('Sheet Excel tidak ditemukan.');
+      const raw=window.XLSX.utils.sheet_to_json(sheet,{defval:''});
+      const req=['Kode Barang','Nama Barang','Kategori','Saldo Awal (Qty)','Saldo Awal (Nilai)','Bertambah (Qty)','Bertambah (Nilai)'];
+      const missing=req.filter(h=>!Object.prototype.hasOwnProperty.call(raw[0]||{},h));
+      if(missing.length)throw new Error('Kolom Excel kurang: '+missing.join(', '));
+      importRows=raw.map(r=>({
+        kode_barang:String(r['Kode Barang']||'').trim(),
+        nama_barang:String(r['Nama Barang']||'').trim(),
+        kategori:String(r['Kategori']||'').trim(),
+        satuan:String(r['Satuan']||'').trim(),
+        saldo_qty:Number(r['Saldo Awal (Qty)']||0),
+        saldo_value:Number(r['Saldo Awal (Nilai)']||0),
+        bertambah_qty:Number(r['Bertambah (Qty)']||0),
+        bertambah_value:Number(r['Bertambah (Nilai)']||0)
+      })).filter(r=>r.kode_barang||r.nama_barang);
+      const bad=importRows.findIndex(r=>!r.kode_barang||!r.nama_barang||!r.kategori||![r.saldo_qty,r.saldo_value,r.bertambah_qty,r.bertambah_value].every(Number.isFinite)||r.saldo_qty<0||r.bertambah_qty<0);
+      if(bad>=0)throw new Error('Data Excel pada baris '+(bad+2)+' tidak lengkap atau tidak valid.');
+      const seen=new Set();const dup=importRows.find(r=>{const k=r.kode_barang.toLowerCase();if(seen.has(k))return true;seen.add(k);return false});
+      if(dup)throw new Error('Kode Barang duplikat di file: '+dup.kode_barang);
+      const saldo=importRows.reduce((n,r)=>n+r.saldo_qty,0),tambah=importRows.reduce((n,r)=>n+r.bertambah_qty,0);
+      const sample=importRows.slice(0,6).map((r,i)=>'<tr><td>'+(i+1)+'</td><td><small>'+esc(r.kode_barang)+'</small></td><td>'+esc(r.nama_barang)+'</td><td class="right">'+r.saldo_qty.toLocaleString('id-ID')+'</td><td class="right">'+r.bertambah_qty.toLocaleString('id-ID')+'</td></tr>').join('');
+      preview.innerHTML='<div class="detail-grid"><div><small>Barang</small><strong>'+importRows.length+'</strong></div><div><small>Saldo Awal</small><strong>'+saldo.toLocaleString('id-ID')+'</strong></div><div><small>Bertambah</small><strong>'+tambah.toLocaleString('id-ID')+'</strong></div><div><small>Tanggal</small><strong>31/12/2025 → 02/01/2026</strong></div></div><div class="table-wrap"><table><thead><tr><th>No</th><th>Kode</th><th>Barang</th><th>Saldo Awal</th><th>Bertambah</th></tr></thead><tbody>'+sample+'</tbody></table></div><p class="note">Preview 6 baris pertama. Seluruh '+importRows.length+' barang akan diproses.</p>';
+      run.disabled=false;
+    }catch(err){preview.innerHTML='<div class="alert">'+esc(err?.message||String(err))+'</div>'}
+  };
+  run.onclick=async()=>{
+    if(!importRows.length)return;
+    run.disabled=true;run.textContent='Mengimpor...';
+    try{
+      const {data,error}=await client.rpc('import_rekap_persediaan',{p_rows:importRows});
+      if(error)throw error;
+      toast('Import berhasil: '+(data?.barang||importRows.length)+' barang dan '+(data?.penerimaan||0)+' histori penerimaan.');
+      close();renderApp('barang');
+    }catch(err){run.disabled=false;run.textContent='Import ke SIPB';fail(err)}
+  };
+}
+async function barangForm(id=null){let row={kode_barang:'',nama_barang:'',kategori_id:'',tipe:'',merk:'',satuan:'',stok_minimum:0};if(id){const {data,error}=await client.from('barang').select('*').eq('id',id).single();if(error)throw error;row=data}const {data:k,error}=await client.from('kategori').select('*').order('nama_kategori');if(error)throw error;return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER BARANG</span><h2>${id?'Edit Barang':'Tambah Barang'}</h2><p>Informasi operasional persediaan.</p></div><button class="ghost" id="backBarang">← Kembali</button></div><div class="form-grid"><label>Kode Barang <input id="b_kode" value="${esc(row.kode_barang||"")}" maxlength="80" placeholder="Kode barang sumber"></label><label>Nama Barang <input id="b_nama" value="${esc(row.nama_barang)}" maxlength="255"></label><label>Kategori <select id="b_kat"><option value="">- Pilih kategori -</option>${(k||[]).map(x=>`<option value="${x.id}" ${String(x.id)===String(row.kategori_id)?'selected':''}>${esc(x.nama_kategori)}</option>`).join('')}</select></label><label>Tipe <input id="b_tipe" value="${esc(row.tipe||'')}"></label><label>Merk <input id="b_merk" value="${esc(row.merk||'')}"></label><label>Satuan <input id="b_satuan" value="${esc(row.satuan||'')}"></label><label>Stok Minimum <input id="b_min" type="number" min="0" value="${row.stok_minimum||0}"></label></div><div class="form-actions"><button class="primary" id="saveBarang">${id?'Simpan Perubahan':'Simpan Barang'}</button><button class="ghost" id="cancelBarang">Batal</button></div></section>`}
 async function simple(title,table,cols){const {data,error}=await client.from(table).select('*').order('id',{ascending:false}).limit(200);if(error)throw error;return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DATA SIPB</span><h2>${title}</h2><p>Maksimal 200 data terbaru.</p></div></div><div class="table-wrap"><table><thead><tr>${cols.map(x=>`<th>${x[1]}</th>`).join('')}</tr></thead><tbody>${(data||[]).map(row=>`<tr>${cols.map(x=>`<td>${esc(row[x[0]])}</td>`).join('')}</tr>`).join('')||emptyRow(cols.length)}</tbody></table></div></section>`}
 
 async function barangMasukForm(){
@@ -1098,6 +1158,8 @@ function bind(page){
     });
   }
   if(page==='barang'){
+    const importPersediaan=$('importPersediaan');
+    if(importPersediaan) importPersediaan.onclick=async e=>{e.preventDefault();e.stopPropagation();await showImportPersediaanModal()};
     const addBarang=$('addBarang');
     if(addBarang) addBarang.onclick=async e=>{
       e.preventDefault();
@@ -1182,6 +1244,7 @@ function bindForm(id){
     e.preventDefault();
     e.stopPropagation();
     const payload={
+      kode_barang:$('b_kode').value.trim()||null,
       nama_barang:$('b_nama').value.trim(),
       kategori_id:$('b_kat').value?+$('b_kat').value:null,
       tipe:$('b_tipe').value.trim()||'-',
