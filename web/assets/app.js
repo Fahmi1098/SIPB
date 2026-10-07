@@ -1511,7 +1511,7 @@ async function bindOpnameForm(){
   };
 }
 async function bindKeluarForm(){
-  const result=await client.from('barang').select('id,nama_barang,satuan,sisa,kategori:kategori_id(id,nama_kategori)').order('nama_barang');
+  const result=await client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,kategori:kategori_id(id,nama_kategori)').order('nama_barang');
   if(result.error)throw result.error;
   const items=result.data||[];
   const pegawaiQ=await client.from('pegawai').select('id,nama_pegawai,nip,status_pegawai,jabatan,unit_kerja').order('nama_pegawai');
