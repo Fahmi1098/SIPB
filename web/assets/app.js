@@ -507,7 +507,7 @@ async function barangPage(){
     return {...r,keterangan_tampil:merged.join(' · ')};
   });
 
-  return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER DATA</span><h2>Master Barang</h2><p>Kelola data barang, kode sumber, dan stok persediaan.</p></div>${profile?.role==='admin'?'<div class="kartu-head-actions"><button type="button" class="ghost" id="importPersediaan">⇧ Import Persediaan</button><button class="primary" id="addBarang">＋ Tambah Barang</button></div>':''}</div><div class="filter-bar"><div class="search-box">⌕<input id="barangSearch" placeholder="Cari kode, nama, keterangan, tipe, merk, atau satuan..."></div><select id="barangFilter"><option value="">Semua kategori</option>${(k||[]).map(x=>`<option value="${x.id}">${esc(x.nama_kategori)}</option>`).join('')}</select><span id="barangCount" class="result-count">${data?.length||0} data</span></div><div class="table-wrap"><table id="barangTable"><thead><tr><th>ID</th><th>Kode Barang</th><th>Nama Barang</th><th>Keterangan</th><th>Kategori</th><th>Tipe</th><th>Merk</th><th>Satuan</th><th>Harga Terakhir</th><th>Stok</th><th>Aksi</th></tr></thead><tbody>${rows.map(barangRow).join('')||emptyRow(10)}</tbody></table></div></section>`
+  return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER DATA</span><h2>Master Barang</h2><p>Kelola data barang, kode sumber, dan stok persediaan.</p></div>${profile?.role==='admin'?'<div class="kartu-head-actions"><button type="button" class="ghost" id="importPersediaan">⇧ Import Persediaan</button><button class="primary" id="addBarang">＋ Tambah Barang</button></div>':''}</div><div class="filter-bar"><div class="search-box">⌕<input id="barangSearch" placeholder="Cari kode, nama, keterangan, tipe, merk, atau satuan..."></div><select id="barangFilter"><option value="">Semua kategori</option>${(k||[]).map(x=>`<option value="${x.id}">${esc(x.nama_kategori)}</option>`).join('')}</select><span id="barangCount" class="result-count">${data?.length||0} data</span></div><div class="table-wrap master-barang-table-wrap"><table id="barangTable" class="master-barang-table"><thead><tr><th>ID</th><th>Kode Barang</th><th>Nama Barang</th><th>Keterangan</th><th>Kategori</th><th>Tipe</th><th>Merk</th><th>Satuan</th><th>Harga Terakhir</th><th>Stok</th><th>Aksi</th></tr></thead><tbody>${rows.map(barangRow).join('')||emptyRow(11)}</tbody></table></div></section>`
 }
 function barangRow(r){const low=Number(r.sisa??0)<=Number(r.stok_minimum??0);const ket=String(r.keterangan_tampil??r.keterangan??'').trim();return `<tr data-search="${esc([r.kode_barang,r.nama_barang,ket,r.tipe,r.merk,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())}" data-kategori="${r.kategori_id||''}"><td class="id-cell">#${r.id}</td><td><small>${esc(r.kode_barang||"-")}</small></td><td><strong>${esc(r.nama_barang)}</strong></td><td>${esc(ket||'-')}</td><td>${esc(r.kategori?.nama_kategori||'-')}</td><td>${esc(r.tipe||'-')}</td><td>${esc(r.merk||'-')}</td><td>${esc(r.satuan||'-')}</td><td>${rupiah(r.harga_terakhir)}</td><td><span class="stock ${low?'low':''}">${formatAngka(r.sisa??0)}</span></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-barang" data-id="'+r.id+'">Edit</button><button class="btn-sm danger delete-barang" data-id="'+r.id+'">Hapus</button></div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`}
 function emptyRow(n){return `<tr><td colspan="${n}" class="empty">Belum ada data.</td></tr>`}
@@ -601,7 +601,8 @@ async function barangMasukForm(){
   ]);
   if(error||ke)throw(error||ke);
   return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PENERIMAAN</span><h2>Rekam Barang Masuk</h2><p>Stok, transaksi penerimaan, dan batch Kuasi disimpan atomik dalam satu transaksi database.</p></div><button class="ghost" id="backMasuk">← Kembali</button></div><div class="form-grid">
-  <label>Barang yang sudah ada <select id="m_barang">${canCreate?'<option value="">＋ Barang baru</option>':''}${items.map(x=>`<option value="${x.id}" data-kuasi="${String(x.kategori?.nama_kategori||'').toLowerCase().includes('kuasi')?'1':'0'}" data-kategori="${x.kategori_id||''}" data-satuan="${esc(x.satuan||'')}" data-tipe="${esc(x.tipe||'')}" data-merk="${esc(x.merk||'')}">${esc(x.nama_barang)} — ${esc(x.satuan||'-')}</option>`).join('')}</select></label>
+  <label>Barang yang sudah ada <select id="m_barang">${canCreate?'<option value="">＋ Barang baru</option>':''}${items.map(x=>`<option value="${x.id}" data-kode="${esc(x.kode_barang||'')}" data-kuasi="${String(x.kategori?.nama_kategori||'').toLowerCase().includes('kuasi')?'1':'0'}" data-kategori="${x.kategori_id||''}" data-satuan="${esc(x.satuan||'')}" data-tipe="${esc(x.tipe||'')}" data-merk="${esc(x.merk||'')}">${esc(x.nama_barang)} — ${esc(x.satuan||'-')}</option>`).join('')}</select></label>
+  <label${canCreate?'':' style="display:none"'}>Kode Barang <input id="m_kode" maxlength="100" placeholder="Contoh: 01.01.01.001"><small class="field-hint">Kode akan disimpan pada Master Barang.</small></label>
   <label${canCreate?'':' style="display:none"'}>Nama Barang Baru <input id="m_nama" placeholder="Isi jika memilih Barang baru"></label>
   <label${canCreate?'':' style="display:none"'}>Kategori Barang Baru <select id="m_kat"><option value="">- Pilih kategori -</option>${kats.map(x=>`<option value="${x.id}" data-kuasi="${String(x.nama_kategori||'').toLowerCase().includes('kuasi')?'1':'0'}">${esc(x.nama_kategori)}</option>`).join('')}</select></label>
   <label>Tipe <input id="m_tipe" value="-"></label><label>Merk <input id="m_merk" value="-"></label><label>Satuan <input id="m_satuan" placeholder="BUAH / PCS / KOTAK"></label>
@@ -1567,20 +1568,26 @@ async function bindMasukForm(){
   const toggle=()=>{
     const sel=$('m_barang'), opt=sel.selectedOptions[0];
     const isNew=!sel.value;
-    const nama=$('m_nama'),katSel=$('m_kat'),tipe=$('m_tipe'),merk=$('m_merk'),satuan=$('m_satuan');
+     const nama=$('m_nama'),kode=$('m_kode'),katSel=$('m_kat'),tipe=$('m_tipe'),merk=$('m_merk'),satuan=$('m_satuan');
     if(isNew){
+      kode.disabled=false;
+      kode.readOnly=false;
       nama.disabled=false;
       katSel.disabled=false;
       satuan.disabled=false;
       tipe.readOnly=false;
       merk.readOnly=false;
+      if(kode.dataset.auto==='1')kode.value='';
       if(nama.dataset.auto==='1')nama.value='';
       if(katSel.dataset.auto==='1')katSel.value='';
       if(satuan.dataset.auto==='1')satuan.value='';
       if(tipe.dataset.auto==='1')tipe.value='-';
       if(merk.dataset.auto==='1')merk.value='-';
-      [nama,katSel,satuan,tipe,merk].forEach(el=>{el.dataset.auto='0'});
+      [kode,nama,katSel,satuan,tipe,merk].forEach(el=>{el.dataset.auto='0'});
     }else{
+      kode.value=opt?.dataset.kode||'';
+      kode.disabled=false;
+      kode.readOnly=true;
       nama.value='';
       nama.disabled=true;
       katSel.value=opt?.dataset.kategori||'';
@@ -1591,7 +1598,7 @@ async function bindMasukForm(){
       tipe.readOnly=true;
       merk.value=opt?.dataset.merk||'-';
       merk.readOnly=true;
-      [katSel,satuan,tipe,merk].forEach(el=>{el.dataset.auto='1'});
+      [kode,katSel,satuan,tipe,merk].forEach(el=>{el.dataset.auto='1'});
     }
     const kat=katSel.selectedOptions[0];
     const kuasi=isNew?(kat?.dataset.kuasi==='1'):(opt?.dataset.kuasi==='1');
@@ -1608,7 +1615,7 @@ async function bindMasukForm(){
     const btn=$('saveMasuk');btn.disabled=true;btn.textContent='Memproses transaksi...';
     try{
       const result=await client.rpc('record_barang_masuk',{
-        p_barang_id:existing,p_kategori_id:Number($('m_kat').value)||null,
+        p_barang_id:existing,p_kode_barang:$('m_kode').value.trim()||null,p_kategori_id:Number($('m_kat').value)||null,
         p_nama_barang:nama,p_tipe:$('m_tipe').value.trim()||'-',p_merk:$('m_merk').value.trim()||'-',
         p_satuan:$('m_satuan').value.trim()||'PCS',p_jumlah:jumlah,p_harga_satuan:harga,
         p_sumber_dana:$('m_sumber').value,p_tanggal:$('m_tanggal').value,
