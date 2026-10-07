@@ -330,16 +330,18 @@ async function dashboard(){
     client.from('transaksi_keluar').select('id,status'),
     client.from('transaksi_keluar').select('*').order('id',{ascending:false}).limit(6),
     client.from('barang').select('id,sisa,harga_terakhir,kategori_id,kategori:kategori_id(nama_kategori)'),
+    client.from('barang_masuk').select('id,barang_id,jumlah,harga_satuan,barang:barang_id(id,kategori_id,kategori:kategori_id(nama_kategori))'),
     client.from('transaksi_keluar').select('tanggal_keluar,status').gte('tanggal_keluar',since).order('tanggal_keluar'),
     client.from('stok_kuasi').select('id,barang_id,sisa_lembar,barang:barang_id(nama_barang,satuan)').gt('sisa_lembar',0)
   ]);
-  const err=barangQ.error||masukQ.error||keluarQ.error||recentQ.error||catQ.error||outQ.error||kuasiQ.error;
+  const err=barangQ.error||masukQ.error||keluarQ.error||recentQ.error||catQ.error||masukCatQ.error||outQ.error||kuasiQ.error;
   if(err)throw err;
 
   const barangData=barangQ.data||[];
   const masukData=masukQ.data||[];
   const keluarData=(keluarQ.data||[]).filter(x=>(x.status||'AKTIF')!=='DIBATALKAN');
   const recentData=(recentQ.data||[]).filter(r=>(r.status||'AKTIF')==='AKTIF');
+  const masukCatData=masukCatQ.data||[];
   const totalBarang=barangData.length;
   const totalSisa=barangData.reduce((n,r)=>n+(Number(r.sisa)||0),0);
   const totalMasuk=masukData.reduce((n,r)=>n+(Number(r.jumlah)||0),0);
@@ -360,14 +362,16 @@ async function dashboard(){
   const kuasiLow=Object.values(kuasiMap).filter(r=>r.sisa<=20).sort((a,b)=>a.sisa-b.sisa);
 
   const catMap={};
-  (catQ.data||[]).forEach(x=>{
-    const n=x.kategori?.nama_kategori||'Tanpa Kategori';
-    if(!catMap[n])catMap[n]={jenis:0,jumlah:0,nilai:0};
-    catMap[n].jenis++;
-    catMap[n].jumlah+=Number(x.sisa)||0;
-    catMap[n].nilai+=(Number(x.sisa)||0)*(Number(x.harga_terakhir)||0);
+  masukCatData.forEach(x=>{
+    const n=x.barang?.kategori?.nama_kategori||'Tanpa Kategori';
+    if(!catMap[n])catMap[n]={jenis:new Set(),jumlah:0,nilai:0};
+    if(x.barang?.id!=null)catMap[n].jenis.add(x.barang.id);
+    catMap[n].jumlah+=Number(x.jumlah)||0;
+    catMap[n].nilai+=(Number(x.jumlah)||0)*(Number(x.harga_satuan)||0);
   });
-  const catEntries=Object.entries(catMap).sort((a,b)=>b[1].nilai-a[1].nilai);
+  const catEntries=Object.entries(catMap)
+    .map(([name,v])=>[name,{jenis:v.jenis.size,jumlah:v.jumlah,nilai:v.nilai}])
+    .sort((a,b)=>b[1].nilai-a[1].nilai);
   const catSummaryRows=catEntries.map(([name,v])=>'<tr><td><strong>'+esc(name)+'</strong></td><td class="right">'+v.jenis.toLocaleString('id-ID')+'</td><td class="right">'+v.jumlah.toLocaleString('id-ID')+'</td><td class="right">'+rupiah(v.nilai)+'</td></tr>').join('');
 
   const monthMap={};
@@ -405,7 +409,7 @@ async function dashboard(){
   '<section class="stats-grid"><div class="stat-card blue"><span class="stat-icon">'+navSvg('barang')+'</span><div><small>Total Barang</small><strong>'+totalBarang+'</strong><em>Master barang</em></div></div><div class="stat-card blue"><span class="stat-icon">'+navSvg('barang_masuk')+'</span><div><small>Nilai Barang Masuk</small><strong>'+rupiah(nominalMasuk)+'</strong><em>Total nilai penerimaan</em></div></div><div class="stat-card green"><span class="stat-icon">'+navSvg('barang_masuk')+'</span><div><small>Jumlah Barang Masuk</small><strong>'+totalMasuk.toLocaleString('id-ID')+'</strong><em>Total kuantitas masuk</em></div></div><div class="stat-card red"><span class="stat-icon">'+navSvg('barang_keluar')+'</span><div><small>Barang Keluar</small><strong>'+totalKeluar+'</strong><em>Transaksi aktif</em></div></div><div class="stat-card purple"><span class="stat-icon">'+navSvg('stock_opname')+'</span><div><small>Sisa Stok</small><strong>'+totalSisa.toLocaleString('id-ID')+'</strong><em>Total stok saat ini</em></div></div></section>'+
   '<section class="stock-alert-center card"><div class="section-head"><div><span class="eyebrow">PERINGATAN PERSEDIAAN</span><h3>Pusat Peringatan Stok</h3><p>Barang yang sudah habis atau berada di bawah batas stok minimum.</p></div><div class="stock-alert-counts"><span class="alert-count danger"><strong>'+outOfStock.length+'</strong><small>Habis</small></span><span class="alert-count warning"><strong>'+lowStock.length+'</strong><small>Menipis</small></span><span class="alert-count kuasi"><strong>'+kuasiLow.length+'</strong><small>Kuasi ≤ 20</small></span></div></div>'+
   '<div class="stock-alert-layout"><div class="stock-alert-list">'+(alertList||'<div class="stock-alert-empty"><span>✓</span><div><strong>Stok aman</strong><small>Tidak ada barang yang berada di bawah batas minimum.</small></div></div>')+'</div><div class="stock-alert-side"><div class="stock-alert-side-title">Ringkasan cepat</div><div class="stock-alert-metric"><span>Barang perlu perhatian</span><strong>'+stockAlerts.length+'</strong></div><div class="stock-alert-metric"><span>Batch Kuasi menipis</span><strong>'+kuasiLow.length+'</strong></div><button class="ghost" data-page="barang">Buka Master Barang <span aria-hidden="true">→</span></button></div></div></section>'+
-  '<section class="card page-card category-summary-card"><div class="section-head"><div><span class="eyebrow">RINGKASAN KATEGORI</span><h3>Jumlah Barang dan Nominal Berdasarkan Kategori</h3><p>Rekap jenis barang, jumlah stok tersisa, dan nilai persediaan menurut kategori.</p></div></div><div class="table-wrap"><table><thead><tr><th>Kategori</th><th>Jenis Barang</th><th>Jumlah Stok</th><th>Nominal Persediaan</th></tr></thead><tbody>'+(catSummaryRows||emptyRow(4))+'</tbody></table></div></section>'+  '<section class="charts-grid"><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h3>Barang berdasarkan kategori</h3><p>Delapan kategori dengan jumlah barang terbanyak.</p></div></div><div class="chart-wrap"><canvas id="categoryChart"></canvas></div></article><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">AKTIVITAS</span><h3>Barang keluar per bulan</h3><p>Enam bulan terakhir, transaksi aktif.</p></div></div><div class="chart-wrap"><canvas id="outgoingChart"></canvas></div></article></section>'+
+  '<section class="card page-card category-summary-card"><div class="section-head"><div><span class="eyebrow">RINGKASAN KATEGORI</span><h3>Jumlah Barang dan Nominal Berdasarkan Kategori</h3><p>Rekap jenis barang, jumlah masuk, dan nilai penerimaan berdasarkan transaksi Barang Masuk.</p></div></div><div class="table-wrap"><table><thead><tr><th>Kategori</th><th>Jenis Barang</th><th>Jumlah Masuk</th><th>Nominal Barang Masuk</th></tr></thead><tbody>'+(catSummaryRows||emptyRow(4))+'</tbody></table></div></section>'+  '<section class="charts-grid"><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h3>Barang berdasarkan kategori</h3><p>Delapan kategori dengan jumlah barang terbanyak.</p></div></div><div class="chart-wrap"><canvas id="categoryChart"></canvas></div></article><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">AKTIVITAS</span><h3>Barang keluar per bulan</h3><p>Enam bulan terakhir, transaksi aktif.</p></div></div><div class="chart-wrap"><canvas id="outgoingChart"></canvas></div></article></section>'+
   '<section class="card recent"><div class="section-head"><div><span class="eyebrow">AKTIVITAS TERKINI</span><h3>Transaksi terbaru</h3><p>Enam transaksi barang keluar terakhir.</p></div><button class="ghost" data-page="barang_keluar">Lihat semua <span aria-hidden="true">→</span></button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Penerima</th><th>Tujuan</th></tr></thead><tbody>'+(recentData.map(r=>'<tr><td>'+fmtDate(r.tanggal_keluar)+'</td><td><strong>'+esc(r.penerima_nama||'-')+'</strong></td><td>'+esc(r.tujuan_ruangan||'-')+'</td></tr>').join('')||'<tr><td colspan="3" class="empty">Belum ada transaksi.</td></tr>')+'</tbody></table></div></section>';
 }
 
