@@ -324,7 +324,7 @@ async function count(t){const {count,error}=await client.from(t).select('*',{cou
 async function dashboard(){
   const now=new Date();
   const since=new Date(now.getFullYear(),now.getMonth()-5,1).toISOString();
-  const [barangQ,masukQ,keluarQ,recentQ,catQ,outQ,kuasiQ]=await Promise.all([
+  const [barangQ,masukQ,keluarQ,recentQ,catQ,masukCatQ,outQ,kuasiQ]=await Promise.all([
     client.from('barang').select('id,nama_barang,satuan,sisa,stok_minimum,harga_terakhir'),
     client.from('barang_masuk').select('jumlah,harga_satuan'),
     client.from('transaksi_keluar').select('id,status'),
