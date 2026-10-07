@@ -516,7 +516,7 @@ async function showImportPersediaanModal(){
   const wrap=document.createElement('div');wrap.id='importPersediaanModal';wrap.className='modal-backdrop';
   wrap.innerHTML='<div class="modal-card user-create-modal"><div class="modal-head"><div><span class="eyebrow">MASTER DATA</span><h2>Import Persediaan</h2><p>Import saldo awal dan penambahan barang dari Excel.</p></div><button type="button" class="modal-close" aria-label="Tutup">×</button></div>'+
     '<div class="form-grid"><label>File Excel <input id="importPersediaanFile" type="file" accept=".xlsx,.xls"></label></div>'+
-    '<div class="alert-box"><strong>Tanggal otomatis:</strong> Saldo Awal <b>31 Desember 2025</b> · Bertambah <b>02 Januari 2026</b>. Baris subtotal/kelompok tidak diimpor.</div>'+
+    '<div class="alert-box"><strong>Tanggal masuk:</strong> gunakan kolom <b>Tanggal Saldo Awal</b> dan <b>Tanggal Bertambah</b> pada Excel. Jika kosong, default <b>31 Desember 2025</b> dan <b>02 Januari 2026</b>. Kolom <b>Tanggal Masuk</b> juga diterima sebagai fallback.</div>'+
     '<div id="importPersediaanPreview" class="import-preview"><div class="badge-soft">Belum ada file dipilih.</div></div>'+
     '<div class="form-actions"><button type="button" class="primary" id="runImportPersediaan" disabled>Import ke SIPB</button><button type="button" class="ghost modal-cancel">Batal</button></div></div>';
   document.body.appendChild(wrap);
@@ -533,10 +533,25 @@ async function showImportPersediaanModal(){
     preview.innerHTML='<div class="loading-state"><div class="spinner"></div><span>Membaca file...</span></div>';
     try{
       if(!window.XLSX)throw new Error('Library Excel belum tersedia. Muat ulang SIPB.');
-      const wb=window.XLSX.read(await file.arrayBuffer(),{type:'array'});
+      const wb=window.XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
       const sheet=wb.Sheets['Import SIPB']||wb.Sheets[wb.SheetNames[0]];
       if(!sheet)throw new Error('Sheet Excel tidak ditemukan.');
       const raw=window.XLSX.utils.sheet_to_json(sheet,{defval:''});
+      const excelDate=v=>{
+        if(v instanceof Date&&!Number.isNaN(v.getTime())){
+          return v.getFullYear()+'-'+String(v.getMonth()+1).padStart(2,'0')+'-'+String(v.getDate()).padStart(2,'0');
+        }
+        if(typeof v==='number'&&Number.isFinite(v)&&v>20000){
+          const dt=new Date(Date.UTC(1899,11,30)+Math.round(v)*86400000);
+          if(!Number.isNaN(dt.getTime()))return dt.toISOString().slice(0,10);
+        }
+        const s=String(v??'').trim();
+        if(!s)return '';
+        let m=s.match(/^(\\d{1,2})[\\/.-](\\d{1,2})[\\/.-](\\d{4})$/);
+        if(m)return m[3]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0');
+        m=s.match(/^(\\d{4})[\\/.-](\\d{1,2})[\\/.-](\\d{1,2})$/);
+        return m?m[1]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0'):'';
+      };
       const req=['Kode Barang','Nama Barang','Kategori','Saldo Awal (Qty)','Saldo Awal (Nilai)','Bertambah (Qty)','Bertambah (Nilai)'];
       const missing=req.filter(h=>!Object.prototype.hasOwnProperty.call(raw[0]||{},h));
       if(missing.length)throw new Error('Kolom Excel kurang: '+missing.join(', '));
@@ -546,18 +561,20 @@ async function showImportPersediaanModal(){
         kategori:String(r['Kategori']||'').trim(),
         satuan:String(r['Satuan']||'').trim(),
         keterangan:String(r['Keterangan']||r['Keterangan / Spesifikasi']||'').trim(),
+        tanggal_saldo_awal:excelDate(r['Tanggal Saldo Awal']||r['Tanggal Saldo']||r['Tanggal Masuk'])||'2025-12-31',
+        tanggal_bertambah:excelDate(r['Tanggal Bertambah']||r['Tanggal Penambahan']||r['Tanggal Masuk'])||'2026-01-02',
         saldo_qty:Number(r['Saldo Awal (Qty)']||0),
         saldo_value:Number(r['Saldo Awal (Nilai)']||0),
         bertambah_qty:Number(r['Bertambah (Qty)']||0),
         bertambah_value:Number(r['Bertambah (Nilai)']||0)
       })).filter(r=>r.kode_barang||r.nama_barang);
-      const bad=importRows.findIndex(r=>!r.kode_barang||!r.nama_barang||!r.kategori||![r.saldo_qty,r.saldo_value,r.bertambah_qty,r.bertambah_value].every(Number.isFinite)||r.saldo_qty<0||r.bertambah_qty<0);
+      const bad=importRows.findIndex(r=>!r.kode_barang||!r.nama_barang||!r.kategori||![r.saldo_qty,r.saldo_value,r.bertambah_qty,r.bertambah_value].every(Number.isFinite)||r.saldo_qty<0||r.bertambah_qty<0||!/^\\d{4}-\\d{2}-\\d{2}$/.test(r.tanggal_saldo_awal)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(r.tanggal_bertambah));
       if(bad>=0)throw new Error('Data Excel pada baris '+(bad+2)+' tidak lengkap atau tidak valid.');
       const seen=new Set();const dup=importRows.find(r=>{const k=r.kode_barang.toLowerCase();if(seen.has(k))return true;seen.add(k);return false});
       if(dup)throw new Error('Kode Barang duplikat di file: '+dup.kode_barang);
       const saldo=importRows.reduce((n,r)=>n+r.saldo_qty,0),tambah=importRows.reduce((n,r)=>n+r.bertambah_qty,0);
-      const sample=importRows.slice(0,6).map((r,i)=>'<tr><td>'+(i+1)+'</td><td><small>'+esc(r.kode_barang)+'</small></td><td>'+esc(r.nama_barang)+'</td><td>'+esc(r.keterangan||'-')+'</td><td class="right">'+r.saldo_qty.toLocaleString('id-ID')+'</td><td class="right">'+r.bertambah_qty.toLocaleString('id-ID')+'</td></tr>').join('');
-      preview.innerHTML='<div class="detail-grid"><div><small>Barang</small><strong>'+importRows.length+'</strong></div><div><small>Saldo Awal</small><strong>'+saldo.toLocaleString('id-ID')+'</strong></div><div><small>Bertambah</small><strong>'+tambah.toLocaleString('id-ID')+'</strong></div><div><small>Tanggal</small><strong>31/12/2025 → 02/01/2026</strong></div></div><div class="table-wrap"><table><thead><tr><th>No</th><th>Kode</th><th>Barang</th><th>Keterangan</th><th>Saldo Awal</th><th>Bertambah</th></tr></thead><tbody>'+sample+'</tbody></table></div><p class="note">Kolom Keterangan bersifat opsional. Preview 6 baris pertama. Seluruh '+importRows.length+' barang akan diproses.</p>';
+      const sample=importRows.slice(0,6).map((r,i)=>'<tr><td>'+(i+1)+'</td><td><small>'+esc(r.kode_barang)+'</small></td><td>'+esc(r.nama_barang)+'</td><td>'+esc(r.keterangan||'-')+'</td><td>'+fmtDate(r.tanggal_saldo_awal)+'</td><td>'+fmtDate(r.tanggal_bertambah)+'</td><td class="right">'+r.saldo_qty.toLocaleString('id-ID')+'</td><td class="right">'+r.bertambah_qty.toLocaleString('id-ID')+'</td></tr>').join('');
+      preview.innerHTML='<div class="detail-grid"><div><small>Barang</small><strong>'+importRows.length+'</strong></div><div><small>Saldo Awal</small><strong>'+saldo.toLocaleString('id-ID')+'</strong></div><div><small>Bertambah</small><strong>'+tambah.toLocaleString('id-ID')+'</strong></div><div><small>Tanggal</small><strong>Per baris</strong></div></div><div class="table-wrap"><table><thead><tr><th>No</th><th>Kode</th><th>Barang</th><th>Keterangan</th><th>Tgl Saldo Awal</th><th>Tgl Bertambah</th><th>Saldo Awal</th><th>Bertambah</th></tr></thead><tbody>'+sample+'</tbody></table></div><p class="note">Tanggal dibaca dari Excel per baris. Kolom Keterangan bersifat opsional. Preview 6 baris pertama. Seluruh '+importRows.length+' barang akan diproses.</p>';
       run.disabled=false;
     }catch(err){preview.innerHTML='<div class="alert">'+esc(err?.message||String(err))+'</div>'}
   };
