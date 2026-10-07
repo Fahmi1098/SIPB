@@ -1645,18 +1645,31 @@ async function bindMasukForm(){
     const existing=Number($('m_barang').value)||null,nama=$('m_nama').value.trim(),jumlah=parseAngka($('m_jumlah').value),harga=parseAngka($('m_harga').value);
     if(!jumlah||jumlah<1)return toast('Jumlah harus lebih dari 0.','error');
     if(harga<0||Number.isNaN(harga))return toast('Harga tidak valid.','error');
+    const kodeInput=$('m_kode').value.trim();
+    const keterangan=$('m_keterangan').value.trim();
+    const tanggal=$('m_tanggal').value;
     if(!existing&&!nama)return toast('Pilih barang atau isi nama barang baru.','error');
     if(!existing&&!Number($('m_kat').value))return toast('Kategori barang baru wajib dipilih.','error');
+    if(!existing&&!kodeInput)return toast('Kode Barang wajib diisi untuk barang baru.','error');
+    if(keterangan.length>500)return toast('Keterangan maksimal 500 karakter.','error');
+    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(tanggal))return toast('Tanggal Masuk tidak valid.','error');
+    const selected=$('m_barang').selectedOptions[0];
+    const masterKode=String(selected?.dataset.kode||'').trim();
+    if(existing&&kodeInput.toLowerCase()!==masterKode.toLowerCase())return toast('Kode Barang tidak boleh diubah dari Barang Masuk.','error');
+    if(!existing){
+      const duplicate=items.find(x=>String(x.kode_barang||'').trim().toLowerCase()===kodeInput.toLowerCase());
+      if(duplicate)return toast('Kode Barang sudah digunakan oleh '+duplicate.nama_barang+'.','error');
+    }
     const btn=$('saveMasuk');btn.disabled=true;btn.textContent='Memproses transaksi...';
     try{
       const result=await client.rpc('record_barang_masuk',{
-        p_barang_id:existing,p_kode_barang:$('m_kode').value.trim()||null,p_kategori_id:Number($('m_kat').value)||null,
+        p_barang_id:existing,p_kode_barang:kodeInput||null,p_kategori_id:Number($('m_kat').value)||null,
         p_nama_barang:nama,p_tipe:$('m_tipe').value.trim()||'-',p_merk:$('m_merk').value.trim()||'-',
         p_satuan:$('m_satuan').value.trim()||'PCS',p_jumlah:jumlah,p_harga_satuan:harga,
-        p_sumber_dana:$('m_sumber').value,p_tanggal:$('m_tanggal').value,
+        p_sumber_dana:$('m_sumber').value,p_tanggal:tanggal,
         p_nama_penyerah:$('m_penyerah').value.trim()||'Pihak ke Tiga',
         p_nama_penerima:$('m_penerima').value.trim()||profile?.nama_lengkap||session.user.email,
-        p_keterangan:$('m_keterangan').value.trim()||null,
+        p_keterangan:keterangan||null,
         p_nomor_dus:$('m_dus').value.trim()||null,p_nomor_awal:$('m_awal').value.trim()||null,p_nomor_akhir:$('m_akhir').value.trim()||null
       });
       if(result.error)throw result.error;
