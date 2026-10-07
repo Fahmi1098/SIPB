@@ -476,7 +476,39 @@ async function dashboard(){
   '<section class="charts-grid"><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h3>Barang berdasarkan kategori</h3><p>Delapan kategori dengan jumlah barang terbanyak.</p></div></div><div class="chart-wrap"><canvas id="categoryChart"></canvas></div></article><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">AKTIVITAS</span><h3>Barang keluar per bulan</h3><p>Enam bulan terakhir, transaksi aktif.</p></div></div><div class="chart-wrap"><canvas id="outgoingChart"></canvas></div></article></section>'+
   '<section class="card recent dashboard-rekap-barang"><div class="section-head"><div><span class="eyebrow">REKAP BARANG MASUK</span><h3>Daftar / Rekap Barang</h3><p>Keterangan diambil langsung dari transaksi Barang Masuk. Nama barang yang sama dipisahkan jika keterangan atau harga berbeda.</p></div><div class="kartu-head-actions"><span class="status-pill">'+rekapBarang.length+' baris</span><span class="status-pill">'+rekapTotalQty.toLocaleString('id-ID')+' masuk</span></div></div><div class="table-wrap"><table id="dashboardBarangTable"><thead><tr><th>No.</th><th>Nama Barang</th><th>Keterangan</th><th>Harga Satuan</th><th>Jumlah Masuk</th><th>Satuan</th><th>Nilai Masuk</th></tr></thead><tbody>'+(rekapRows||emptyRow(7))+'</tbody></table></div></section>';
 }
-async function barangPage(){const [{data,error},{data:k,error:ke}]=await Promise.all([client.from('barang').select('*, kategori:kategori_id(nama_kategori)').order('id'),client.from('kategori').select('*').order('nama_kategori')]);if(error)throw error;if(ke)throw ke;return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER DATA</span><h2>Master Barang</h2><p>Kelola data barang, kode sumber, dan stok persediaan.</p></div>${profile?.role==='admin'?'<div class="kartu-head-actions"><button type="button" class="ghost" id="importPersediaan">⇧ Import Persediaan</button><button class="primary" id="addBarang">＋ Tambah Barang</button></div>':''}</div><div class="filter-bar"><div class="search-box">⌕<input id="barangSearch" placeholder="Cari kode, nama, keterangan, tipe, merk, atau satuan..."></div><select id="barangFilter"><option value="">Semua kategori</option>${(k||[]).map(x=>`<option value="${x.id}">${esc(x.nama_kategori)}</option>`).join('')}</select><span id="barangCount" class="result-count">${data?.length||0} data</span></div><div class="table-wrap"><table id="barangTable"><thead><tr><th>ID</th><th>Kode Barang</th><th>Nama Barang</th><th>Keterangan</th><th>Kategori</th><th>Tipe</th><th>Merk</th><th>Satuan</th><th>Harga Terakhir</th><th>Stok</th><th>Aksi</th></tr></thead><tbody>${(data||[]).map(barangRow).join('')||emptyRow(10)}</tbody></table></div></section>`}
+async function barangPage(){
+  const [{data,error},{data:k,error:ke},{data:masuk,error:me}]=await Promise.all([
+    client.from('barang').select('*, kategori:kategori_id(nama_kategori)').order('id'),
+    client.from('kategori').select('*').order('nama_kategori'),
+    client.from('barang_masuk').select('id,barang_id,keterangan,harga_satuan,tanggal_masuk').order('tanggal_masuk',{ascending:false}).order('id',{ascending:false})
+  ]);
+  if(error)throw error;
+  if(ke)throw ke;
+  if(me)throw me;
+
+  // Keterangan pada Barang Masuk merupakan keterangan per-transaksi.
+  // Untuk Master Barang, tampilkan seluruh keterangan unik yang pernah
+  // tercatat untuk barang tersebut; keterangan Master tetap menjadi fallback.
+  const ketMap=new Map();
+  (masuk||[]).forEach(r=>{
+    const id=Number(r.barang_id);
+    const ket=String(r.keterangan||'').trim();
+    if(!id||!ket)return;
+    if(!ketMap.has(id))ketMap.set(id,[]);
+    const arr=ketMap.get(id);
+    if(!arr.some(x=>x.toLocaleLowerCase('id-ID')===ket.toLocaleLowerCase('id-ID')))arr.push(ket);
+  });
+
+  const rows=(data||[]).map(r=>{
+    const fromMasuk=ketMap.get(Number(r.id))||[];
+    const masterKet=String(r.keterangan||'').trim();
+    const merged=[...fromMasuk];
+    if(masterKet&&!merged.some(x=>x.toLocaleLowerCase('id-ID')===masterKet.toLocaleLowerCase('id-ID')))merged.unshift(masterKet);
+    return {...r,keterangan_tampil:merged.join(' · ')};
+  });
+
+  return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER DATA</span><h2>Master Barang</h2><p>Kelola data barang, kode sumber, dan stok persediaan.</p></div>${profile?.role==='admin'?'<div class="kartu-head-actions"><button type="button" class="ghost" id="importPersediaan">⇧ Import Persediaan</button><button class="primary" id="addBarang">＋ Tambah Barang</button></div>':''}</div><div class="filter-bar"><div class="search-box">⌕<input id="barangSearch" placeholder="Cari kode, nama, keterangan, tipe, merk, atau satuan..."></div><select id="barangFilter"><option value="">Semua kategori</option>${(k||[]).map(x=>`<option value="${x.id}">${esc(x.nama_kategori)}</option>`).join('')}</select><span id="barangCount" class="result-count">${data?.length||0} data</span></div><div class="table-wrap"><table id="barangTable"><thead><tr><th>ID</th><th>Kode Barang</th><th>Nama Barang</th><th>Keterangan</th><th>Kategori</th><th>Tipe</th><th>Merk</th><th>Satuan</th><th>Harga Terakhir</th><th>Stok</th><th>Aksi</th></tr></thead><tbody>${rows.map(barangRow).join('')||emptyRow(10)}</tbody></table></div></section>`
+}
 function barangRow(r){const low=Number(r.sisa??0)<=Number(r.stok_minimum??0);return `<tr data-search="${esc([r.kode_barang,r.nama_barang,r.keterangan,r.tipe,r.merk,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())}" data-kategori="${r.kategori_id||''}"><td class="id-cell">#${r.id}</td><td><small>${esc(r.kode_barang||"-")}</small></td><td><strong>${esc(r.nama_barang)}</strong></td><td>${esc(r.keterangan||'-')}</td><td>${esc(r.kategori?.nama_kategori||'-')}</td><td>${esc(r.tipe||'-')}</td><td>${esc(r.merk||'-')}</td><td>${esc(r.satuan||'-')}</td><td>${rupiah(r.harga_terakhir)}</td><td><span class="stock ${low?'low':''}">${formatAngka(r.sisa??0)}</span></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-barang" data-id="'+r.id+'">Edit</button><button class="btn-sm danger delete-barang" data-id="'+r.id+'">Hapus</button></div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`}
 function emptyRow(n){return `<tr><td colspan="${n}" class="empty">Belum ada data.</td></tr>`}
 async function showImportPersediaanModal(){
