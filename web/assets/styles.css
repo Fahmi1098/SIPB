@@ -5984,3 +5984,76 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
     min-height:45px;
   }
 }
+
+/* Master Barang: tabel padat, teks panjang membungkus tanpa melebar ke samping. */
+.master-barang-table-wrap{
+  overflow-x:hidden;
+}
+.master-barang-table{
+  width:100%;
+  min-width:0 !important;
+  table-layout:fixed;
+}
+.master-barang-table th,
+.master-barang-table td{
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+  vertical-align:top;
+}
+.master-barang-table th{
+  padding:8px 7px;
+  font-size:.57rem;
+}
+.master-barang-table td{
+  padding:8px 7px;
+  font-size:.68rem;
+  line-height:1.35;
+}
+.master-barang-table th:nth-child(1){width:5%}
+.master-barang-table th:nth-child(2){width:10%}
+.master-barang-table th:nth-child(3){width:15%}
+.master-barang-table th:nth-child(4){width:17%}
+.master-barang-table th:nth-child(5){width:11%}
+.master-barang-table th:nth-child(6){width:7%}
+.master-barang-table th:nth-child(7){width:7%}
+.master-barang-table th:nth-child(8){width:6%}
+.master-barang-table th:nth-child(9){width:9%}
+.master-barang-table th:nth-child(10){width:5%}
+.master-barang-table th:nth-child(11){width:8%}
+.master-barang-table td:nth-child(2) small{
+  display:block;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.master-barang-table td:nth-child(9),
+.master-barang-table td:nth-child(10){
+  white-space:nowrap;
+}
+.master-barang-table .actions{
+  justify-content:flex-start;
+}
+@media (max-width:1100px){
+  .master-barang-table th{
+    padding:7px 5px;
+    font-size:.52rem;
+  }
+  .master-barang-table td{
+    padding:7px 5px;
+    font-size:.62rem;
+  }
+  .master-barang-table .btn-sm{
+    min-height:27px;
+    padding:4px 6px;
+    font-size:.6rem;
+  }
+}
+@media (max-width:760px){
+  .master-barang-table th{
+    font-size:.5rem;
+    letter-spacing:.035em;
+  }
+  .master-barang-table td{
+    font-size:.6rem;
+  }
+}
