@@ -652,12 +652,21 @@ async function barangKeluarForm(){const [{data:items,error},{data:pegawai,error:
 
 function keluarItemRow(items){
   const id='ki_'+Math.random().toString(36).slice(2,9);
-  return '<div class="transaction-row" data-row="'+id+'"><select class="ki-barang"><option value="">- Pilih barang -</option>'+
-    items.map(x=>{
-      const kat=String(x.kategori?.nama_kategori||'').toLowerCase(),isKuasi=kat.includes('kuasi');
-      return '<option value="'+x.id+'" data-stock="'+x.sisa+'" data-unit="'+esc(x.satuan||'')+'" data-kode="'+esc(x.kode_barang||'')+'" data-keterangan="'+esc(x.keterangan||'')+'" data-kuasi="'+(isKuasi?'kuasi':'')+'">'+esc(x.nama_barang)+(x.kode_barang?' — '+esc(x.kode_barang):'')+(x.keterangan?' · '+esc(x.keterangan):'')+' — stok '+x.sisa+' '+esc(x.satuan||'')+(isKuasi?' — FIFO Kuasi':'')+'</option>';
-    }).join('')+
-    '</select><input class="ki-jumlah" type="text" inputmode="numeric" data-number-format="integer" value="1" placeholder="Jumlah"><span class="kuasi-hint" aria-live="polite"></span><button type="button" class="btn-sm danger remove-item" title="Hapus baris barang" aria-label="Hapus baris barang">×</button></div>';
+  const options=items.map(x=>{
+    const kat=String(x.kategori?.nama_kategori||'').toLowerCase(),isKuasi=kat.includes('kuasi');
+    return '<option value="'+x.id+'" data-stock="'+x.sisa+'" data-unit="'+esc(x.satuan||'')+'" data-kode="'+esc(x.kode_barang||'')+'" data-keterangan="'+esc(x.keterangan||'')+'" data-kuasi="'+(isKuasi?'kuasi':'')+'">'+esc(x.nama_barang)+(x.kode_barang?' — '+esc(x.kode_barang):'')+(x.keterangan?' · '+esc(x.keterangan):'')+' — stok '+x.sisa+' '+esc(x.satuan||'')+(isKuasi?' — FIFO Kuasi':'')+'</option>';
+  }).join('');
+  return '<div class="transaction-row" data-row="'+id+'">'+
+    '<div class="barang-picker">'+
+      '<div class="barang-search-wrap"><span class="barang-search-icon">⌕</span><input class="ki-search" type="search" autocomplete="off" placeholder="Cari kode, nama, atau keterangan barang..."><button type="button" class="ki-clear" title="Hapus pilihan" aria-label="Hapus pilihan">×</button></div>'+
+      '<div class="ki-selected-info" aria-live="polite"></div>'+
+      '<div class="ki-results" role="listbox"></div>'+
+      '<select class="ki-barang" aria-hidden="true" tabindex="-1" style="display:none"><option value="">- Pilih barang -</option>'+options+'</select>'+
+    '</div>'+
+    '<input class="ki-jumlah" type="text" inputmode="numeric" data-number-format="integer" value="1" placeholder="Jumlah">'+
+    '<span class="kuasi-hint" aria-live="polite"></span>'+
+    '<button type="button" class="btn-sm danger remove-item" title="Hapus baris barang" aria-label="Hapus baris barang">×</button>'+
+  '</div>';
 }
 
 async function stockOpnamePage(){const [{data:rows,error},{data:items,error:ie}]=await Promise.all([client.from('riwayat_opname').select('*,barang:barang_id(nama_barang)').order('id',{ascending:false}).limit(200),client.from('barang').select('id,nama_barang,sisa,satuan').order('nama_barang')]);if(error||ie)throw(error||ie);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PERSEDIAAN</span><h2>Stock Opname</h2><p>Penyesuaian stok fisik terhadap stok sistem.</p></div><button class="primary" id="addOpname">＋ Rekam Stock Opname</button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Barang</th><th>Sistem</th><th>Fisik</th><th>Selisih</th><th>Petugas</th><th>Keterangan</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${fmtDate(r.tanggal_opname)}</td><td>${esc(r.barang?.nama_barang||'-')}</td><td>${r.stok_sistem}</td><td>${r.stok_fisik}</td><td><span class="stock ${r.selisih<0?'low':''}">${r.selisih>0?'+':''}${r.selisih}</span></td><td>${esc(r.petugas||'-')}</td><td>${esc(r.keterangan||'-')}</td></tr>`).join('')||emptyRow(7)}</tbody></table></div></section>`}
@@ -1552,16 +1561,57 @@ async function bindKeluarForm(){
     if(row)row.remove();
     syncRemoveButtons();
   });
-  const wireRows=()=>{
-    box.querySelectorAll('.ki-barang').forEach(select=>select.onchange=async()=>{
-      const hint=select.closest('.transaction-row').querySelector('.kuasi-hint');
-      if(select.selectedOptions[0]?.dataset.kuasi==='kuasi'){
-        const q=await client.from('stok_kuasi').select('sisa_lembar').eq('barang_id',select.value).gt('sisa_lembar',0);
-        if(q.error)throw q.error;
-        const total=(q.data||[]).reduce((sum,row)=>sum+Number(row.sisa_lembar||0),0);
+  const updatePicker=(row,query='')=>{
+    const select=row.querySelector('.ki-barang'), search=row.querySelector('.ki-search'), results=row.querySelector('.ki-results'), info=row.querySelector('.ki-selected-info');
+    if(!select||!search||!results)return;
+    const q=String(query||'').trim().toLocaleLowerCase('id-ID');
+    const matches=[...select.options].filter(o=>{
+      if(!o.value)return false;
+      const hay=[o.textContent,o.dataset.kode,o.dataset.keterangan].join(' ').toLocaleLowerCase('id-ID');
+      return !q||hay.includes(q);
+    }).slice(0,30);
+    results.innerHTML=matches.length?matches.map(o=>'<button type="button" class="ki-result" data-value="'+esc(o.value)+'">'+
+      '<strong>'+esc(o.dataset.kode||'Tanpa kode')+'</strong>'+
+      '<span>'+esc(o.textContent.replace(/^.*?— /,'').replace(/ — stok.*$/,''))+'</span>'+
+      (o.dataset.keterangan?'<small>'+esc(o.dataset.keterangan)+'</small>':'')+
+      '<em>Stok '+esc(o.dataset.stock||'0')+' '+esc(o.dataset.unit||'')+'</em>'+
+      '</button>').join(''):'<div class="ki-no-result">Barang tidak ditemukan.</div>';
+    results.classList.toggle('open',document.activeElement===search||!!q);
+    if(!select.value)info.innerHTML='<span class="muted">Belum ada barang dipilih</span>';
+  };
+  const applySelected=(row,value)=>{
+    const select=row.querySelector('.ki-barang'),search=row.querySelector('.ki-search'),results=row.querySelector('.ki-results'),info=row.querySelector('.ki-selected-info');
+    const opt=[...select.options].find(o=>o.value===String(value));
+    if(!opt)return;
+    select.value=String(value);
+    const name=opt.textContent.replace(/\s+— stok.*$/,'').replace(/\s+— FIFO Kuasi$/,'');
+    search.value='';
+    info.innerHTML='<strong>'+esc(opt.dataset.kode||'Tanpa kode')+'</strong><span>'+esc(name)+'</span>'+(opt.dataset.keterangan?'<small>'+esc(opt.dataset.keterangan)+'</small>':'')+'<em>Stok '+esc(opt.dataset.stock||'0')+' '+esc(opt.dataset.unit||'')+'</em>';
+    results.classList.remove('open');
+    const hint=row.querySelector('.kuasi-hint');
+    if(opt.dataset.kuasi==='kuasi'){
+      client.from('stok_kuasi').select('sisa_lembar').eq('barang_id',value).gt('sisa_lembar',0).then(q=>{
+        if(q.error)return fail(q.error);
+        const total=(q.data||[]).reduce((sum,r)=>sum+Number(r.sisa_lembar||0),0);
         hint.textContent='FIFO: '+total+' lembar pada batch aktif';
         hint.className='kuasi-hint'+(total<1?' warning':'');
-      }else{hint.textContent='';hint.className='kuasi-hint'}
+      });
+    }else{hint.textContent='';hint.className='kuasi-hint'}
+  };
+  const wireRows=()=>{
+    box.querySelectorAll('.transaction-row').forEach(row=>{
+      const search=row.querySelector('.ki-search'),results=row.querySelector('.ki-results'),clear=row.querySelector('.ki-clear');
+      if(!search||search.dataset.wired==='1')return;
+      search.dataset.wired='1';
+      search.addEventListener('focus',()=>updatePicker(row,search.value));
+      search.addEventListener('input',()=>updatePicker(row,search.value));
+      results.addEventListener('click',e=>{
+        const item=e.target.closest('.ki-result');
+        if(item){e.preventDefault();applySelected(row,item.dataset.value);}
+      });
+      clear.addEventListener('click',()=>{row.querySelector('.ki-barang').value='';search.value='';row.querySelector('.ki-selected-info').innerHTML='<span class="muted">Belum ada barang dipilih</span>';results.classList.remove('open');row.querySelector('.kuasi-hint').textContent='';});
+      document.addEventListener('click',e=>{if(!row.contains(e.target))results.classList.remove('open')},{once:false});
+      updatePicker(row);
     });
     syncRemoveButtons();
   };
