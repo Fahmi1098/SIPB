@@ -282,8 +282,10 @@ function enhanceTables(scope=document){
       prev.onclick=()=>{table.dataset.page=String(Math.max(1,Number(table.dataset.page||1)-1));table.refreshPagination()};
       next.onclick=()=>{table.dataset.page=String(Number(table.dataset.page||1)+1);table.refreshPagination()};
       table.dataset.paginationReady='1';
+      // Hanya amati perubahan baris/data tabel. Jangan mengamati atribut/class,
+      // karena refreshPagination sendiri mengubah class dan dapat memicu loop refresh.
       const observer=new MutationObserver(()=>window.requestAnimationFrame(()=>table.refreshPagination()));
-      if(table.tBodies?.[0])observer.observe(table.tBodies[0],{subtree:true,attributes:true,attributeFilter:['style']});
+      if(table.tBodies?.[0])observer.observe(table.tBodies[0],{subtree:true,childList:true});
     }
     table.refreshPagination?.();
   });
