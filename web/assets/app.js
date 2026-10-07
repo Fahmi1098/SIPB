@@ -326,7 +326,7 @@ async function dashboard(){
   const since=new Date(now.getFullYear(),now.getMonth()-5,1).toISOString();
   const [barangQ,masukQ,keluarQ,catQ,masukCatQ,outQ,kuasiQ]=await Promise.all([
     client.from('barang').select('id,nama_barang,keterangan,satuan,sisa,stok_minimum,harga_terakhir'),
-    client.from('barang_masuk').select('jumlah,harga_satuan'),
+    client.from('barang_masuk').select('id,barang_id,jumlah,harga_satuan,keterangan,tanggal_masuk,barang:barang_id(id,nama_barang,satuan,keterangan)'),
     client.from('transaksi_keluar').select('id,status'),
     client.from('barang').select('id,sisa,harga_terakhir,kategori_id,kategori:kategori_id(nama_kategori)'),
     client.from('barang_masuk').select('id,barang_id,jumlah,harga_satuan,barang:barang_id(id,kategori_id,kategori:kategori_id(nama_kategori))'),
@@ -335,43 +335,146 @@ async function dashboard(){
   ]);
   const err=barangQ.error||masukQ.error||keluarQ.error||catQ.error||masukCatQ.error||outQ.error||kuasiQ.error;
   if(err)throw err;
-  const barangData=barangQ.data||[], masukData=masukQ.data||[], keluarData=(keluarQ.data||[]).filter(x=>(x.status||'AKTIF')!=='DIBATALKAN');
-  const totalBarang=barangData.length, totalSisa=barangData.reduce((n,r)=>n+(Number(r.sisa)||0),0), totalMasuk=masukData.reduce((n,r)=>n+(Number(r.jumlah)||0),0);
-  const nominalMasuk=masukData.reduce((n,r)=>n+((Number(r.jumlah)||0)*(Number(r.harga_satuan)||0)),0), totalKeluar=keluarData.length;
-  const stockAlerts=barangData.filter(r=>Number(r.sisa||0)<=Number(r.stok_minimum||0)).sort((a,b)=>(Number(a.sisa)||0)-(Number(b.sisa)||0));
-  const outOfStock=stockAlerts.filter(r=>Number(r.sisa||0)<=0), lowStock=stockAlerts.filter(r=>Number(r.sisa||0)>0);
-  const kuasiMap={};
-  (kuasiQ.data||[]).forEach(r=>{const id=r.barang_id;if(!kuasiMap[id])kuasiMap[id]={nama:r.barang?.nama_barang||'-',satuan:r.barang?.satuan||'',sisa:0};kuasiMap[id].sisa+=Number(r.sisa_lembar)||0});
-  const kuasiLow=Object.values(kuasiMap).filter(r=>r.sisa<=20).sort((a,b)=>a.sisa-b.sisa);
-  const catMap={};
-  (masukCatQ.data||[]).forEach(x=>{const n=x.barang?.kategori?.nama_kategori||'Tanpa Kategori';if(!catMap[n])catMap[n]={jenis:new Set(),jumlah:0,nilai:0};if(x.barang?.id!=null)catMap[n].jenis.add(x.barang.id);catMap[n].jumlah+=Number(x.jumlah)||0;catMap[n].nilai+=(Number(x.jumlah)||0)*(Number(x.harga_satuan)||0)});
-  const catEntries=Object.entries(catMap).map(([name,v])=>[name,{jenis:v.jenis.size,jumlah:v.jumlah,nilai:v.nilai}]).sort((a,b)=>b[1].nilai-a[1].nilai);
-  const catSummaryRows=catEntries.map(([name,v])=>'<tr><td><strong>'+esc(name)+'</strong></td><td class="right">'+v.jenis.toLocaleString('id-ID')+'</td><td class="right">'+v.jumlah.toLocaleString('id-ID')+'</td><td class="right">'+rupiah(v.nilai)+'</td></tr>').join('');
 
-  const rekapMap=new Map();
-  barangData.forEach(r=>{
-    const nama=String(r.nama_barang||'-').trim(), keterangan=String(r.keterangan||'').trim(), satuan=String(r.satuan||'-').trim(), harga=Number(r.harga_terakhir)||0;
-    const key=[nama.toLocaleLowerCase('id-ID'),keterangan.toLocaleLowerCase('id-ID'),String(harga),satuan.toLocaleLowerCase('id-ID')].join('¦');
-    const existing=rekapMap.get(key);
-    if(existing){existing.sisa+=Number(r.sisa)||0;existing.sourceCount++}
-    else rekapMap.set(key,{nama,keterangan,satuan,harga,sisa:Number(r.sisa)||0,sourceCount:1});
+  const barangData=barangQ.data||[];
+  const masukData=masukQ.data||[];
+  const keluarData=(keluarQ.data||[]).filter(x=>(x.status||'AKTIF')!=='DIBATALKAN');
+
+  const totalBarang=barangData.length;
+  const totalSisa=barangData.reduce((n,r)=>n+(Number(r.sisa)||0),0);
+  const totalMasuk=masukData.reduce((n,r)=>n+(Number(r.jumlah)||0),0);
+  const nominalMasuk=masukData.reduce((n,r)=>n+((Number(r.jumlah)||0)*(Number(r.harga_satuan)||0)),0);
+  const totalKeluar=keluarData.length;
+
+  const stockAlerts=barangData.filter(r=>Number(r.sisa||0)<=Number(r.stok_minimum||0)).sort((a,b)=>(Number(a.sisa)||0)-(Number(b.sisa)||0));
+  const outOfStock=stockAlerts.filter(r=>Number(r.sisa||0)<=0);
+  const lowStock=stockAlerts.filter(r=>Number(r.sisa||0)>0);
+
+  const kuasiMap={};
+  (kuasiQ.data||[]).forEach(r=>{
+    const id=r.barang_id;
+    if(!kuasiMap[id])kuasiMap[id]={nama:r.barang?.nama_barang||'-',satuan:r.barang?.satuan||'',sisa:0};
+    kuasiMap[id].sisa+=Number(r.sisa_lembar)||0;
   });
-  const rekapBarang=[...rekapMap.values()].sort((a,b)=>a.nama.localeCompare(b.nama,'id',{sensitivity:'base'})||a.keterangan.localeCompare(b.keterangan,'id',{sensitivity:'base'})||a.harga-b.harga);
-  const rekapRows=rekapBarang.map((r,i)=>'<tr><td class="id-cell">'+(i+1)+'</td><td><strong>'+esc(r.nama)+'</strong></td><td>'+esc(r.keterangan||'-')+'</td><td class="right">'+rupiah(r.harga)+'</td><td class="right">'+r.sisa.toLocaleString('id-ID')+'</td><td>'+esc(r.satuan)+'</td><td class="right">'+rupiah(r.sisa*r.harga)+'</td></tr>').join('');
-  const rekapTotalQty=rekapBarang.reduce((n,r)=>n+r.sisa,0);
+  const kuasiLow=Object.values(kuasiMap).filter(r=>r.sisa<=20).sort((a,b)=>a.sisa-b.sisa);
+
+  const catMap={};
+  (masukCatQ.data||[]).forEach(x=>{
+    const n=x.barang?.kategori?.nama_kategori||'Tanpa Kategori';
+    if(!catMap[n])catMap[n]={jenis:new Set(),jumlah:0,nilai:0};
+    if(x.barang?.id!=null)catMap[n].jenis.add(x.barang.id);
+    catMap[n].jumlah+=Number(x.jumlah)||0;
+    catMap[n].nilai+=(Number(x.jumlah)||0)*(Number(x.harga_satuan)||0);
+  });
+  const catEntries=Object.entries(catMap)
+    .map(([name,v])=>[name,{jenis:v.jenis.size,jumlah:v.jumlah,nilai:v.nilai}])
+    .sort((a,b)=>b[1].nilai-a[1].nilai);
+  const catSummaryRows=catEntries.map(([name,v])=>
+    '<tr><td><strong>'+esc(name)+'</strong></td><td class="right">'+v.jenis.toLocaleString('id-ID')+'</td><td class="right">'+v.jumlah.toLocaleString('id-ID')+'</td><td class="right">'+rupiah(v.nilai)+'</td></tr>'
+  ).join('');
+
+  // Keterangan pada form Barang Masuk bersifat per-transaksi.
+  // Karena itu Dashboard harus membaca barang_masuk.keterangan, bukan hanya barang.keterangan.
+  // Baris hanya digabung bila nama + keterangan + harga + satuan benar-benar sama.
+  const masterById=new Map(barangData.map(r=>[Number(r.id),r]));
+  const rekapMap=new Map();
+
+  masukData.forEach(r=>{
+    const master=masterById.get(Number(r.barang_id))||r.barang||{};
+    const nama=String(master.nama_barang||'-').trim();
+    const keterangan=String(r.keterangan||master.keterangan||'').trim();
+    const satuan=String(master.satuan||r.barang?.satuan||'-').trim();
+    const harga=Number(r.harga_satuan)||0;
+    const jumlah=Number(r.jumlah)||0;
+    const key=[
+      nama.toLocaleLowerCase('id-ID'),
+      keterangan.toLocaleLowerCase('id-ID'),
+      String(harga),
+      satuan.toLocaleLowerCase('id-ID')
+    ].join('¦');
+
+    const existing=rekapMap.get(key);
+    if(existing){
+      existing.jumlah+=jumlah;
+      existing.sourceCount++;
+    }else{
+      rekapMap.set(key,{
+        nama,keterangan,satuan,harga,jumlah,
+        sourceCount:1,
+        barangIds:new Set([Number(r.barang_id)])
+      });
+    }
+  });
+
+  // Master lama yang belum memiliki histori Barang Masuk tetap ditampilkan.
+  barangData.filter(r=>!masukData.some(m=>Number(m.barang_id)===Number(r.id))).forEach(r=>{
+    const nama=String(r.nama_barang||'-').trim();
+    const keterangan=String(r.keterangan||'').trim();
+    const satuan=String(r.satuan||'-').trim();
+    const harga=Number(r.harga_terakhir)||0;
+    const key=[
+      nama.toLocaleLowerCase('id-ID'),
+      keterangan.toLocaleLowerCase('id-ID'),
+      String(harga),
+      satuan.toLocaleLowerCase('id-ID')
+    ].join('¦');
+    if(!rekapMap.has(key)){
+      rekapMap.set(key,{nama,keterangan,satuan,harga,jumlah:0,sourceCount:0,barangIds:new Set([Number(r.id)])});
+    }
+  });
+
+  const rekapBarang=[...rekapMap.values()].sort((a,b)=>
+    a.nama.localeCompare(b.nama,'id',{sensitivity:'base'})||
+    a.keterangan.localeCompare(b.keterangan,'id',{sensitivity:'base'})||
+    a.harga-b.harga
+  );
+
+  const rekapRows=rekapBarang.map((r,i)=>
+    '<tr><td class="id-cell">'+(i+1)+'</td>'+
+    '<td><strong>'+esc(r.nama)+'</strong></td>'+
+    '<td>'+esc(r.keterangan||'-')+'</td>'+
+    '<td class="right">'+rupiah(r.harga)+'</td>'+
+    '<td class="right">'+r.jumlah.toLocaleString('id-ID')+'</td>'+
+    '<td>'+esc(r.satuan)+'</td>'+
+    '<td class="right">'+rupiah(r.jumlah*r.harga)+'</td></tr>'
+  ).join('');
+
+  const rekapTotalQty=rekapBarang.reduce((n,r)=>n+r.jumlah,0);
 
   const monthMap={};
-  for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');monthMap[key]=0}
-  (outQ.data||[]).filter(x=>(x.status||'AKTIF')!=='DIBATALKAN').forEach(x=>{const d=new Date(x.tanggal_keluar);const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');if(key in monthMap)monthMap[key]++});
-  const monthLabels=Object.keys(monthMap).map(k=>{const [y,m]=k.split('-');return new Intl.DateTimeFormat('id-ID',{month:'short'}).format(new Date(Number(y),Number(m)-1,1))});
-  window.SIPB_DASHBOARD_CHARTS={categoryLabels:catEntries.slice(0,8).map(x=>x[0]),categoryData:catEntries.slice(0,8).map(x=>x[1].jenis),monthLabels,monthData:Object.values(monthMap)};
-  const alertList=stockAlerts.slice(0,6).map(r=>{const zero=Number(r.sisa||0)<=0;return '<div class="stock-alert-row '+(zero?'danger':'warning')+'"><span class="stock-alert-icon">'+navSvg(zero?'barang_keluar':'barang')+'</span><div><strong>'+esc(r.nama_barang)+'</strong><small>Stok '+(Number(r.sisa)||0)+' '+esc(r.satuan||'')+' · Minimum '+(Number(r.stok_minimum)||0)+'</small></div><span class="stock-alert-value">'+(zero?'Habis':'Menipis')+'</span></div>'}).join('');
+  for(let i=5;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    monthMap[key]=0;
+  }
+  (outQ.data||[]).filter(x=>(x.status||'AKTIF')!=='DIBATALKAN').forEach(x=>{
+    const d=new Date(x.tanggal_keluar);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    if(key in monthMap)monthMap[key]++;
+  });
+  const monthLabels=Object.keys(monthMap).map(k=>{
+    const [y,m]=k.split('-');
+    return new Intl.DateTimeFormat('id-ID',{month:'short'}).format(new Date(Number(y),Number(m)-1,1));
+  });
+
+  window.SIPB_DASHBOARD_CHARTS={
+    categoryLabels:catEntries.slice(0,8).map(x=>x[0]),
+    categoryData:catEntries.slice(0,8).map(x=>x[1].jenis),
+    monthLabels,
+    monthData:Object.values(monthMap)
+  };
+
+  const alertList=stockAlerts.slice(0,6).map(r=>{
+    const zero=Number(r.sisa||0)<=0;
+    return '<div class="stock-alert-row '+(zero?'danger':'warning')+'"><span class="stock-alert-icon">'+navSvg(zero?'barang_keluar':'barang')+'</span><div><strong>'+esc(r.nama_barang)+'</strong><small>Stok '+(Number(r.sisa)||0)+' '+esc(r.satuan||'')+' · Minimum '+(Number(r.stok_minimum)||0)+'</small></div><span class="stock-alert-value">'+(zero?'Habis':'Menipis')+'</span></div>';
+  }).join('');
+
   return '<section class="welcome card"><div class="welcome-copy"><span class="eyebrow">DASHBOARD</span><h2>Selamat Datang</h2><p>Sistem Informasi Pengurus Barang untuk administrasi persediaan UPTD PPD Malingping.</p><div class="welcome-meta"><span class="top-separator" aria-hidden="true"></span><span>•</span><span>'+new Intl.DateTimeFormat('id-ID',{dateStyle:'full'}).format(now)+'</span></div></div><div class="welcome-emblem"><img src="'+BANTEN_LOGO+'" alt="Lambang Provinsi Banten"><div><strong>PEMERINTAH PROVINSI BANTEN</strong><span>UPTD PPD MALINGPING</span></div></div></section>'+
   '<section class="stats-grid"><div class="stat-card blue"><span class="stat-icon">'+navSvg('barang')+'</span><div><small>Total Barang</small><strong>'+totalBarang+'</strong><em>Master barang</em></div></div><div class="stat-card blue"><span class="stat-icon">'+navSvg('barang_masuk')+'</span><div><small>Nilai Barang Masuk</small><strong>'+rupiah(nominalMasuk)+'</strong><em>Total nilai penerimaan</em></div></div><div class="stat-card green"><span class="stat-icon">'+navSvg('barang_masuk')+'</span><div><small>Jumlah Barang Masuk</small><strong>'+totalMasuk.toLocaleString('id-ID')+'</strong><em>Total kuantitas masuk</em></div></div><div class="stat-card red"><span class="stat-icon">'+navSvg('barang_keluar')+'</span><div><small>Barang Keluar</small><strong>'+totalKeluar+'</strong><em>Transaksi aktif</em></div></div><div class="stat-card purple"><span class="stat-icon">'+navSvg('stock_opname')+'</span><div><small>Sisa Stok</small><strong>'+totalSisa.toLocaleString('id-ID')+'</strong><em>Total stok saat ini</em></div></div></section>'+
   '<section class="stock-alert-center card"><div class="section-head"><div><span class="eyebrow">PERINGATAN PERSEDIAAN</span><h3>Pusat Peringatan Stok</h3><p>Barang yang sudah habis atau berada di bawah batas stok minimum.</p></div><div class="stock-alert-counts"><span class="alert-count danger"><strong>'+outOfStock.length+'</strong><small>Habis</small></span><span class="alert-count warning"><strong>'+lowStock.length+'</strong><small>Menipis</small></span><span class="alert-count kuasi"><strong>'+kuasiLow.length+'</strong><small>Kuasi ≤ 20</small></span></div></div><div class="stock-alert-layout"><div class="stock-alert-list">'+(alertList||'<div class="stock-alert-empty"><span>✓</span><div><strong>Stok aman</strong><small>Tidak ada barang yang berada di bawah batas minimum.</small></div></div>')+'</div><div class="stock-alert-side"><div class="stock-alert-side-title">Ringkasan cepat</div><div class="stock-alert-metric"><span>Barang perlu perhatian</span><strong>'+stockAlerts.length+'</strong></div><div class="stock-alert-metric"><span>Batch Kuasi menipis</span><strong>'+kuasiLow.length+'</strong></div><button class="ghost" data-page="barang">Buka Master Barang <span aria-hidden="true">→</span></button></div></div></section>'+
   '<section class="card page-card category-summary-card"><div class="section-head"><div><span class="eyebrow">RINGKASAN KATEGORI</span><h3>Jumlah Barang dan Nominal Berdasarkan Kategori</h3><p>Rekap jenis barang, jumlah masuk, dan nilai penerimaan berdasarkan transaksi Barang Masuk.</p></div></div><div class="table-wrap"><table><thead><tr><th>Kategori</th><th>Jenis Barang</th><th>Jumlah Masuk</th><th>Nominal Barang Masuk</th></tr></thead><tbody>'+(catSummaryRows||emptyRow(4))+'</tbody></table></div></section>'+
   '<section class="charts-grid"><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h3>Barang berdasarkan kategori</h3><p>Delapan kategori dengan jumlah barang terbanyak.</p></div></div><div class="chart-wrap"><canvas id="categoryChart"></canvas></div></article><article class="card chart-card"><div class="section-head"><div><span class="eyebrow">AKTIVITAS</span><h3>Barang keluar per bulan</h3><p>Enam bulan terakhir, transaksi aktif.</p></div></div><div class="chart-wrap"><canvas id="outgoingChart"></canvas></div></article></section>'+
-  '<section class="card recent dashboard-rekap-barang"><div class="section-head"><div><span class="eyebrow">REKAP PERSEDIAAN</span><h3>Daftar / Rekap Barang</h3><p>Nama barang yang sama dipisahkan jika keterangan atau harga berbeda. Data identik saja yang digabung.</p></div><div class="kartu-head-actions"><span class="status-pill">'+rekapBarang.length+' baris</span><span class="status-pill">'+rekapTotalQty.toLocaleString('id-ID')+' stok</span></div></div><div class="table-wrap"><table id="dashboardBarangTable"><thead><tr><th>No.</th><th>Nama Barang</th><th>Keterangan</th><th>Harga Satuan</th><th>Sisa</th><th>Satuan</th><th>Nilai Sisa</th></tr></thead><tbody>'+(rekapRows||emptyRow(7))+'</tbody></table></div></section>';
+  '<section class="card recent dashboard-rekap-barang"><div class="section-head"><div><span class="eyebrow">REKAP BARANG MASUK</span><h3>Daftar / Rekap Barang</h3><p>Keterangan diambil langsung dari transaksi Barang Masuk. Nama barang yang sama dipisahkan jika keterangan atau harga berbeda.</p></div><div class="kartu-head-actions"><span class="status-pill">'+rekapBarang.length+' baris</span><span class="status-pill">'+rekapTotalQty.toLocaleString('id-ID')+' masuk</span></div></div><div class="table-wrap"><table id="dashboardBarangTable"><thead><tr><th>No.</th><th>Nama Barang</th><th>Keterangan</th><th>Harga Satuan</th><th>Jumlah Masuk</th><th>Satuan</th><th>Nilai Masuk</th></tr></thead><tbody>'+(rekapRows||emptyRow(7))+'</tbody></table></div></section>';
 }
 async function barangPage(){const [{data,error},{data:k,error:ke}]=await Promise.all([client.from('barang').select('*, kategori:kategori_id(nama_kategori)').order('id'),client.from('kategori').select('*').order('nama_kategori')]);if(error)throw error;if(ke)throw ke;return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER DATA</span><h2>Master Barang</h2><p>Kelola data barang, kode sumber, dan stok persediaan.</p></div>${profile?.role==='admin'?'<div class="kartu-head-actions"><button type="button" class="ghost" id="importPersediaan">⇧ Import Persediaan</button><button class="primary" id="addBarang">＋ Tambah Barang</button></div>':''}</div><div class="filter-bar"><div class="search-box">⌕<input id="barangSearch" placeholder="Cari kode, nama, keterangan, tipe, merk, atau satuan..."></div><select id="barangFilter"><option value="">Semua kategori</option>${(k||[]).map(x=>`<option value="${x.id}">${esc(x.nama_kategori)}</option>`).join('')}</select><span id="barangCount" class="result-count">${data?.length||0} data</span></div><div class="table-wrap"><table id="barangTable"><thead><tr><th>ID</th><th>Kode Barang</th><th>Nama Barang</th><th>Keterangan</th><th>Kategori</th><th>Tipe</th><th>Merk</th><th>Satuan</th><th>Harga Terakhir</th><th>Stok</th><th>Aksi</th></tr></thead><tbody>${(data||[]).map(barangRow).join('')||emptyRow(10)}</tbody></table></div></section>`}
 function barangRow(r){const low=Number(r.sisa??0)<=Number(r.stok_minimum??0);return `<tr data-search="${esc([r.kode_barang,r.nama_barang,r.keterangan,r.tipe,r.merk,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())}" data-kategori="${r.kategori_id||''}"><td class="id-cell">#${r.id}</td><td><small>${esc(r.kode_barang||"-")}</small></td><td><strong>${esc(r.nama_barang)}</strong></td><td>${esc(r.keterangan||'-')}</td><td>${esc(r.kategori?.nama_kategori||'-')}</td><td>${esc(r.tipe||'-')}</td><td>${esc(r.merk||'-')}</td><td>${esc(r.satuan||'-')}</td><td>${rupiah(r.harga_terakhir)}</td><td><span class="stock ${low?'low':''}">${formatAngka(r.sisa??0)}</span></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-barang" data-id="'+r.id+'">Edit</button><button class="btn-sm danger delete-barang" data-id="'+r.id+'">Hapus</button></div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`}
