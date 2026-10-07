@@ -388,8 +388,9 @@ async function dashboard(){
     const satuan=String(master.satuan||r.barang?.satuan||'-').trim();
     const harga=Number(r.harga_satuan)||0;
     const jumlah=Number(r.jumlah)||0;
+    const kode=String(master.kode_barang||'').trim();
     const key=[
-      String(master.kode_barang||'').trim().toLocaleLowerCase('id-ID'),
+      kode.toLocaleLowerCase('id-ID'),
       String(master.id??r.barang_id??'').trim(),
       nama.toLocaleLowerCase('id-ID'),
       keterangan.toLocaleLowerCase('id-ID'),
