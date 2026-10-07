@@ -506,7 +506,7 @@ async function barangMasukForm(){
   <label${canCreate?'':' style="display:none"'}>Nama Barang Baru <input id="m_nama" placeholder="Isi jika memilih Barang baru"></label>
   <label${canCreate?'':' style="display:none"'}>Kategori Barang Baru <select id="m_kat"><option value="">- Pilih kategori -</option>${kats.map(x=>`<option value="${x.id}" data-kuasi="${String(x.nama_kategori||'').toLowerCase().includes('kuasi')?'1':'0'}">${esc(x.nama_kategori)}</option>`).join('')}</select></label>
   <label>Tipe <input id="m_tipe" value="-"></label><label>Merk <input id="m_merk" value="-"></label><label>Satuan <input id="m_satuan" placeholder="BUAH / PCS / KOTAK"></label>
-  <label>Jumlah Masuk <input id="m_jumlah" type="number" min="1" value="1"></label><label>Harga Satuan <input id="m_harga" type="number" min="0" step="0.01" value="0"></label>
+  <label>Jumlah Masuk <input id="m_jumlah" type="text" inputmode="numeric" autocomplete="off" data-number-format="integer" min="1" value="1"></label><label>Harga Satuan <input id="m_harga" type="text" inputmode="numeric" autocomplete="off" data-number-format="integer" min="0" value="0"></label>
   <label>Sumber Dana <select id="m_sumber"><option>APBD</option><option>APBN</option><option>Lainnya</option></select></label>
   <label>Tanggal Masuk <input id="m_tanggal" type="date" value="${localDate()}"></label>
   <label>Nama Penyerah <input id="m_penyerah" required placeholder="Pihak ke Tiga"></label><label>Nama Penerima <input id="m_penerima" value="${esc(profile?.nama_lengkap||'')}"></label>
