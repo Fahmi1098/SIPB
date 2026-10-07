@@ -327,7 +327,7 @@ async function dashboard(){
   const now=new Date();
   const since=new Date(now.getFullYear(),now.getMonth()-5,1).toISOString();
   const [barangQ,masukQ,keluarQ,catQ,masukCatQ,outQ,kuasiQ]=await Promise.all([
-    client.from('barang').select('id,nama_barang,keterangan,satuan,sisa,stok_minimum,harga_terakhir'),
+    client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,stok_minimum,harga_terakhir'),
     client.from('barang_masuk').select('id,barang_id,jumlah,harga_satuan,keterangan,tanggal_masuk,barang:barang_id(id,nama_barang,satuan,keterangan)'),
     client.from('transaksi_keluar').select('id,status'),
     client.from('barang').select('id,sisa,harga_terakhir,kategori_id,kategori:kategori_id(nama_kategori)'),
@@ -389,6 +389,8 @@ async function dashboard(){
     const harga=Number(r.harga_satuan)||0;
     const jumlah=Number(r.jumlah)||0;
     const key=[
+      String(master.kode_barang||'').trim().toLocaleLowerCase('id-ID'),
+      kode.toLocaleLowerCase('id-ID'),
       nama.toLocaleLowerCase('id-ID'),
       keterangan.toLocaleLowerCase('id-ID'),
       String(harga),
@@ -401,6 +403,7 @@ async function dashboard(){
       existing.sourceCount++;
     }else{
       rekapMap.set(key,{
+        kode:String(master.kode_barang||'').trim(),
         nama,keterangan,satuan,harga,jumlah,
         sourceCount:1,
         barangIds:new Set([Number(r.barang_id)])
@@ -410,6 +413,7 @@ async function dashboard(){
 
   // Master lama yang belum memiliki histori Barang Masuk tetap ditampilkan.
   barangData.filter(r=>!masukData.some(m=>Number(m.barang_id)===Number(r.id))).forEach(r=>{
+    const kode=String(r.kode_barang||'').trim();
     const nama=String(r.nama_barang||'-').trim();
     const keterangan=String(r.keterangan||'').trim();
     const satuan=String(r.satuan||'-').trim();
@@ -421,7 +425,7 @@ async function dashboard(){
       satuan.toLocaleLowerCase('id-ID')
     ].join('¦');
     if(!rekapMap.has(key)){
-      rekapMap.set(key,{nama,keterangan,satuan,harga,jumlah:0,sourceCount:0,barangIds:new Set([Number(r.id)])});
+      rekapMap.set(key,{kode,nama,keterangan,satuan,harga,jumlah:0,sourceCount:0,barangIds:new Set([Number(r.id)])});
     }
   });
 
@@ -433,7 +437,7 @@ async function dashboard(){
 
   const rekapRows=rekapBarang.map((r,i)=>
     '<tr><td class="id-cell">'+(i+1)+'</td>'+
-    '<td><strong>'+esc(r.nama)+'</strong></td>'+
+    '<td><strong>'+esc(r.nama)+'</strong>'+(r.kode?'<small class="rekap-kode">'+esc(r.kode)+'</small>':'')+'</td>'+
     '<td>'+esc(r.keterangan||'-')+'</td>'+
     '<td class="right">'+rupiah(r.harga)+'</td>'+
     '<td class="right">'+r.jumlah.toLocaleString('id-ID')+'</td>'+
