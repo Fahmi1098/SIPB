@@ -390,7 +390,7 @@ async function dashboard(){
     const jumlah=Number(r.jumlah)||0;
     const key=[
       String(master.kode_barang||'').trim().toLocaleLowerCase('id-ID'),
-      kode.toLocaleLowerCase('id-ID'),
+      String(master.id??r.barang_id??'').trim(),
       nama.toLocaleLowerCase('id-ID'),
       keterangan.toLocaleLowerCase('id-ID'),
       String(harga),
