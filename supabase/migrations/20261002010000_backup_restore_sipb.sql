@@ -93,12 +93,12 @@ begin
 
   insert into public.barang_masuk(
     id,barang_id,jumlah,harga_satuan,sumber_dana,nomor_awal,nomor_akhir,
-    tanggal_masuk,nama_penyerah,nama_penerima,nomor_dus
+    tanggal_masuk,nama_penyerah,nama_penerima,nomor_dus,keterangan
   )
   select
     x.id,x.barang_id,x.jumlah,coalesce(x.harga_satuan,0),x.sumber_dana,
     x.nomor_awal,x.nomor_akhir,x.tanggal_masuk,x.nama_penyerah,
-    x.nama_penerima,x.nomor_dus
+    x.nama_penerima,x.nomor_dus,x.keterangan
   from jsonb_to_recordset(p_backup->'tables'->'barang_masuk')
     as x(
       id integer,
@@ -111,7 +111,8 @@ begin
       tanggal_masuk date,
       nama_penyerah text,
       nama_penerima text,
-      nomor_dus text
+      nomor_dus text,
+      keterangan text
     );
 
   insert into public.stok_kuasi(
