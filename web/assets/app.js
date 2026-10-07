@@ -559,6 +559,14 @@ async function showImportPersediaanModal(){
         m=s.match(/^(\\d{4})[\\/.-](\\d{1,2})[\\/.-](\\d{1,2})$/);
         return m?m[1]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0'):'';
       };
+      const excelNumber=v=>{
+        if(typeof v==='number'&&Number.isFinite(v))return v;
+        const s=String(v??'').trim().replace(/\\s/g,'');
+        if(!s)return 0;
+        if(/^-?\\d+(?:[.,]\\d+)?$/.test(s))return Number(s.replace(',','.'));
+        const normalized=s.replace(/\\./g,'').replace(',','.');
+        return /^-?\\d+(?:\\.\\d+)?$/.test(normalized)?Number(normalized):NaN;
+      };
       const req=['Kode Barang','Nama Barang','Kategori','Saldo Awal (Qty)','Saldo Awal (Nilai)','Bertambah (Qty)','Bertambah (Nilai)'];
       const missing=req.filter(h=>!Object.prototype.hasOwnProperty.call(raw[0]||{},h));
       if(missing.length)throw new Error('Kolom Excel kurang: '+missing.join(', '));
@@ -570,13 +578,15 @@ async function showImportPersediaanModal(){
         keterangan:String(r['Keterangan']||r['Keterangan / Spesifikasi']||'').trim(),
         tanggal_saldo_awal:excelDate(r['Tanggal Saldo Awal']||r['Tanggal Saldo']||r['Tanggal Masuk'])||'2025-12-31',
         tanggal_bertambah:excelDate(r['Tanggal Bertambah']||r['Tanggal Penambahan']||r['Tanggal Masuk'])||'2026-01-02',
-        saldo_qty:Number(r['Saldo Awal (Qty)']||0),
-        saldo_value:Number(r['Saldo Awal (Nilai)']||0),
-        bertambah_qty:Number(r['Bertambah (Qty)']||0),
-        bertambah_value:Number(r['Bertambah (Nilai)']||0)
+        saldo_qty:excelNumber(r['Saldo Awal (Qty)']),
+        saldo_value:excelNumber(r['Saldo Awal (Nilai)']),
+        bertambah_qty:excelNumber(r['Bertambah (Qty)']),
+        bertambah_value:excelNumber(r['Bertambah (Nilai)'])
       })).filter(r=>r.kode_barang||r.nama_barang);
       const bad=importRows.findIndex(r=>!r.kode_barang||!r.nama_barang||!r.kategori||![r.saldo_qty,r.saldo_value,r.bertambah_qty,r.bertambah_value].every(Number.isFinite)||r.saldo_qty<0||r.bertambah_qty<0||!/^\\d{4}-\\d{2}-\\d{2}$/.test(r.tanggal_saldo_awal)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(r.tanggal_bertambah));
-      if(bad>=0)throw new Error('Data Excel pada baris '+(bad+2)+' tidak lengkap atau tidak valid.');
+      if(bad>=0)throw new Error('Data Excel pada baris '+(bad+2)+' tidak lengkap atau tidak valid. Pastikan angka menggunakan format angka/nominal yang benar dan tanggal valid.');
+      const dateOrderError=importRows.findIndex(r=>r.bertambah_qty>0&&r.tanggal_bertambah<r.tanggal_saldo_awal);
+      if(dateOrderError>=0)throw new Error('Baris Excel '+(dateOrderError+2)+': Tanggal Bertambah tidak boleh lebih awal dari Tanggal Saldo Awal.');
       const seen=new Set();const dup=importRows.find(r=>{const k=r.kode_barang.toLowerCase();if(seen.has(k))return true;seen.add(k);return false});
       if(dup)throw new Error('Kode Barang duplikat di file: '+dup.kode_barang);
       const saldo=importRows.reduce((n,r)=>n+r.saldo_qty,0),tambah=importRows.reduce((n,r)=>n+r.bertambah_qty,0);
