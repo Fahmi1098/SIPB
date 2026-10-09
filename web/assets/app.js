@@ -554,18 +554,18 @@ async function showImportPersediaanModal(){
         }
         const s=String(v??'').trim();
         if(!s)return '';
-        let m=s.match(/^(\\d{1,2})[\\/.-](\\d{1,2})[\\/.-](\\d{4})$/);
+        let m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
         if(m)return m[3]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0');
-        m=s.match(/^(\\d{4})[\\/.-](\\d{1,2})[\\/.-](\\d{1,2})$/);
+        m=s.match(/^(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})$/);
         return m?m[1]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0'):'';
       };
       const excelNumber=v=>{
         if(typeof v==='number'&&Number.isFinite(v))return v;
-        const s=String(v??'').trim().replace(/\\s/g,'');
+        const s=String(v??'').trim().replace(/\s/g,'');
         if(!s)return 0;
-        if(/^-?\\d+(?:[.,]\\d+)?$/.test(s))return Number(s.replace(',','.'));
-        const normalized=s.replace(/\\./g,'').replace(',','.');
-        return /^-?\\d+(?:\\.\\d+)?$/.test(normalized)?Number(normalized):NaN;
+        if(/^-?\d+(?:[.,]\d+)?$/.test(s))return Number(s.replace(',','.'));
+        const normalized=s.replace(/\./g,'').replace(',','.');
+        return /^-?\d+(?:\.\d+)?$/.test(normalized)?Number(normalized):NaN;
       };
       const req=['Kode Barang','Nama Barang','Kategori','Saldo Awal (Qty)','Saldo Awal (Nilai)','Bertambah (Qty)','Bertambah (Nilai)'];
       const missing=req.filter(h=>!Object.prototype.hasOwnProperty.call(raw[0]||{},h));
@@ -583,7 +583,7 @@ async function showImportPersediaanModal(){
         bertambah_qty:excelNumber(r['Bertambah (Qty)']),
         bertambah_value:excelNumber(r['Bertambah (Nilai)'])
       })).filter(r=>r.kode_barang||r.nama_barang);
-      const bad=importRows.findIndex(r=>!r.kode_barang||!r.nama_barang||!r.kategori||![r.saldo_qty,r.saldo_value,r.bertambah_qty,r.bertambah_value].every(Number.isFinite)||r.saldo_qty<0||r.bertambah_qty<0||!/^\\d{4}-\\d{2}-\\d{2}$/.test(r.tanggal_saldo_awal)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(r.tanggal_bertambah));
+      const bad=importRows.findIndex(r=>!r.kode_barang||!r.nama_barang||!r.kategori||![r.saldo_qty,r.saldo_value,r.bertambah_qty,r.bertambah_value].every(Number.isFinite)||r.saldo_qty<0||r.bertambah_qty<0||!/^\d{4}-\d{2}-\d{2}$/.test(r.tanggal_saldo_awal)||!/^\d{4}-\d{2}-\d{2}$/.test(r.tanggal_bertambah));
       if(bad>=0)throw new Error('Data Excel pada baris '+(bad+2)+' tidak lengkap atau tidak valid. Pastikan angka menggunakan format angka/nominal yang benar dan tanggal valid.');
       const dateOrderError=importRows.findIndex(r=>r.bertambah_qty>0&&r.tanggal_bertambah<r.tanggal_saldo_awal);
       if(dateOrderError>=0)throw new Error('Baris Excel '+(dateOrderError+2)+': Tanggal Bertambah tidak boleh lebih awal dari Tanggal Saldo Awal.');
@@ -1712,7 +1712,7 @@ async function bindMasukForm(){
     if(!existing&&!Number($('m_kat').value))return toast('Kategori barang baru wajib dipilih.','error');
     if(!existing&&!kodeInput)return toast('Kode Barang wajib diisi untuk barang baru.','error');
     if(keterangan.length>500)return toast('Keterangan maksimal 500 karakter.','error');
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(tanggal))return toast('Tanggal Masuk tidak valid.','error');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(tanggal))return toast('Tanggal Masuk tidak valid.','error');
     const selected=$('m_barang').selectedOptions[0];
     const masterKode=String(selected?.dataset.kode||'').trim();
     if(existing&&kodeInput.toLowerCase()!==masterKode.toLowerCase())return toast('Kode Barang tidak boleh diubah dari Barang Masuk.','error');
