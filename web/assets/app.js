@@ -540,7 +540,8 @@ async function showImportPersediaanModal(){
     preview.innerHTML='<div class="loading-state"><div class="spinner"></div><span>Membaca file...</span></div>';
     try{
       if(!window.XLSX)throw new Error('Library Excel belum tersedia. Muat ulang SIPB.');
-      const wb=window.XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
+      // Baca tanggal Excel sebagai nomor serial, bukan Date lokal, untuk menghindari tanggal bergeser sehari karena zona waktu.
+      const wb=window.XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false});
       const sheet=wb.Sheets['Import SIPB']||wb.Sheets[wb.SheetNames[0]];
       if(!sheet)throw new Error('Sheet Excel tidak ditemukan.');
       const raw=window.XLSX.utils.sheet_to_json(sheet,{defval:''});
