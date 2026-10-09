@@ -581,9 +581,20 @@ async function showImportPersediaanModal(){
         if(typeof v==='number'&&Number.isFinite(v))return v;
         const s=String(v??'').trim().replace(/\s/g,'');
         if(!s)return 0;
-        if(/^-?\d+(?:[.,]\d+)?$/.test(s))return Number(s.replace(',','.'));
-        const normalized=s.replace(/\./g,'').replace(',','.');
-        return /^-?\d+(?:\.\d+)?$/.test(normalized)?Number(normalized):NaN;
+        // Angka Indonesia: titik untuk ribuan, koma untuk desimal.
+        // "1.234" dibaca 1234, sedangkan "1,25" dibaca 1.25.
+        if(s.includes(',')){
+          const normalized=s.replace(/\./g,'').replace(',','.');
+          return /^-?\d+(?:\.\d+)?$/.test(normalized)?Number(normalized):NaN;
+        }
+        if((s.match(/\./g)||[]).length>1){
+          const normalized=s.replace(/\./g,'');
+          return /^-?\d+$/.test(normalized)?Number(normalized):NaN;
+        }
+        if(/^-?\d+\.\d{3}$/.test(s)){
+          return Number(s.replace(/\./g,''));
+        }
+        return /^-?\d+(?:\.\d+)?$/.test(s)?Number(s):NaN;
       };
       const req=['Kode Barang','Nama Barang','Kategori','Saldo Awal (Qty)','Saldo Awal (Nilai)','Bertambah (Qty)','Bertambah (Nilai)'];
       const missing=req.filter(h=>!Object.prototype.hasOwnProperty.call(raw[0]||{},h));
