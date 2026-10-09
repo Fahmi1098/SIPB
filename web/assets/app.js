@@ -9,7 +9,7 @@ const formatAngka=v=>{const n=Number(v);return Number.isFinite(n)?Math.trunc(n).
 const parseAngka=v=>{const s=String(v??'').replace(/[^0-9-]/g,'');return s?Number(s):0};
 const formatInputAngka=input=>{if(!input)return;const raw=String(input.value??'').replace(/[^0-9]/g,'');input.value=raw?Number(raw).toLocaleString('id-ID'):''};
 document.addEventListener('input',e=>{const el=e.target;if(el?.matches?.('[data-number-format="integer"]')){const before=el.value;formatInputAngka(el);if(before!==el.value){try{el.setSelectionRange(el.value.length,el.value.length)}catch(_){}}}});
-const fmtDate=v=>v?new Intl.DateTimeFormat('id-ID',{dateStyle:'medium'}).format(new Date(v)):'-';
+const fmtDate=v=>{if(!v)return '-';const s=String(v);const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);const d=m?new Date(Number(m[1]),Number(m[2])-1,Number(m[3])):new Date(v);return Number.isNaN(d.getTime())?'-':new Intl.DateTimeFormat('id-ID',{dateStyle:'medium'}).format(d)};
 const localDate=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const $=id=>document.getElementById(id);
 const BANTEN_LOGO='assets/logo_banten.png';
