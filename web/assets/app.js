@@ -581,9 +581,20 @@ async function showImportPersediaanModal(){
         if(typeof v==='number'&&Number.isFinite(v))return v;
         const s=String(v??'').trim().replace(/\s/g,'');
         if(!s)return 0;
-        if(/^-?\d+(?:[.,]\d+)?$/.test(s))return Number(s.replace(',','.'));
-        const normalized=s.replace(/\./g,'').replace(',','.');
-        return /^-?\d+(?:\.\d+)?$/.test(normalized)?Number(normalized):NaN;
+        // Angka Indonesia: titik untuk ribuan, koma untuk desimal.
+        // "1.234" dibaca 1234, sedangkan "1,25" dibaca 1.25.
+        if(s.includes(',')){
+          const normalized=s.replace(/\./g,'').replace(',','.');
+          return /^-?\d+(?:\.\d+)?$/.test(normalized)?Number(normalized):NaN;
+        }
+        if((s.match(/\./g)||[]).length>1){
+          const normalized=s.replace(/\./g,'');
+          return /^-?\d+$/.test(normalized)?Number(normalized):NaN;
+        }
+        if(/^-?\d+\.\d{3}$/.test(s)){
+          return Number(s.replace(/\./g,''));
+        }
+        return /^-?\d+(?:\.\d+)?$/.test(s)?Number(s):NaN;
       };
       const req=['Kode Barang','Nama Barang','Kategori','Saldo Awal (Qty)','Saldo Awal (Nilai)','Bertambah (Qty)','Bertambah (Nilai)'];
       const missing=req.filter(h=>!Object.prototype.hasOwnProperty.call(raw[0]||{},h));
@@ -647,8 +658,9 @@ async function barangForm(id=null){
   <label>Tipe <input id="b_tipe" value="${esc(row.tipe||'')}"></label>
   <label>Merk <input id="b_merk" value="${esc(row.merk||'')}"></label>
   <label>Satuan <input id="b_satuan" value="${esc(row.satuan||'')}"></label>
+  <label>Harga Terakhir (per unit) <input id="b_harga" type="text" inputmode="numeric" autocomplete="off" data-number-format="integer" min="0" value="${formatAngka(row.harga_terakhir||0)}"></label>
   <label>Stok Minimum <input id="b_min" type="text" inputmode="numeric" data-number-format="integer" min="0" value="${formatAngka(row.stok_minimum||0)}"></label>
-  </div><div class="form-actions"><button class="primary" id="saveBarang">${id?'Simpan Perubahan':'Simpan Barang'}</button><button class="ghost" id="cancelBarang">Batal</button></div></section>`
+  </div><p class="field-hint">Harga Terakhir mengubah nilai referensi di Master Barang, bukan riwayat harga transaksi sebelumnya. Untuk koreksi jumlah stok gunakan Stock Opname agar saldo tetap tercatat.</p><div class="form-actions">${id?'<button type="button" class="ghost" id="correctStock">Koreksi Stok (Stock Opname)</button>':''}<button class="primary" id="saveBarang">${id?'Simpan Perubahan':'Simpan Barang'}</button><button class="ghost" id="cancelBarang">Batal</button></div></section>`
 }
 async function simple(title,table,cols){const {data,error}=await client.from(table).select('*').order('id',{ascending:false}).limit(200);if(error)throw error;return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DATA SIPB</span><h2>${title}</h2><p>Maksimal 200 data terbaru.</p></div></div><div class="table-wrap"><table><thead><tr>${cols.map(x=>`<th>${x[1]}</th>`).join('')}</tr></thead><tbody>${(data||[]).map(row=>`<tr>${cols.map(x=>`<td>${esc(row[x[0]])}</td>`).join('')}</tr>`).join('')||emptyRow(cols.length)}</tbody></table></div></section>`}
 
@@ -1439,6 +1451,8 @@ function bindForm(id){
   const back=$('backBarang'),cancel=$('cancelBarang'),save=$('saveBarang');
   if(back)back.onclick=e=>{e.preventDefault();e.stopPropagation();renderApp('barang')};
   if(cancel)cancel.onclick=e=>{e.preventDefault();e.stopPropagation();renderApp('barang')};
+  const correctStock=$('correctStock');
+  if(correctStock)correctStock.onclick=e=>{e.preventDefault();e.stopPropagation();renderApp('stock_opname')};
   if(save)save.onclick=async e=>{
     e.preventDefault();
     e.stopPropagation();
@@ -1450,9 +1464,12 @@ function bindForm(id){
       tipe:$('b_tipe').value.trim()||'-',
       merk:$('b_merk').value.trim()||'-',
       satuan:$('b_satuan').value.trim(),
+      harga_terakhir:parseAngka($('b_harga').value),
       stok_minimum:parseAngka($('b_min').value)
     };
     if(!payload.nama_barang)return toast('Nama barang wajib diisi.','error');
+    if(!Number.isFinite(payload.harga_terakhir)||payload.harga_terakhir<0)return toast('Harga terakhir harus nol atau lebih.','error');
+    if(!Number.isInteger(payload.stok_minimum)||payload.stok_minimum<0)return toast('Stok minimum harus bilangan bulat nol atau lebih.','error');
     save.disabled=true;
     save.textContent='Menyimpan...';
     try{
