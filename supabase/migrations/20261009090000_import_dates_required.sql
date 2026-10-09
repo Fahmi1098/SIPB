@@ -140,7 +140,7 @@ BEGIN
         CASE WHEN v_saldo_qty>0 THEN round(v_saldo_value/v_saldo_qty,2) ELSE 0 END,
         'Saldo Awal',
         NULL,NULL,v_saldo_date,
-        'Saldo Awal '+to_char(v_saldo_date,'DD Mon YYYY'),'Pengurus Barang',NULL,v_keterangan
+        'Saldo Awal ' || to_char(v_saldo_date,'DD Mon YYYY'),'Pengurus Barang',NULL,v_keterangan
       );
       v_receipts := v_receipts + 1;
     END IF;
@@ -157,7 +157,7 @@ BEGIN
         round(v_add_value/v_add_qty,2),
         'Bertambah',
         NULL,NULL,v_add_date,
-        'Rekapitulasi Persediaan '+to_char(v_add_date,'YYYY'),'Pengurus Barang',NULL,v_keterangan
+        'Rekapitulasi Persediaan ' || to_char(v_add_date,'YYYY'),'Pengurus Barang',NULL,v_keterangan
       );
       v_receipts := v_receipts + 1;
     END IF;
