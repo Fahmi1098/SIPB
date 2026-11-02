@@ -75,7 +75,7 @@ const sipbAlert=message=>sipbDialog('alert',message,{title:'Pemberitahuan'});
 const sipbConfirm=message=>sipbDialog('confirm',message);
 const sipbPrompt=(message,value='')=>sipbDialog('prompt',message,{value});
 window.SIPBDialog={alert:sipbAlert,confirm:sipbConfirm,prompt:sipbPrompt};
-const fail=e=>{console.error(e);toast(e?.message||'Terjadi kesalahan.','error')};
+const fail=e=>{console.error(e);const duplicateCode=e?.code==='23505'&&/uq_barang_kode_barang/i.test(e?.message||'');toast(duplicateCode?'Kode Barang sudah digunakan. Gunakan kode yang unik untuk setiap Master Barang.':(e?.message||'Terjadi kesalahan.'),'error')};
 const loading=label=>'<div class="loading-state"><div class="spinner"></div><span>'+esc(label||'Memuat...')+'</span></div>';
 
 function sortableValue(text){
@@ -374,17 +374,16 @@ async function count(t){const {count,error}=await client.from(t).select('*',{cou
 async function dashboard(){
   const now=new Date();
   const since=new Date(now.getFullYear(),now.getMonth()-5,1).toISOString();
-  const [barangQ,masukQ,keluarQ,catQ,masukCatQ,outQ,kuasiQ]=await Promise.all([
-    client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,stok_minimum,harga_terakhir').eq('is_archived',false).order('nama_barang',{ascending:true}).order('id',{ascending:true}),
-    client.from('barang_masuk').select('id,barang_id,jumlah,harga_satuan,keterangan,tanggal_masuk,barang:barang_id(id,nama_barang,satuan,keterangan)'),
-    client.from('transaksi_keluar').select('id,status'),
-    client.from('barang').select('id,sisa,harga_terakhir,kategori_id,kategori:kategori_id(nama_kategori)').eq('is_archived',false).order('id',{ascending:true}),
-    client.from('barang_masuk').select('id,barang_id,jumlah,harga_satuan,barang:barang_id(id,kategori_id,kategori:kategori_id(nama_kategori))'),
-    client.from('transaksi_keluar').select('tanggal_keluar,status').gte('tanggal_keluar',since).order('tanggal_keluar'),
-    client.from('stok_kuasi').select('id,barang_id,sisa_lembar,barang:barang_id(nama_barang,satuan)').gt('sisa_lembar',0)
+  const [barangRows,masukRows,keluarRows,categoryBarangRows,masukCategoryRows,outgoingMonthRows,kuasiRows]=await Promise.all([
+    fetchAllSipbRows('barang','id,kode_barang,nama_barang,keterangan,satuan,sisa,stok_minimum,harga_terakhir',q=>q.eq('is_archived',false).order('nama_barang',{ascending:true}).order('id',{ascending:true})),
+    fetchAllSipbRows('barang_masuk','id,barang_id,jumlah,harga_satuan,keterangan,tanggal_masuk,barang:barang_id(id,nama_barang,satuan,keterangan)',q=>q.order('tanggal_masuk',{ascending:false}).order('id',{ascending:false})),
+    fetchAllSipbRows('transaksi_keluar','id,status',q=>q.order('id',{ascending:true})),
+    fetchAllSipbRows('barang','id,sisa,harga_terakhir,kategori_id,kategori:kategori_id(nama_kategori)',q=>q.eq('is_archived',false).order('id',{ascending:true})),
+    fetchAllSipbRows('barang_masuk','id,barang_id,jumlah,harga_satuan,barang:barang_id(id,kategori_id,kategori:kategori_id(nama_kategori))',q=>q.order('id',{ascending:true})),
+    fetchAllSipbRows('transaksi_keluar','tanggal_keluar,status',q=>q.gte('tanggal_keluar',since).order('tanggal_keluar').order('id',{ascending:true})),
+    fetchAllSipbRows('stok_kuasi','id,barang_id,sisa_lembar,barang:barang_id(nama_barang,satuan)',q=>q.gt('sisa_lembar',0).order('id',{ascending:true}))
   ]);
-  const err=barangQ.error||masukQ.error||keluarQ.error||catQ.error||masukCatQ.error||outQ.error||kuasiQ.error;
-  if(err)throw err;
+  const barangQ={data:barangRows},masukQ={data:masukRows},keluarQ={data:keluarRows},catQ={data:categoryBarangRows},masukCatQ={data:masukCategoryRows},outQ={data:outgoingMonthRows},kuasiQ={data:kuasiRows};
 
   const barangData=barangQ.data||[];
   const masukData=masukQ.data||[];
@@ -532,14 +531,11 @@ async function dashboard(){
   '<section class="card recent dashboard-rekap-barang"><div class="section-head"><div><span class="eyebrow">REKAP BARANG MASUK</span><h3>Daftar / Rekap Barang</h3><p>Keterangan diambil langsung dari transaksi Barang Masuk. Nama barang yang sama dipisahkan jika keterangan atau harga berbeda.</p></div><div class="kartu-head-actions"><span class="status-pill">'+rekapBarang.length+' baris</span><span class="status-pill">'+rekapTotalQty.toLocaleString('id-ID')+' masuk</span></div></div><div class="table-wrap"><table id="dashboardBarangTable"><thead><tr><th>No.</th><th>Nama Barang</th><th>Keterangan</th><th>Harga Satuan</th><th>Jumlah Masuk</th><th>Satuan</th><th>Nilai Masuk</th></tr></thead><tbody>'+(rekapRows||emptyRow(7))+'</tbody></table></div></section>';
 }
 async function barangPage(){
-  const [{data,error},{data:k,error:ke},{data:masuk,error:me}]=await Promise.all([
-    client.from('barang').select('*, kategori:kategori_id(nama_kategori)').order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true}),
-    client.from('kategori').select('*').order('nama_kategori'),
-    client.from('barang_masuk').select('id,barang_id,keterangan,harga_satuan,tanggal_masuk').order('tanggal_masuk',{ascending:false}).order('id',{ascending:false})
+  const [data,k,masuk]=await Promise.all([
+    fetchAllSipbRows('barang','*, kategori:kategori_id(nama_kategori)',q=>q.order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true})),
+    fetchAllSipbRows('kategori','*',q=>q.order('nama_kategori').order('id',{ascending:true})),
+    fetchAllSipbRows('barang_masuk','id,barang_id,keterangan,harga_satuan,tanggal_masuk',q=>q.order('tanggal_masuk',{ascending:false}).order('id',{ascending:false}))
   ]);
-  if(error)throw error;
-  if(ke)throw ke;
-  if(me)throw me;
 
   // Keterangan pada Barang Masuk merupakan keterangan per-transaksi.
   // Untuk Master Barang, tampilkan seluruh keterangan unik yang pernah
@@ -578,7 +574,7 @@ async function showImportPersediaanModal(){
   const old=document.getElementById('importPersediaanModal');if(old)old.remove();
   const wrap=document.createElement('div');wrap.id='importPersediaanModal';wrap.className='modal-backdrop';
   wrap.innerHTML='<div class="modal-card user-create-modal"><div class="modal-head"><div><span class="eyebrow">MASTER DATA</span><h2>Import Persediaan</h2><p>Import saldo awal dan penambahan barang dari Excel.</p></div><button type="button" class="modal-close" aria-label="Tutup">×</button></div>'+
-    '<div class="form-grid"><label>File Excel <input id="importPersediaanFile" type="file" accept=".xlsx,.xls"></label></div>'+
+    '<div class="form-grid"><label>File Excel <input id="importPersediaanFile" type="file" accept=".xlsx,.xls"></label><div class="field-wide"><button type="button" class="ghost" id="downloadImportTemplate">↓ Unduh Template Excel</button><small class="field-hint">Template memiliki judul kolom yang dikenali sistem dan lembar petunjuk.</small></div></div>'+
     '<div class="alert-box"><strong>Format tanggal wajib:</strong> <b>DD/MM/YYYY</b> (tanggal/bulan/tahun), contohnya <b>02/01/2026</b>. Isi kolom <b>Tanggal Saldo Awal</b> dan <b>Tanggal Bertambah</b> pada setiap baris. Tanggal tidak akan diisi otomatis; baris dengan tanggal kosong akan ditolak.</div>'+
     '<div id="importPersediaanPreview" class="import-preview"><div class="badge-soft">Belum ada file dipilih.</div></div>'+
     '<div class="form-actions"><button type="button" class="primary" id="runImportPersediaan" disabled>Import ke SIPB</button><button type="button" class="ghost modal-cancel">Batal</button></div></div>';
@@ -588,6 +584,27 @@ async function showImportPersediaanModal(){
   wrap.querySelector('.modal-cancel').onclick=close;
   wrap.onclick=e=>{if(e.target===wrap)close()};
   const fileInput=wrap.querySelector('#importPersediaanFile'),preview=wrap.querySelector('#importPersediaanPreview'),run=wrap.querySelector('#runImportPersediaan');
+  wrap.querySelector('#downloadImportTemplate').onclick=()=>{
+    if(!window.XLSX)return toast('Library Excel belum tersedia. Muat ulang SIPB.','error');
+    const headers=['Kode Barang','Nama Barang','Kategori','Satuan','Keterangan','Tanggal Saldo Awal','Saldo Awal (Qty)','Saldo Awal (Nilai)','Tanggal Bertambah','Bertambah (Qty)','Bertambah (Nilai)'];
+    const wb=window.XLSX.utils.book_new(),ws=window.XLSX.utils.aoa_to_sheet([headers]);
+    ws['!cols']=headers.map((h,i)=>({wch:[0,1,2,4].includes(i)?26:(i===5||i===8?20:18)}));
+    window.XLSX.utils.book_append_sheet(wb,ws,'Import SIPB');
+    const guide=window.XLSX.utils.aoa_to_sheet([
+      ['PETUNJUK IMPORT SIPB'],
+      ['Isi data pada sheet Import SIPB di bawah baris judul kolom.'],
+      ['Tanggal wajib DD/MM/YYYY, misalnya 31/12/2025.'],
+      ['Tanggal Saldo Awal dan Tanggal Bertambah wajib diisi pada setiap baris.'],
+      ['Qty harus bilangan bulat nol atau lebih. Nilai diisi dalam rupiah, tanpa teks Rp.'],
+      ['Kode Barang wajib unik dan tidak boleh berulang dalam file atau Master Barang.'],
+      ['Jika Qty bernilai 0, Nilai pada bagian tersebut juga harus 0.'],
+      ['Maksimal 500 barang untuk satu kali import.']
+    ]);
+    guide['!cols']=[{wch:100}];
+    window.XLSX.utils.book_append_sheet(wb,guide,'Petunjuk');
+    window.XLSX.writeFile(wb,'Template-Import-Persediaan-SIPB.xlsx');
+    toast('Template Excel berhasil diunduh.');
+  };
   let importRows=[];
   fileInput.onchange=async()=>{
     importRows=[];run.disabled=true;
@@ -673,6 +690,7 @@ async function showImportPersediaanModal(){
         bertambah_value:excelNumber(r['Bertambah (Nilai)'])
       })).filter(r=>r.kode_barang||r.nama_barang);
       if(!importRows.length)throw new Error('File Excel tidak berisi baris barang untuk diimpor. Tambahkan data di bawah judul kolom lalu pilih file kembali.');
+      if(importRows.length>500)throw new Error('Maksimal 500 barang untuk satu kali import. Bagi file menjadi beberapa bagian.');
       const missingDate=importRows.findIndex(r=>!r.tanggal_saldo_awal||!r.tanggal_bertambah);
       if(missingDate>=0)throw new Error('Baris Excel '+(missingDate+2)+': Tanggal Saldo Awal dan Tanggal Bertambah wajib diisi dalam format DD/MM/YYYY (tanggal/bulan/tahun). Tidak ada tanggal otomatis.');
       const bad=importRows.findIndex(r=>{
@@ -691,8 +709,9 @@ async function showImportPersediaanModal(){
       const seen=new Set();const dup=importRows.find(r=>{const k=r.kode_barang.toLowerCase();if(seen.has(k))return true;seen.add(k);return false});
       if(dup)throw new Error('Kode Barang duplikat di file: '+dup.kode_barang);
       const saldo=importRows.reduce((n,r)=>n+r.saldo_qty,0),tambah=importRows.reduce((n,r)=>n+r.bertambah_qty,0);
-      const sample=importRows.slice(0,6).map((r,i)=>'<tr><td>'+(i+1)+'</td><td><small>'+esc(r.kode_barang)+'</small></td><td>'+esc(r.nama_barang)+'</td><td>'+esc(r.keterangan||'-')+'</td><td>'+formatImportDate(r.tanggal_saldo_awal)+'</td><td>'+formatImportDate(r.tanggal_bertambah)+'</td><td class="right">'+r.saldo_qty.toLocaleString('id-ID')+'</td><td class="right">'+r.bertambah_qty.toLocaleString('id-ID')+'</td></tr>').join('');
-      preview.innerHTML='<div class="detail-grid"><div><small>Barang</small><strong>'+importRows.length+'</strong></div><div><small>Saldo Awal</small><strong>'+saldo.toLocaleString('id-ID')+'</strong></div><div><small>Bertambah</small><strong>'+tambah.toLocaleString('id-ID')+'</strong></div><div><small>Tanggal</small><strong>Per baris</strong></div></div><div class="table-wrap"><table><thead><tr><th>No</th><th>Kode</th><th>Barang</th><th>Keterangan</th><th>Tgl Saldo Awal</th><th>Tgl Bertambah</th><th>Saldo Awal</th><th>Bertambah</th></tr></thead><tbody>'+sample+'</tbody></table></div><p class="note">Tanggal dibaca dari Excel per baris. Kolom Keterangan bersifat opsional. Preview 6 baris pertama. Seluruh '+importRows.length+' barang akan diproses.</p>';
+      const saldoNilai=importRows.reduce((n,r)=>n+r.saldo_value,0),tambahNilai=importRows.reduce((n,r)=>n+r.bertambah_value,0);
+      const sample=importRows.slice(0,10).map((r,i)=>'<tr><td>'+(i+1)+'</td><td><small>'+esc(r.kode_barang)+'</small></td><td>'+esc(r.nama_barang)+'</td><td>'+esc(r.keterangan||'-')+'</td><td>'+formatImportDate(r.tanggal_saldo_awal)+'</td><td>'+formatImportDate(r.tanggal_bertambah)+'</td><td class="right">'+r.saldo_qty.toLocaleString('id-ID')+'</td><td class="right">'+rupiah(r.saldo_value)+'</td><td class="right">'+r.bertambah_qty.toLocaleString('id-ID')+'</td><td class="right">'+rupiah(r.bertambah_value)+'</td></tr>').join('');
+      preview.innerHTML='<div class="detail-grid"><div><small>Barang</small><strong>'+importRows.length+'</strong></div><div><small>Qty Saldo Awal</small><strong>'+saldo.toLocaleString('id-ID')+'</strong></div><div><small>Nilai Saldo Awal</small><strong>'+rupiah(saldoNilai)+'</strong></div><div><small>Qty Bertambah</small><strong>'+tambah.toLocaleString('id-ID')+'</strong></div><div><small>Nilai Bertambah</small><strong>'+rupiah(tambahNilai)+'</strong></div></div><div class="table-wrap"><table><thead><tr><th>No</th><th>Kode</th><th>Barang</th><th>Keterangan</th><th>Tgl Saldo</th><th>Tgl Bertambah</th><th>Qty Saldo</th><th>Nilai Saldo</th><th>Qty Tambah</th><th>Nilai Tambah</th></tr></thead><tbody>'+sample+'</tbody></table></div><p class="note">Tanggal dibaca dari Excel per baris. Kolom Keterangan bersifat opsional. Preview 10 baris pertama. Nilai nominal total ditampilkan sebelum import; seluruh '+importRows.length+' barang akan diproses.</p>';
       run.disabled=false;
     }catch(err){preview.innerHTML='<div class="alert">'+esc(err?.message||String(err))+'</div>'}
   };
@@ -714,8 +733,7 @@ async function barangForm(id=null){
     if(error)throw error;
     row=data;
   }
-  const {data:k,error}=await client.from('kategori').select('*').order('nama_kategori');
-  if(error)throw error;
+  const k=await fetchAllSipbRows('kategori','*',q=>q.order('nama_kategori').order('id',{ascending:true}));
   return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER BARANG</span><h2>${id?'Edit Barang':'Tambah Barang'}</h2><p>Informasi operasional persediaan.</p></div><button class="ghost" id="backBarang">← Kembali</button></div><div class="form-grid">
   <label>Kode Barang <input id="b_kode" value="${esc(row.kode_barang||"")}" maxlength="80" placeholder="Kode barang sumber"></label>
   <label>Nama Barang <input id="b_nama" value="${esc(row.nama_barang||'')}" maxlength="255"></label>
@@ -732,14 +750,13 @@ async function simple(title,table,cols){const {data,error}=await client.from(tab
 
 async function barangMasukForm(){
   const canCreate=profile?.role==='admin';
-  const [{data:items,error},{data:kats,error:ke}]=await Promise.all([
-    client.from('barang').select('id,nama_barang,satuan,kategori_id,tipe,merk,kode_barang,keterangan,kategori:kategori_id(id,nama_kategori)').eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true}),
-    client.from('kategori').select('*').order('nama_kategori')
+  const [items,kats]=await Promise.all([
+    fetchAllSipbRows('barang','id,nama_barang,satuan,kategori_id,tipe,merk,kode_barang,keterangan,kategori:kategori_id(id,nama_kategori)',q=>q.eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true})),
+    fetchAllSipbRows('kategori','*',q=>q.order('nama_kategori').order('id',{ascending:true}))
   ]);
-  if(error||ke)throw(error||ke);
   return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PENERIMAAN</span><h2>Rekam Barang Masuk</h2><p>Stok, transaksi penerimaan, dan batch Kuasi disimpan atomik dalam satu transaksi database.</p></div><button class="ghost" id="backMasuk">← Kembali</button></div><div class="form-grid">
   <label>Barang yang sudah ada <select id="m_barang">${canCreate?'<option value="">＋ Barang baru</option>':''}${items.map(x=>`<option value="${x.id}" data-kode="${esc(x.kode_barang||'')}" data-kuasi="${String(x.kategori?.nama_kategori||'').toLowerCase().includes('kuasi')?'1':'0'}" data-kategori="${x.kategori_id||''}" data-satuan="${esc(x.satuan||'')}" data-tipe="${esc(x.tipe||'')}" data-merk="${esc(x.merk||'')}">${esc(x.nama_barang)} — ${esc(x.kode_barang||'Tanpa Kode')} · ${esc(x.satuan||'-')}</option>`).join('')}</select></label>
-  <label>Kode Barang <input id="m_kode" maxlength="100" placeholder="Contoh: 01.01.01.001"><small class="field-hint">Barang lama ditampilkan otomatis; barang baru dapat diisi di sini.</small></label>
+  <label>Kode Barang <input id="m_kode" maxlength="80" placeholder="Contoh: 01.01.01.001"><small class="field-hint">Barang lama ditampilkan otomatis; barang baru dapat diisi di sini.</small></label>
   <label${canCreate?'':' style="display:none"'}>Nama Barang Baru <input id="m_nama" placeholder="Isi jika memilih Barang baru"></label>
   <label${canCreate?'':' style="display:none"'}>Kategori Barang Baru <select id="m_kat"><option value="">- Pilih kategori -</option>${kats.map(x=>`<option value="${x.id}" data-kuasi="${String(x.nama_kategori||'').toLowerCase().includes('kuasi')?'1':'0'}">${esc(x.nama_kategori)}</option>`).join('')}</select></label>
   <label>Tipe <input id="m_tipe" value="-"></label><label>Merk <input id="m_merk" value="-"></label><label>Satuan <input id="m_satuan" placeholder="BUAH / PCS / KOTAK"></label>
@@ -750,7 +767,7 @@ async function barangMasukForm(){
   <label class="field-wide">Keterangan / Spesifikasi <textarea id="m_keterangan" rows="3" maxlength="500" placeholder="Contoh: ukuran, warna, model, jenis, bahan, atau keterangan lain untuk membedakan nama barang yang sama"></textarea><small class="field-hint">Keterangan ini melekat pada transaksi Barang Masuk, bukan Master Barang.</small></label>
   </div><div id="masukKuasi" class="kuasi-box" style="display:none"><strong>📑 Batch Kuasi</strong><span>Isi rentang nomor seri yang diterima. Jumlah harus sama dengan rentang.</span><div class="form-grid"><label>No. Dus <input id="m_dus" placeholder="Contoh: 411"></label><label>No. Seri Awal <input id="m_awal" placeholder="A-001"></label><label>No. Seri Akhir <input id="m_akhir" placeholder="A-100"></label></div></div><div class="form-actions"><button class="primary" id="saveMasuk">Rekam & Tambah Stok</button><button class="ghost" id="cancelMasuk">Batal</button></div></section>`;
 }
-async function barangKeluarForm(){const [{data:items,error},{data:pegawai,error:pe}]=await Promise.all([client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,kategori:kategori_id(id,nama_kategori)').eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true}),client.from('pegawai').select('id,nama_pegawai,nip,status_pegawai,jabatan,unit_kerja').order('nama_pegawai')]);if(error||pe)throw(error||pe);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h2>Rekam Barang Keluar</h2><p>Stok akan dikurangi setelah seluruh item lolos validasi.</p></div><button class="ghost" id="backKeluar">← Kembali</button></div><div class="form-grid"><label>Tanggal Keluar <input id="k_tanggal" type="date" value="${localDate()}"></label><label>Penyerah (Gudang) <select id="k_penyerah"><option value="">- Pilih penyerah -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penyerah <input id="k_penyerah_jabatan" readonly></label><label>NIP Penyerah <input id="k_penyerah_nip" readonly></label><label>Penerima (Pemohon) <select id="k_penerima"><option value="">- Pilih pegawai -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penerima <input id="k_jabatan" readonly></label><label>NIP Penerima <input id="k_nip" readonly></label><label>Tujuan / Ruangan <input id="k_tujuan" placeholder="Otomatis dari Unit Kerja/Ruangan Penerima; dapat diedit" required></label></div><div class="section-head compact"><div><h3>Daftar Barang</h3><p>Tambahkan satu atau beberapa item.</p></div><button class="ghost" id="addItemKeluar">＋ Tambah Item</button></div><div id="keluarItems"></div><div class="form-actions"><button class="primary" id="saveKeluar">Rekam Transaksi & Kurangi Stok</button><button class="ghost" id="cancelKeluar">Batal</button></div></section>`}
+async function barangKeluarForm(){const [items,pegawai]=await Promise.all([fetchAllSipbRows('barang','id,kode_barang,nama_barang,keterangan,satuan,sisa,kategori:kategori_id(id,nama_kategori)',q=>q.eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true})),fetchAllSipbRows('pegawai','id,nama_pegawai,nip,status_pegawai,jabatan,unit_kerja',q=>q.order('nama_pegawai').order('id',{ascending:true}))]);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h2>Rekam Barang Keluar</h2><p>Stok akan dikurangi setelah seluruh item lolos validasi.</p></div><button class="ghost" id="backKeluar">← Kembali</button></div><div class="form-grid"><label>Tanggal Keluar <input id="k_tanggal" type="date" value="${localDate()}"></label><label>Penyerah (Gudang) <select id="k_penyerah"><option value="">- Pilih penyerah -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penyerah <input id="k_penyerah_jabatan" readonly></label><label>NIP Penyerah <input id="k_penyerah_nip" readonly></label><label>Penerima (Pemohon) <select id="k_penerima"><option value="">- Pilih pegawai -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penerima <input id="k_jabatan" readonly></label><label>NIP Penerima <input id="k_nip" readonly></label><label>Tujuan / Ruangan <input id="k_tujuan" placeholder="Otomatis dari Unit Kerja/Ruangan Penerima; dapat diedit" required></label></div><div class="section-head compact"><div><h3>Daftar Barang</h3><p>Tambahkan satu atau beberapa item.</p></div><button class="ghost" id="addItemKeluar">＋ Tambah Item</button></div><div id="keluarItems"></div><div class="form-actions"><button class="primary" id="saveKeluar">Rekam Transaksi & Kurangi Stok</button><button class="ghost" id="cancelKeluar">Batal</button></div></section>`}
 
 function keluarItemRow(items){
   const id='ki_'+Math.random().toString(36).slice(2,9);
@@ -771,12 +788,10 @@ function keluarItemRow(items){
   '</div>';
 }
 
-async function stockOpnamePage(){const [{data:rows,error},{data:items,error:ie}]=await Promise.all([client.from('riwayat_opname').select('*,barang:barang_id(nama_barang)').order('id',{ascending:false}).limit(200),client.from('barang').select('id,nama_barang,sisa,satuan').order('nama_barang',{ascending:true}).order('id',{ascending:true})]);if(error||ie)throw(error||ie);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PERSEDIAAN</span><h2>Stock Opname</h2><p>Penyesuaian stok fisik terhadap stok sistem.</p></div><button class="primary" id="addOpname">＋ Rekam Stock Opname</button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Barang</th><th>Sistem</th><th>Fisik</th><th>Selisih</th><th>Petugas</th><th>Keterangan</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${fmtDate(r.tanggal_opname)}</td><td>${esc(r.barang?.nama_barang||'-')}</td><td>${r.stok_sistem}</td><td>${r.stok_fisik}</td><td><span class="stock ${r.selisih<0?'low':''}">${r.selisih>0?'+':''}${r.selisih}</span></td><td>${esc(r.petugas||'-')}</td><td>${esc(r.keterangan||'-')}</td></tr>`).join('')||emptyRow(7)}</tbody></table></div></section>`}
+async function stockOpnamePage(){const [rows,items]=await Promise.all([fetchAllSipbRows('riwayat_opname','*,barang:barang_id(nama_barang)',q=>q.order('id',{ascending:false})),fetchAllSipbRows('barang','id,nama_barang,sisa,satuan',q=>q.order('nama_barang',{ascending:true}).order('id',{ascending:true}))]);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PERSEDIAAN</span><h2>Stock Opname</h2><p>Penyesuaian stok fisik terhadap stok sistem.</p></div><button class="primary" id="addOpname">＋ Rekam Stock Opname</button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Barang</th><th>Sistem</th><th>Fisik</th><th>Selisih</th><th>Petugas</th><th>Keterangan</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${fmtDate(r.tanggal_opname)}</td><td>${esc(r.barang?.nama_barang||'-')}</td><td>${r.stok_sistem}</td><td>${r.stok_fisik}</td><td><span class="stock ${r.selisih<0?'low':''}">${r.selisih>0?'+':''}${r.selisih}</span></td><td>${esc(r.petugas||'-')}</td><td>${esc(r.keterangan||'-')}</td></tr>`).join('')||emptyRow(7)}</tbody></table></div></section>`}
 
 async function kuasiPage(){
-  const {data,error}=await client.from('stok_kuasi').select('id,barang_id,prefix_huruf,panjang_digit,digit_awal,digit_akhir,digit_sekarang,sisa_lembar,tanggal_masuk,nomor_dus,barang:barang_id(nama_barang,satuan)').gt('sisa_lembar',0).order('tanggal_masuk',{ascending:true}).order('id',{ascending:true});
-  if(error)throw error;
-  const rows=data||[];
+  const rows=await fetchAllSipbRows('stok_kuasi','id,barang_id,prefix_huruf,panjang_digit,digit_awal,digit_akhir,digit_sekarang,sisa_lembar,tanggal_masuk,nomor_dus,barang:barang_id(nama_barang,satuan)',q=>q.gt('sisa_lembar',0).order('tanggal_masuk',{ascending:true}).order('id',{ascending:true}));
   const grouped={};
   rows.forEach(r=>{const k=r.barang_id;if(!grouped[k])grouped[k]=[];grouped[k].push(r)});
   const totalLembar=rows.reduce((n,r)=>n+(Number(r.sisa_lembar)||0),0);
@@ -799,21 +814,17 @@ async function showKuasiDetail(id){
     .select('id,barang_id,prefix_huruf,panjang_digit,digit_awal,digit_akhir,digit_sekarang,sisa_lembar,tanggal_masuk,nomor_dus,barang:barang_id(nama_barang,satuan,merk,tipe)')
     .eq('id',id).single();
   if(be)throw be;
-  const [{data:allocations,error:ae},{data:legacy,error:le},{data:batchRows,error:batchError}]=await Promise.all([
-    client.from('transaksi_kuasi_alokasi').select('id,transaksi_keluar_id,detail_barang_keluar_id,jumlah,digit_awal,digit_akhir,created_at,transaksi:transaksi_keluar_id(id,tanggal_keluar,penerima_nama,penerima_jabatan,tujuan_ruangan,status,jenis_dokumen),detail:detail_barang_keluar_id(nomor_awal,nomor_akhir,nomor_dus)').eq('stok_kuasi_id',id).order('id',{ascending:false}),
-    client.from('detail_barang_keluar').select('id,jumlah,nomor_awal,nomor_akhir,nomor_dus,transaksi:transaksi_keluar_id(id,status)').eq('barang_id',batch.barang_id).limit(5000),
-    client.from('stok_kuasi').select('id').eq('barang_id',batch.barang_id)
+  const [allocations,legacy,batchRows]=await Promise.all([
+    fetchAllSipbRows('transaksi_kuasi_alokasi','id,transaksi_keluar_id,detail_barang_keluar_id,jumlah,digit_awal,digit_akhir,created_at,transaksi:transaksi_keluar_id(id,tanggal_keluar,penerima_nama,penerima_jabatan,tujuan_ruangan,status,jenis_dokumen),detail:detail_barang_keluar_id(nomor_awal,nomor_akhir,nomor_dus)',q=>q.eq('stok_kuasi_id',id).order('id',{ascending:false})),
+    fetchAllSipbRows('detail_barang_keluar','id,jumlah,nomor_awal,nomor_akhir,nomor_dus,transaksi:transaksi_keluar_id(id,status)',q=>q.eq('barang_id',batch.barang_id).order('id',{ascending:true})),
+    fetchAllSipbRows('stok_kuasi','id',q=>q.eq('barang_id',batch.barang_id).order('id',{ascending:true}))
   ]);
-  if(ae||le||batchError)throw(ae||le||batchError);
   const batchIds=(batchRows||[]).map(r=>Number(r.id)).filter(Number.isFinite);
-  const allAllocationsQuery=batchIds.length
-    ?await client.from('transaksi_kuasi_alokasi').select('detail_barang_keluar_id').in('stok_kuasi_id',batchIds)
-    :{data:[],error:null};
-  if(allAllocationsQuery.error)throw allAllocationsQuery.error;
+  const allAllocationRows=batchIds.length?await fetchAllSipbRowsByValues('transaksi_kuasi_alokasi','detail_barang_keluar_id','stok_kuasi_id',batchIds):[];
   const pad=Number(batch.panjang_digit)||0,p=batch.prefix_huruf||'';
   const awal=p+String(batch.digit_awal).padStart(pad,'0'),akhir=p+String(batch.digit_akhir).padStart(pad,'0'),sekarang=p+String(batch.digit_sekarang).padStart(pad,'0');
   const related=(allocations||[]).filter(r=>(r.transaksi?.status||'AKTIF')==='AKTIF');
-  const allocatedDetailIds=new Set((allAllocationsQuery.data||[]).map(r=>Number(r.detail_barang_keluar_id)));
+  const allocatedDetailIds=new Set(allAllocationRows.map(r=>Number(r.detail_barang_keluar_id)));
   const legacyUntracked=(legacy||[]).filter(r=>(r.transaksi?.status||'AKTIF')==='AKTIF'&&!allocatedDetailIds.has(Number(r.id)));
   const box=document.createElement('div');box.className='modal-backdrop';
   box.innerHTML='<div class="modal-card kuasi-detail-modal"><div class="modal-head"><div><span class="eyebrow">DETAIL BATCH KUASI</span><h2>'+esc(batch.barang?.nama_barang||'-')+'</h2><p>'+esc(batch.barang?.satuan||'')+' · '+esc(batch.barang?.merk||'-')+' / '+esc(batch.barang?.tipe||'-')+'</p></div><button class="modal-close" aria-label="Tutup">×</button></div>'+
@@ -833,17 +844,12 @@ async function showKuasiDetail(id){
 }
 
 async function kartuPage(){
-  const [itemsQ,layersQ]=await Promise.all([
-    client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,merk,tipe,sisa,stok_minimum,harga_terakhir,kategori_id,kategori:kategori_id(id,nama_kategori)').order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true}),
-    client.from('sipb_fifo_layers').select('barang_id,sisa,harga_satuan')
-  ]);
-  if(itemsQ.error)throw itemsQ.error;
-  const items=itemsQ.data||[];
+  const items=await fetchAllSipbRows('barang','id,kode_barang,nama_barang,keterangan,satuan,merk,tipe,sisa,stok_minimum,harga_terakhir,kategori_id,kategori:kategori_id(id,nama_kategori)',q=>q.order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true}));
   const fifoMissing=e=>['42P01','PGRST205'].includes(e?.code)||/does not exist|could not find the table/i.test(e?.message||'');
-  const fifoReady=!layersQ.error;
-  if(layersQ.error&&!fifoMissing(layersQ.error))throw layersQ.error;
+  let fifoReady=true,layers=[];
+  try{layers=await fetchAllSipbRows('sipb_fifo_layers','barang_id,sisa,harga_satuan',q=>q.order('id',{ascending:true}))}catch(e){if(!fifoMissing(e))throw e;fifoReady=false;}
   const fifoValues=new Map();
-  (layersQ.data||[]).forEach(l=>{
+  layers.forEach(l=>{
     const key=Number(l.barang_id),value=(Number(l.sisa)||0)*(Number(l.harga_satuan)||0);
     fifoValues.set(key,(fifoValues.get(key)||0)+value);
   });
@@ -865,28 +871,25 @@ async function kartuPage(){
 }
 
 async function loadKartuDetail(id){
-  const [itemQ,masukQ,keluarQ,opnameQ,layersQ]=await Promise.all([
-    client.from('barang').select('id,nama_barang,satuan,merk,tipe,sisa,stok_minimum,harga_terakhir,kategori:kategori_id(nama_kategori)').eq('id',id).single(),
-    client.from('barang_masuk').select('id,tanggal_masuk,jumlah,harga_satuan,nama_penyerah,nama_penerima,keterangan,nomor_awal,nomor_akhir,nomor_dus').eq('barang_id',id).order('tanggal_masuk',{ascending:true}).order('id',{ascending:true}),
-    client.from('detail_barang_keluar').select('id,transaksi_keluar_id,jumlah,nomor_awal,nomor_akhir,nomor_dus,transaksi:transaksi_keluar_id(id,tanggal_keluar,penerima_nama,penerima_jabatan,penerima_nip,tujuan_ruangan,status,jenis_dokumen)').eq('barang_id',id).order('id',{ascending:true}),
-    client.from('riwayat_opname').select('id,tanggal_opname,stok_sistem,stok_fisik,selisih,keterangan,petugas').eq('barang_id',id).order('tanggal_opname',{ascending:true}).order('id',{ascending:true}),
-    client.from('sipb_fifo_layers').select('id,barang_masuk_id,source_type,tanggal_masuk,jumlah_masuk,sisa,harga_satuan,harga_estimasi,catatan').eq('barang_id',id).order('tanggal_masuk',{ascending:true}).order('id',{ascending:true})
+  const {data:item,error:itemError}=await client.from('barang').select('id,nama_barang,satuan,merk,tipe,sisa,stok_minimum,harga_terakhir,kategori:kategori_id(nama_kategori)').eq('id',id).single();
+  if(itemError)throw itemError;
+  const [masuk,keluar,opname]=await Promise.all([
+    fetchAllSipbRows('barang_masuk','id,tanggal_masuk,jumlah,harga_satuan,nama_penyerah,nama_penerima,keterangan,nomor_awal,nomor_akhir,nomor_dus',q=>q.eq('barang_id',id).order('tanggal_masuk',{ascending:true}).order('id',{ascending:true})),
+    fetchAllSipbRows('detail_barang_keluar','id,transaksi_keluar_id,jumlah,nomor_awal,nomor_akhir,nomor_dus,transaksi:transaksi_keluar_id(id,tanggal_keluar,penerima_nama,penerima_jabatan,penerima_nip,tujuan_ruangan,status,jenis_dokumen)',q=>q.eq('barang_id',id).order('id',{ascending:true})),
+    fetchAllSipbRows('riwayat_opname','id,tanggal_opname,stok_sistem,stok_fisik,selisih,keterangan,petugas',q=>q.eq('barang_id',id).order('tanggal_opname',{ascending:true}).order('id',{ascending:true}))
   ]);
-  if(itemQ.error||masukQ.error||keluarQ.error||opnameQ.error)throw(itemQ.error||masukQ.error||keluarQ.error||opnameQ.error);
-  const item=itemQ.data,masuk=masukQ.data||[],keluar=keluarQ.data||[],opname=opnameQ.data||[];
   const fifoMissing=e=>['42P01','PGRST205'].includes(e?.code)||/does not exist|could not find the table/i.test(e?.message||'');
-  const fifoReady=!layersQ.error;
-  if(layersQ.error&&!fifoMissing(layersQ.error))throw layersQ.error;
-  const fifoLayers=layersQ.data||[];
+  let fifoReady=true,fifoLayers=[];
+  try{fifoLayers=await fetchAllSipbRows('sipb_fifo_layers','id,barang_masuk_id,source_type,tanggal_masuk,jumlah_masuk,sisa,harga_satuan,harga_estimasi,catatan',q=>q.eq('barang_id',id).order('tanggal_masuk',{ascending:true}).order('id',{ascending:true}))}catch(e){if(!fifoMissing(e))throw e;fifoReady=false;}
   let allocations=[];
   if(fifoReady){
     const detailIds=keluar.map(r=>r.id);
     const opnameIds=opname.filter(r=>Number(r.selisih)<0).map(r=>r.id);
-    const requests=[];
-    if(detailIds.length)requests.push(client.from('sipb_fifo_allocations').select('detail_barang_keluar_id,jumlah,harga_satuan,reversed_at').in('detail_barang_keluar_id',detailIds).is('reversed_at',null));
-    if(opnameIds.length)requests.push(client.from('sipb_fifo_allocations').select('riwayat_opname_id,jumlah,harga_satuan,reversed_at').in('riwayat_opname_id',opnameIds).is('reversed_at',null));
-    const results=await Promise.all(requests);
-    for(const q of results){if(q.error)throw q.error;allocations.push(...(q.data||[]));}
+    const [detailAllocations,opnameAllocations]=await Promise.all([
+      fetchAllSipbRowsByValues('sipb_fifo_allocations','detail_barang_keluar_id,jumlah,harga_satuan,reversed_at','detail_barang_keluar_id',detailIds,q=>q.is('reversed_at',null)),
+      fetchAllSipbRowsByValues('sipb_fifo_allocations','riwayat_opname_id,jumlah,harga_satuan,reversed_at','riwayat_opname_id',opnameIds,q=>q.is('reversed_at',null))
+    ]);
+    allocations.push(...detailAllocations,...opnameAllocations);
   }
   const byDetail=new Map(),byOpname=new Map();
   allocations.forEach(a=>{
@@ -924,16 +927,31 @@ async function loadKartuDetail(id){
   enhanceTables($('kartuDetail'));
 }
 
-async function fetchAllSipbRows(table,select='*'){
+async function fetchAllSipbRows(table,select='*',configure=null){
   const all=[],pageSize=1000;
   let offset=0;
   while(true){
-    const q=await client.from(table).select(select).range(offset,offset+pageSize-1);
+    let query=client.from(table).select(select);
+    if(typeof configure==='function')query=configure(query)||query;
+    else query=query.order('id',{ascending:true});
+    const q=await query.range(offset,offset+pageSize-1);
     if(q.error)throw q.error;
     const rows=q.data||[];
     all.push(...rows);
     if(rows.length<pageSize)break;
     offset+=pageSize;
+  }
+  return all;
+}
+async function fetchAllSipbRowsByValues(table,select,column,values,configure=null){
+  const all=[],batchSize=150,unique=[...new Set((values||[]).filter(v=>v!==null&&v!==undefined))];
+  for(let i=0;i<unique.length;i+=batchSize){
+    const batch=unique.slice(i,i+batchSize);
+    const rows=await fetchAllSipbRows(table,select,q=>{
+      q=q.in(column,batch).order('id',{ascending:true});
+      return typeof configure==='function'?(configure(q)||q):q;
+    });
+    all.push(...rows);
   }
   return all;
 }
@@ -1041,12 +1059,10 @@ async function backupPage(){
     '<div class="table-wrap"><table><thead><tr><th>Tabel</th><th>Data</th></tr></thead><tbody>'+names.map((n,i)=>'<tr><td><strong>'+n+'</strong></td><td>'+counts[i].toLocaleString('id-ID')+'</td></tr>').join('')+'</tbody></table></div></section>';
 }
 
-async function kategoriPage(){const {data,error}=await client.from('kategori').select('*').order('id');if(error)throw error;return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DATA REFERENSI</span><h2>Kategori</h2><p>Kelola klasifikasi barang.</p></div>${profile?.role==='admin'?'<button class="primary" id="addKategori">＋ Tambah Kategori</button>':''}</div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Nama Kategori</th><th>Aksi</th></tr></thead><tbody>${data.map(r=>`<tr><td>#${r.id}</td><td><strong>${esc(r.nama_kategori)}</strong></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-kat" data-id="'+r.id+'">Edit</button><button class="btn-sm danger delete-kat" data-id="'+r.id+'">Hapus</button></div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`).join('')||emptyRow(3)}</tbody></table></div></section>`}
+async function kategoriPage(){const data=await fetchAllSipbRows('kategori','*',q=>q.order('id'));return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DATA REFERENSI</span><h2>Kategori</h2><p>Kelola klasifikasi barang.</p></div>${profile?.role==='admin'?'<button class="primary" id="addKategori">＋ Tambah Kategori</button>':''}</div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Nama Kategori</th><th>Aksi</th></tr></thead><tbody>${data.map(r=>`<tr><td>#${r.id}</td><td><strong>${esc(r.nama_kategori)}</strong></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-kat" data-id="'+r.id+'">Edit</button><button class="btn-sm danger delete-kat" data-id="'+r.id+'">Hapus</button></div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`).join('')||emptyRow(3)}</tbody></table></div></section>`}
 async function penggunaPage(){
   if(profile?.role!=='admin')return '<section class="card error-card"><h2>Akses ditolak</h2><p>Halaman ini hanya dapat diakses admin.</p></section>';
-  const {data,error}=await client.from('user_profiles').select('id,legacy_user_id,username,nama_lengkap,role,is_active,created_at').order('nama_lengkap');
-  if(error)throw error;
-  const rows=data||[];
+  const rows=await fetchAllSipbRows('user_profiles','id,legacy_user_id,username,nama_lengkap,role,is_active,created_at',q=>q.order('nama_lengkap').order('id',{ascending:true}));
   const active=rows.filter(u=>u.is_active).length;
   const admins=rows.filter(u=>u.is_active&&u.role==='admin').length;
   return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">ADMINISTRASI</span><h2>Kelola Pengguna</h2><p>Kelola akun SIPB, peran, dan status pengguna.</p></div><div class="kartu-head-actions"><span class="status-pill">'+rows.length+' pengguna</span><button class="primary" id="addUser">＋ Tambah Pengguna</button></div></div>'+
@@ -1172,8 +1188,7 @@ function showUserCreateModal(){
 }
 
 async function pegawaiPage(){
-  const {data,error}=await client.from('pegawai').select('*').order('nama_pegawai');
-  if(error)throw error;
+  const data=await fetchAllSipbRows('pegawai','*',q=>q.order('nama_pegawai').order('id',{ascending:true}));
   return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DATA REFERENSI</span><h2>Pegawai</h2><p>Kelola data pegawai untuk kebutuhan penyerah dan penerima barang.</p></div>'+
     (profile?.role==='admin'?'<button class="primary" id="addPegawai">＋ Tambah Pegawai</button>':'')+
     '</div><div class="filter-bar"><div class="search-box">⌕<input id="pegawaiSearch" placeholder="Cari nama, NIP, status, jabatan, atau unit kerja..."></div><span id="pegawaiCount" class="result-count">'+(data?.length||0)+' data</span></div>'+
@@ -1195,15 +1210,12 @@ async function pegawaiForm(id=null){
     '<div class="form-actions"><button class="primary" id="savePegawai">'+(id?'Simpan Perubahan':'Simpan Pegawai')+'</button><button class="ghost" id="cancelPegawai">Batal</button></div></section>';
 }
 async function riwayatPage(){
-  const [{data:keluar,error:ke},{data:masuk,error:me},{data:opname,error:oe},{data:audit,error:ae}]=await Promise.all([
-    client.from('transaksi_keluar').select('*,detail_barang_keluar(id,jumlah,nomor_awal,nomor_akhir,nomor_dus,barang:barang_id(nama_barang,satuan))').order('tanggal_keluar',{ascending:false}).order('id',{ascending:false}).limit(200),
-    client.from('barang_masuk').select('*,barang:barang_id(nama_barang,satuan)').order('tanggal_masuk',{ascending:false}).order('id',{ascending:false}).limit(200),
-    client.from('riwayat_opname').select('*,barang:barang_id(nama_barang,satuan)').order('tanggal_opname',{ascending:false}).order('id',{ascending:false}).limit(200),
-    (profile?.role==='admin'
-      ?client.from('sipb_transaction_audit').select('*').order('created_at',{ascending:false}).limit(100)
-      :Promise.resolve({data:[],error:null}))
+  const [keluar,masuk,opname,audit]=await Promise.all([
+    fetchAllSipbRows('transaksi_keluar','*,detail_barang_keluar(id,jumlah,nomor_awal,nomor_akhir,nomor_dus,barang:barang_id(nama_barang,satuan))',q=>q.order('tanggal_keluar',{ascending:false}).order('id',{ascending:false})),
+    fetchAllSipbRows('barang_masuk','*,barang:barang_id(nama_barang,satuan)',q=>q.order('tanggal_masuk',{ascending:false}).order('id',{ascending:false})),
+    fetchAllSipbRows('riwayat_opname','*,barang:barang_id(nama_barang,satuan)',q=>q.order('tanggal_opname',{ascending:false}).order('id',{ascending:false})),
+    profile?.role==='admin'?fetchAllSipbRows('sipb_transaction_audit','*',q=>q.order('created_at',{ascending:false})):Promise.resolve([])
   ]);
-  if(ke||me||oe||ae)throw(ke||me||oe||ae);
   const rows=[
     ...(masuk||[]).map(r=>({
       type:'MASUK',date:r.tanggal_masuk,id:r.id,party:r.nama_penyerah||'-',
@@ -1294,11 +1306,11 @@ function showAuditDetail(id){
 async function showCorrectionModal(type,id){
   if(profile?.role!=='admin')return toast('Hanya admin yang dapat mengoreksi transaksi.','error');
   if(type==='MASUK'){
-    const [{data:r,error},{data:items,error:ie}]=await Promise.all([
+    const [{data:r,error},items]=await Promise.all([
       client.from('barang_masuk').select('*,barang:barang_id(id,nama_barang,satuan,kode_barang,is_archived,kategori:kategori_id(nama_kategori))').eq('id',id).single(),
-      client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,is_archived,kategori:kategori_id(nama_kategori)').eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true})
+      fetchAllSipbRows('barang','id,kode_barang,nama_barang,keterangan,satuan,is_archived,kategori:kategori_id(nama_kategori)',q=>q.eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true}))
     ]);
-    if(error||ie)throw(error||ie);
+    if(error)throw error;
     if(!r||!r.barang)throw new Error('Data penerimaan atau Master Barang tidak ditemukan.');
     if(r.barang.is_archived)throw new Error('Master Barang sudah diarsipkan. Pulihkan barang terlebih dahulu.');
     const category=String(r.barang.kategori?.nama_kategori||'').toLowerCase();
@@ -1349,11 +1361,11 @@ async function showCorrectionModal(type,id){
   }
 
   if(type==='KELUAR'){
-    const [{data:tx,error},{data:items,error:ie}]=await Promise.all([
+    const [{data:tx,error},items]=await Promise.all([
       client.from('transaksi_keluar').select('*,detail_barang_keluar(id,barang_id,jumlah,barang:barang_id(id,nama_barang,satuan,is_archived,kategori:kategori_id(nama_kategori)))').eq('id',id).single(),
-      client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,is_archived,kategori:kategori_id(nama_kategori)').eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true})
+      fetchAllSipbRows('barang','id,kode_barang,nama_barang,keterangan,satuan,sisa,is_archived,kategori:kategori_id(nama_kategori)',q=>q.eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true}))
     ]);
-    if(error||ie)throw(error||ie);
+    if(error)throw error;
     if(!tx||tx.status!=='AKTIF')throw new Error('Hanya transaksi Barang Keluar aktif yang dapat dikoreksi.');
     if((tx.detail_barang_keluar||[]).some(d=>d.barang?.is_archived))throw new Error('Transaksi memakai Master Barang yang sudah diarsipkan. Pulihkan barang terlebih dahulu.');
     const optionMarkup=(selected)=>'<option value="">- Pilih barang -</option>'+(items||[]).map(x=>'<option value="'+x.id+'" '+(Number(x.id)===Number(selected)?'selected':'')+'>'+esc(x.kode_barang||'Tanpa kode')+' — '+esc(x.nama_barang)+' · stok '+x.sisa+' '+esc(x.satuan||'')+'</option>').join('');
@@ -1594,7 +1606,7 @@ function bind(page){
       btn.disabled=true;
       btn.textContent='Menyimpan...';
       try{
-        const {error}=await client.from('user_profiles').update({role,is_active:active}).eq('id',id);
+        const {error}=await client.rpc('manage_user_profile',{p_user_id:id,p_role:role,p_is_active:active});
         if(error)throw error;
         toast('Profil pengguna diperbarui.');
         renderApp('pengguna');
@@ -1784,7 +1796,10 @@ function bindForm(id){
       stok_minimum:parseAngka($('b_min').value)
     };
     if(!payload.nama_barang)return toast('Nama barang wajib diisi.','error');
-    if(!Number.isFinite(payload.harga_terakhir)||payload.harga_terakhir<0)return toast('Harga terakhir harus nol atau lebih.','error');
+    if(!payload.kategori_id)return toast('Kategori barang wajib dipilih.','error');
+    if(payload.kode_barang&&payload.kode_barang.length>80)return toast('Kode Barang maksimal 80 karakter.','error');
+    if(payload.keterangan&&payload.keterangan.length>500)return toast('Keterangan maksimal 500 karakter.','error');
+    if(!Number.isFinite(payload.harga_terakhir)||payload.harga_terakhir<0||payload.harga_terakhir>9999999999999)return toast('Harga terakhir harus nol atau berada dalam batas nominal database.','error');
     if(!Number.isInteger(payload.stok_minimum)||payload.stok_minimum<0)return toast('Stok minimum harus bilangan bulat nol atau lebih.','error');
     save.disabled=true;
     save.textContent='Menyimpan...';
@@ -1837,11 +1852,7 @@ document.addEventListener('click',e=>{
 async function init(){if(!cfg||!cfg.supabaseUrl||!cfg.supabaseAnonKey||cfg.supabaseUrl.includes('YOUR-PROJECT'))return showLogin('Konfigurasi Supabase belum tersedia.');client=window.SIPB_SUPABASE_CLIENT||window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});window.SIPB_SUPABASE_CLIENT=client;client.auth.onAuthStateChange(e=>{if(e==='SIGNED_OUT')showLogin()});const r=await client.auth.getSession();session=r.data.session;if(session)renderApp();else showLogin()}
 init()
 async function stockOpnameForm(){
-  const {data:items,error}=await client.from('barang')
-    .select('id,nama_barang,satuan,sisa,stok_minimum,kategori:kategori_id(nama_kategori)')
-    .eq('is_archived',false)
-    .order('nama_barang',{ascending:true}).order('id',{ascending:true});
-  if(error)throw error;
+  const items=await fetchAllSipbRows('barang','id,nama_barang,satuan,sisa,stok_minimum,kategori:kategori_id(nama_kategori)',q=>q.eq('is_archived',false).order('nama_barang',{ascending:true}).order('id',{ascending:true}));
   const eligible=(items||[]).filter(x=>!String(x.kategori?.nama_kategori||'').toLowerCase().includes('kuasi'));
   return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PERSEDIAAN</span><h2>Rekam Stock Opname</h2><p>Catat stok fisik dan biarkan database menghitung selisih serta memperbarui saldo secara atomik.</p></div><button class="ghost" id="backOpname">← Kembali</button></div>'+
     '<div class="alert-box"><strong>Catatan:</strong> barang Kuasi tidak ditampilkan karena saldo Kuasi harus direkonsiliasi melalui batch/serial FIFO.</div>'+
@@ -1878,12 +1889,10 @@ async function bindOpnameForm(){
   };
 }
 async function bindKeluarForm(){
-  const result=await client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,kategori:kategori_id(id,nama_kategori)').eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true});
-  if(result.error)throw result.error;
-  const items=result.data||[];
-  const pegawaiQ=await client.from('pegawai').select('id,nama_pegawai,nip,status_pegawai,jabatan,unit_kerja').order('nama_pegawai');
-  if(pegawaiQ.error)throw pegawaiQ.error;
-  const pegawai=pegawaiQ.data||[];
+  const [items,pegawai]=await Promise.all([
+    fetchAllSipbRows('barang','id,kode_barang,nama_barang,keterangan,satuan,sisa,kategori:kategori_id(id,nama_kategori)',q=>q.eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true})),
+    fetchAllSipbRows('pegawai','id,nama_pegawai,nip,status_pegawai,jabatan,unit_kerja',q=>q.order('nama_pegawai').order('id',{ascending:true}))
+  ]);
   $('backKeluar').onclick=()=>renderApp('dashboard');
   $('cancelKeluar').onclick=()=>renderApp('dashboard');
 
@@ -1961,9 +1970,8 @@ async function bindKeluarForm(){
     results.classList.remove('open');
     const hint=row.querySelector('.kuasi-hint');
     if(opt.dataset.kuasi==='kuasi'){
-      client.from('stok_kuasi').select('sisa_lembar').eq('barang_id',value).gt('sisa_lembar',0).then(q=>{
-        if(q.error)return fail(q.error);
-        const total=(q.data||[]).reduce((sum,r)=>sum+Number(r.sisa_lembar||0),0);
+      fetchAllSipbRows('stok_kuasi','sisa_lembar',q=>q.eq('barang_id',value).gt('sisa_lembar',0).order('id',{ascending:true})).then(rows=>{
+        const total=rows.reduce((sum,r)=>sum+Number(r.sisa_lembar||0),0);
         hint.textContent='FIFO: '+total+' lembar pada batch aktif';
         hint.className='kuasi-hint'+(total<1?' warning':'');
       });
@@ -2029,6 +2037,7 @@ async function bindKeluarForm(){
   };
 }
 async function bindMasukForm(){
+  const existingGoods=await fetchAllSipbRows('barang','id,kode_barang,nama_barang');
   $('backMasuk').onclick=()=>renderApp('dashboard');
   $('cancelMasuk').onclick=()=>renderApp('dashboard');
   const toggle=()=>{
@@ -2088,7 +2097,7 @@ async function bindMasukForm(){
     const masterKode=String(selected?.dataset.kode||'').trim();
     if(existing&&kodeInput.toLowerCase()!==masterKode.toLowerCase())return toast('Kode Barang tidak boleh diubah dari Barang Masuk.','error');
     if(!existing){
-      const duplicate=items.find(x=>String(x.kode_barang||'').trim().toLowerCase()===kodeInput.toLowerCase());
+      const duplicate=existingGoods.find(x=>String(x.kode_barang||'').trim().toLocaleLowerCase('id-ID')===kodeInput.toLocaleLowerCase('id-ID'));
       if(duplicate)return toast('Kode Barang sudah digunakan oleh '+duplicate.nama_barang+'.','error');
     }
     const btn=$('saveMasuk');btn.disabled=true;btn.textContent='Memproses transaksi...';
