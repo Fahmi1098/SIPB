@@ -36,6 +36,8 @@ document.addEventListener('input',e=>{
 const fmtDate=v=>{if(!v)return '-';const s=String(v);const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);const d=m?new Date(Number(m[1]),Number(m[2])-1,Number(m[3])):new Date(v);return Number.isNaN(d.getTime())?'-':new Intl.DateTimeFormat('id-ID',{dateStyle:'medium'}).format(d)};
 const localDate=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const $=id=>document.getElementById(id);
+function setTableRowMatch(row,matched){if(!row)return;row.dataset.tableFilterMatch=matched?'1':'0';row.style.display=matched?'':'none'}
+function refreshTableFilter(tableId){const table=$(tableId);if(!table)return;table.dataset.page='1';table.refreshPagination?.()}
 const BANTEN_LOGO='assets/logo_banten.png';
 let sidebarOpen=false;
 let uiTheme=localStorage.getItem('sipb-theme')||'light';
@@ -121,7 +123,7 @@ function tableExportData(table){
   const bodyRows=[...(table.tBodies?.[0]?.rows||[])];
   const pagedHidden=bodyRows.filter(row=>row.classList.contains('table-pagination-hidden'));
   pagedHidden.forEach(row=>row.classList.remove('table-pagination-hidden'));
-  const rows=bodyRows.filter(row=>!row.querySelector('.empty')&&row.dataset.tableSearchMatch!=='0'&&getComputedStyle(row).display!=='none');
+  const rows=bodyRows.filter(row=>!row.querySelector('.empty')&&row.dataset.tableSearchMatch!=='0'&&row.dataset.tableFilterMatch!=='0'&&getComputedStyle(row).display!=='none');
   pagedHidden.forEach(row=>row.classList.add('table-pagination-hidden'));
   return {
     headers:headers.map(x=>x.label),
@@ -278,7 +280,7 @@ function enhanceTables(scope=document){
         table.tBodies?.[0]?.querySelectorAll('tr').forEach(row=>{
           if(!row.querySelector('.empty'))row.classList.remove('table-pagination-hidden');
         });
-        return [...(table.tBodies?.[0]?.rows||[])].filter(row=>!row.querySelector('.empty')&&row.dataset.tableSearchMatch!=='0'&&getComputedStyle(row).display!=='none');
+        return [...(table.tBodies?.[0]?.rows||[])].filter(row=>!row.querySelector('.empty')&&row.dataset.tableSearchMatch!=='0'&&row.dataset.tableFilterMatch!=='0');
       };
       const drawPager=(total,page,totalPages)=>{
         info.textContent=total?((page-1)*Number(pageSize.value==='all'?total:pageSize.value)+1)+'–'+Math.min(page*Number(pageSize.value==='all'?total:pageSize.value),total)+' dari '+total:'0 data';
@@ -1024,7 +1026,7 @@ function applyLaporanFilter(){
   $('reportValue').textContent=rupiah(value);
   $('content')?.querySelector('.report-page .status-pill')?.replaceChildren(document.createTextNode(rows.length+' mutasi'));
   const table=$('laporanTable');
-  table?.refreshPagination?.();
+  if(table){table.dataset.page='1';table.refreshPagination?.()}
 }
 
 async function backupPage(){
@@ -1552,11 +1554,12 @@ function bind(page){
       const status=$('userStatusFilter').value;
       let shown=0;
       document.querySelectorAll('#userTable tbody tr[data-search]').forEach(row=>{
-        const ok=(!q||row.dataset.search.includes(q))&&(!role||row.dataset.role===role)&&(!status||row.dataset.status===status);
-        row.style.display=ok?'':'none';
+        const ok=matchesSearch(row.dataset.search,q)&&(!role||row.dataset.role===role)&&(!status||row.dataset.status===status);
+        setTableRowMatch(row,ok);
         if(ok)shown++;
       });
       $('userCount').textContent=shown+' data';
+      refreshTableFilter('userTable');
     };
     $('userSearch').oninput=apply;
     $('userRoleFilter').onchange=apply;
@@ -1608,10 +1611,9 @@ function bind(page){
       const q=search.value,cv=cat.value,sv=status.value;
       document.querySelectorAll('#kartuTable tbody tr[data-search]').forEach(r=>{
         const ok=matchesSearch(r.dataset.search,q)&&(!cv||r.dataset.kategori===cv)&&(!sv||r.dataset.status===sv);
-        r.style.display=ok?'':'none';
+        setTableRowMatch(r,ok);
       });
-      const table=$('kartuTable');
-      if(table){table.dataset.page='1';table.refreshPagination?.()}
+      refreshTableFilter('kartuTable');
     };
     search.oninput=apply;cat.onchange=apply;status.onchange=apply;
     document.querySelectorAll('.view-kartu').forEach(btn=>btn.onclick=async evt=>{evt.preventDefault();evt.stopPropagation();
@@ -1636,10 +1638,11 @@ function bind(page){
   }
   if(page==='riwayat'){
     const apply=()=>{
-      const q=$('historySearch').value.toLowerCase().trim(),t=$('historyType').value;
+      const q=$('historySearch').value,t=$('historyType').value;
       document.querySelectorAll('#historyTable tbody tr[data-search]').forEach(r=>{
-        r.style.display=(!q||r.dataset.search.includes(q))&&(!t||r.dataset.type===t)?'':'none';
+        setTableRowMatch(r,matchesSearch(r.dataset.search,q)&&(!t||r.dataset.type===t));
       });
+      refreshTableFilter('historyTable');
     };
     $('historySearch').oninput=apply;$('historyType').onchange=apply;
     $('historyTable').onclick=async e=>{
@@ -1689,12 +1692,11 @@ function bind(page){
         const archived=r.dataset.archived==='1';
         const statusOk=status==='all'||(status==='archived'?archived:!archived);
         const ok=statusOk&&matchesSearch(r.dataset.search,q)&&(!cat||r.dataset.kategori===cat);
-        r.style.display=ok?'':'none';
+        setTableRowMatch(r,ok);
         if(ok)shown++;
       });
       $('barangCount').textContent=shown+' data';
-      const table=$('barangTable');
-      if(table){table.dataset.page='1';table.refreshPagination?.()}
+      refreshTableFilter('barangTable');
     };
     $('barangSearch').oninput=apply;
     $('barangFilter').onchange=apply;
@@ -1743,7 +1745,7 @@ function bind(page){
   if(page==='pegawai'){
     const add=$('addPegawai');
     if(add) add.onclick=async()=>{try{$('content').innerHTML=await pegawaiForm();bindPegawaiForm()}catch(e){fail(e)}};
-    const apply=()=>{const q=$('pegawaiSearch').value.toLowerCase().trim();let shown=0;document.querySelectorAll('#pegawaiTable tbody tr[data-search]').forEach(r=>{const ok=!q||r.dataset.search.includes(q);r.style.display=ok?'':'none';if(ok)shown++});$('pegawaiCount').textContent=shown+' data'};
+    const apply=()=>{const q=$('pegawaiSearch').value;let shown=0;document.querySelectorAll('#pegawaiTable tbody tr[data-search]').forEach(r=>{const ok=matchesSearch(r.dataset.search,q);setTableRowMatch(r,ok);if(ok)shown++});$('pegawaiCount').textContent=shown+' data';refreshTableFilter('pegawaiTable')};
     $('pegawaiSearch').oninput=apply;
     document.querySelectorAll('.edit-pegawai').forEach(btn=>btn.onclick=async evt=>{evt.preventDefault();evt.stopPropagation();try{$('content').innerHTML=loading('Memuat pegawai...');$('content').innerHTML=await pegawaiForm(Number(btn.dataset.id));bindPegawaiForm(Number(btn.dataset.id))}catch(e){fail(e)}});
     document.querySelectorAll('.delete-pegawai').forEach(btn=>btn.onclick=async evt=>{evt.preventDefault();evt.stopPropagation();if(!(await sipbConfirm('Hapus data pegawai ini? Data historis transaksi tetap tersimpan.')))return;btn.disabled=true;const {error}=await client.from('pegawai').delete().eq('id',Number(btn.dataset.id));if(error){btn.disabled=false;return fail(error)}toast('Pegawai berhasil dihapus.');renderApp('pegawai')});
