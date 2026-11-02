@@ -46,9 +46,49 @@ SELECT
       to_regprocedure('public.cancel_and_delete_barang_keluar(integer)'),
       'EXECUTE'
     )
-  END AS can_call_legacy_cancel_and_delete;
+  END AS can_call_legacy_cancel_and_delete,
+  CASE
+    WHEN to_regprocedure('public.cancel_barang_keluar_audited(integer,text)') IS NULL
+      OR to_regprocedure('public.cancel_barang_keluar(integer)') IS NULL THEN false
+    ELSE (
+      SELECT has_function_privilege(
+        pg_get_userbyid(p.proowner),
+        to_regprocedure('public.cancel_barang_keluar(integer)'),
+        'EXECUTE'
+      )
+      FROM pg_proc p
+      WHERE p.oid = to_regprocedure('public.cancel_barang_keluar_audited(integer,text)')
+    )
+  END AS audited_cancel_owner_can_call_legacy,
+  CASE
+    WHEN to_regprocedure('public.correct_barang_keluar(integer,date,text,text,text,text,text,text,text,text,jsonb,text)') IS NULL
+      OR to_regprocedure('public.cancel_barang_keluar(integer)') IS NULL THEN false
+    ELSE (
+      SELECT has_function_privilege(
+        pg_get_userbyid(p.proowner),
+        to_regprocedure('public.cancel_barang_keluar(integer)'),
+        'EXECUTE'
+      )
+      FROM pg_proc p
+      WHERE p.oid = to_regprocedure('public.correct_barang_keluar(integer,date,text,text,text,text,text,text,text,text,jsonb,text)')
+    )
+  END AS correct_owner_can_call_legacy,
+  CASE
+    WHEN to_regprocedure('public.correct_barang_keluar(integer,date,text,text,text,text,text,text,text,text,jsonb,text)') IS NULL
+      OR to_regprocedure('public.record_barang_keluar(date,text,text,text,text,text,text,text,text,jsonb)') IS NULL THEN false
+    ELSE (
+      SELECT has_function_privilege(
+        pg_get_userbyid(p.proowner),
+        to_regprocedure('public.record_barang_keluar(date,text,text,text,text,text,text,text,text,jsonb)'),
+        'EXECUTE'
+      )
+      FROM pg_proc p
+      WHERE p.oid = to_regprocedure('public.correct_barang_keluar(integer,date,text,text,text,text,text,text,text,text,jsonb,text)')
+    )
+  END AS correct_owner_can_call_record_rpc;
 
 -- Expected: first three = true; legacy cancel and cancel-and-delete = false.
+-- The three SECURITY DEFINER owner checks above must also be true.
 
 SELECT
   policyname, cmd, qual, with_check
