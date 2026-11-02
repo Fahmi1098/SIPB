@@ -690,6 +690,7 @@ async function showImportPersediaanModal(){
         bertambah_value:excelNumber(r['Bertambah (Nilai)'])
       })).filter(r=>r.kode_barang||r.nama_barang);
       if(!importRows.length)throw new Error('File Excel tidak berisi baris barang untuk diimpor. Tambahkan data di bawah judul kolom lalu pilih file kembali.');
+      if(importRows.length>500)throw new Error('Maksimal 500 barang untuk satu kali import. Bagi file menjadi beberapa bagian.');
       const missingDate=importRows.findIndex(r=>!r.tanggal_saldo_awal||!r.tanggal_bertambah);
       if(missingDate>=0)throw new Error('Baris Excel '+(missingDate+2)+': Tanggal Saldo Awal dan Tanggal Bertambah wajib diisi dalam format DD/MM/YYYY (tanggal/bulan/tahun). Tidak ada tanggal otomatis.');
       const bad=importRows.findIndex(r=>{
