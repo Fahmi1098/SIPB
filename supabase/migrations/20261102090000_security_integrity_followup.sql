@@ -539,8 +539,10 @@ BEGIN
     RAISE EXCEPTION 'Hanya admin aktif yang dapat mengimpor data persediaan';
   END IF;
 
-  IF jsonb_typeof(p_rows) IS DISTINCT FROM 'array'
-     OR jsonb_array_length(p_rows) = 0 THEN
+  IF jsonb_typeof(p_rows) IS DISTINCT FROM 'array' THEN
+    RAISE EXCEPTION 'Data import kosong atau tidak valid';
+  END IF;
+  IF jsonb_array_length(p_rows) = 0 THEN
     RAISE EXCEPTION 'Data import kosong atau tidak valid';
   END IF;
 
