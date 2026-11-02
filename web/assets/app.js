@@ -290,8 +290,10 @@ function enhanceTables(scope=document){
     table.refreshPagination?.();
   });
 }
-async function cancelAndDeleteOutgoing(id){
-  const result=await client.rpc('cancel_and_delete_barang_keluar',{p_transaksi_id:Number(id)});
+async function cancelOutgoing(id,reason){
+  const result=await client.rpc('cancel_barang_keluar_audited',{
+    p_transaksi_id:Number(id),p_alasan:String(reason||'').trim()
+  });
   if(result.error)throw result.error;
   return result.data;
 }
@@ -1103,19 +1105,22 @@ async function pegawaiForm(id=null){
     '<div class="form-actions"><button class="primary" id="savePegawai">'+(id?'Simpan Perubahan':'Simpan Pegawai')+'</button><button class="ghost" id="cancelPegawai">Batal</button></div></section>';
 }
 async function riwayatPage(){
-  const [{data:keluar,error:ke},{data:masuk,error:me},{data:opname,error:oe}]=await Promise.all([
+  const [{data:keluar,error:ke},{data:masuk,error:me},{data:opname,error:oe},{data:audit,error:ae}]=await Promise.all([
     client.from('transaksi_keluar').select('*,detail_barang_keluar(id,jumlah,nomor_awal,nomor_akhir,nomor_dus,barang:barang_id(nama_barang,satuan))').order('tanggal_keluar',{ascending:false}).order('id',{ascending:false}).limit(200),
     client.from('barang_masuk').select('*,barang:barang_id(nama_barang,satuan)').order('tanggal_masuk',{ascending:false}).order('id',{ascending:false}).limit(200),
-    client.from('riwayat_opname').select('*,barang:barang_id(nama_barang,satuan)').order('tanggal_opname',{ascending:false}).order('id',{ascending:false}).limit(200)
+    client.from('riwayat_opname').select('*,barang:barang_id(nama_barang,satuan)').order('tanggal_opname',{ascending:false}).order('id',{ascending:false}).limit(200),
+    client.from('sipb_transaction_audit').select('*').order('created_at',{ascending:false}).limit(100)
   ]);
-  if(ke||me||oe)throw(ke||me||oe);
+  if(ke||me||oe||ae)throw(ke||me||oe||ae);
   const rows=[
     ...(masuk||[]).map(r=>({
       type:'MASUK',date:r.tanggal_masuk,id:r.id,party:r.nama_penyerah||'-',
       target:r.nama_penerima||'-',doc:'Penerimaan',status:'AKTIF',
-      items:[{name:r.barang?.nama_barang||'-',unit:r.barang?.satuan||'',qty:r.jumlah,keterangan:r.keterangan||'',serial:r.nomor_awal&&r.nomor_akhir?r.nomor_awal+' → '+r.nomor_akhir:''}]
+      items:[{name:r.barang?.nama_barang||'-',unit:r.barang?.satuan||'',qty:r.jumlah,
+        price:Number(r.harga_satuan)||0,total:(Number(r.jumlah)||0)*(Number(r.harga_satuan)||0),
+        keterangan:r.keterangan||'',serial:r.nomor_awal&&r.nomor_akhir?r.nomor_awal+' → '+r.nomor_akhir:''}]
     })),
-    ...(keluar||[]).filter(r=>(r.status||'AKTIF')==='AKTIF').map(r=>({
+    ...(keluar||[]).map(r=>({
       type:'KELUAR',date:r.tanggal_keluar,id:r.id,party:r.penerima_nama||'-',
       target:r.tujuan_ruangan||'-',doc:r.jenis_dokumen||'Nota Dinas',status:r.status||'AKTIF',
       items:(r.detail_barang_keluar||[]).map(d=>({
@@ -1130,35 +1135,190 @@ async function riwayatPage(){
         serial:'Sistem '+(r.stok_sistem??0)+' → Fisik '+(r.stok_fisik??0)+' (Selisih '+(r.selisih??0)+')'}]
     }))
   ].sort((a,b)=>String(b.date).localeCompare(String(a.date))||Number(b.id)-Number(a.id));
-  const key=(type,id)=>type+'_'+id;
-  window.__sipbHistory=Object.fromEntries(rows.map(r=>[key(r.type,r.id),r]));
+  window.__sipbHistory=Object.fromEntries(rows.map(r=>[r.type+'_'+r.id,r]));
+  window.__sipbAudit=audit||[];
+
   const tableRows=rows.map(r=>{
+    const canCorrect=profile?.role==='admin'&&r.status==='AKTIF'&&(r.type==='MASUK'||r.type==='KELUAR');
+    const correctionAction=canCorrect
+      ?'<button class="btn-sm history-correct" data-type="'+r.type+'" data-id="'+r.id+'">Koreksi</button>':'';
     const cancelAction=profile?.role==='admin'&&r.type==='KELUAR'&&r.status==='AKTIF'
-      ? '<button class="btn-sm danger history-cancel" data-id="'+r.id+'">Batalkan</button>'
-      : '';
-    const printAction=r.type==='KELUAR'
-      ? '<button class="btn-sm sipb-inline-print" data-id="'+r.id+'">Cetak</button>'
-      : '';
+      ?'<button class="btn-sm danger history-cancel" data-id="'+r.id+'">Batalkan</button>':'';
+    const printAction=r.type==='KELUAR'&&r.status==='AKTIF'
+      ?'<button class="btn-sm sipb-inline-print" data-id="'+r.id+'">Cetak</button>':'';
     return '<tr data-type="'+r.type+'" data-search="'+esc([r.date,r.party,r.target,r.doc,r.status,r.items.map(i=>[i.name,i.keterangan].filter(Boolean).join(' ')).join(' ')].join(' ').toLowerCase())+'">'+
       '<td><span class="badge-soft '+(r.type==='MASUK'?'success':'')+'">'+r.type+'</span></td>'+
       '<td>'+fmtDate(r.date)+'</td><td>#'+r.id+'</td><td><strong>'+esc(r.party)+'</strong></td>'+
       '<td>'+esc(r.target)+'</td><td>'+esc(r.doc)+'</td><td>'+r.items.length+'</td>'+
       '<td><span class="badge-soft '+(r.status==='AKTIF'?'success':'')+'">'+r.status+'</span></td>'+
-      '<td><div class="actions"><button class="btn-sm history-detail" data-key="'+key(r.type,r.id)+'">Detail</button>'+
-      cancelAction+printAction+'</div></td></tr>';
+      '<td><div class="actions"><button class="btn-sm history-detail" data-key="'+r.type+'_'+r.id+'">Detail</button>'+
+      correctionAction+cancelAction+printAction+'</div></td></tr>';
   }).join('');
-  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">AUDIT PERSEDIAAN</span><h2>Riwayat Transaksi</h2><p>Gabungan penerimaan dan pengeluaran barang, termasuk keterangan item dan nomor seri Kuasi.</p></div><span class="status-pill">'+rows.length+' transaksi</span></div>'+
+
+  const auditRows=(audit||[]).map(a=>{
+    const label=a.entity_type==='BARANG_MASUK'?'Barang Masuk':a.entity_type==='BARANG_KELUAR'?'Barang Keluar':'Master Barang';
+    const action=a.action==='PEMBATALAN'?'Pembatalan':a.action==='PERUBAHAN_MASTER'?'Perubahan Master':'Koreksi';
+    return '<tr data-search="'+esc([label,action,a.entity_id,a.new_entity_id,a.reason,a.actor_name].join(' ').toLowerCase())+'">'+
+      '<td>'+new Date(a.created_at).toLocaleString('id-ID')+'</td><td>'+esc(label)+'</td>'+
+      '<td>#'+a.entity_id+(a.new_entity_id?' → #'+a.new_entity_id:'')+'</td>'+
+      '<td><span class="badge-soft">'+esc(action)+'</span></td><td>'+esc(a.reason)+'</td>'+
+      '<td>'+esc(a.actor_name||'-')+'</td>'+
+      '<td><button class="btn-sm audit-detail" data-id="'+a.id+'">Data Lama/Baru</button></td></tr>';
+  }).join('');
+
+  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">AUDIT PERSEDIAAN</span><h2>Riwayat Transaksi</h2><p>Koreksi dan pembatalan tersimpan dengan data sebelum/sesudah, alasan, petugas, dan waktu.</p></div><span class="status-pill">'+rows.length+' transaksi</span></div>'+
     '<div class="filter-bar"><div class="search-box">⌕<input id="historySearch" placeholder="Cari tanggal, penerima, barang, atau tujuan..."></div>'+
     '<select id="historyType"><option value="">Semua transaksi</option><option value="MASUK">Barang Masuk</option><option value="KELUAR">Barang Keluar</option><option value="OPNAME">Stock Opname</option></select></div>'+
     '<div class="table-wrap"><table id="historyTable"><thead><tr><th>Jenis</th><th>Tanggal</th><th>No.</th><th>Pihak</th><th>Tujuan/Penerima</th><th>Dokumen</th><th>Item</th><th>Status</th><th>Aksi</th></tr></thead>'+
-    '<tbody>'+tableRows+(tableRows?'':emptyRow(9))+'</tbody></table></div></section>';
+    '<tbody>'+tableRows+(tableRows?'':emptyRow(9))+'</tbody></table></div></section>'+
+    '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">JEJAK PERUBAHAN</span><h2>Riwayat Koreksi & Pembatalan</h2><p>100 perubahan terakhir. Data lama dan data baru dapat dibuka untuk pemeriksaan.</p></div><span class="status-pill">'+(audit||[]).length+' catatan</span></div>'+
+    '<div class="table-wrap"><table id="auditTable"><thead><tr><th>Waktu</th><th>Jenis Data</th><th>Nomor Transaksi</th><th>Tindakan</th><th>Alasan</th><th>Petugas</th><th>Aksi</th></tr></thead>'+
+    '<tbody>'+(auditRows||emptyRow(7))+'</tbody></table></div></section>';
 }
+
 function showHistoryDetail(k){
   const r=window.__sipbHistory?.[k];if(!r)return;
   const box=document.createElement('div');box.className='modal-backdrop';
-  box.innerHTML=`<div class="modal-card"><div class="modal-head"><div><span class="eyebrow">${r.type==='MASUK'?'PENERIMAAN':r.type==='OPNAME'?'STOCK OPNAME':'PENGELUARAN'}</span><h2>Detail Transaksi #${r.id}</h2></div><button class="modal-close" aria-label="Tutup">×</button></div><div class="detail-grid"><div><small>Tanggal</small><strong>${fmtDate(r.date)}</strong></div><div><small>Pihak</small><strong>${esc(r.party)}</strong></div><div><small>Tujuan/Penerima</small><strong>${esc(r.target)}</strong></div><div><small>Status</small><strong><span class="badge-soft ${r.status==='AKTIF'?'success':''}">${r.status}</span></strong></div></div><div class="table-wrap"><table><thead><tr><th>Barang</th><th>Keterangan</th><th>Satuan</th><th>Jumlah</th><th>Nomor Seri</th></tr></thead><tbody>${r.items.map(i=>'<tr><td><strong>'+esc(i.name)+'</strong></td><td>'+esc(i.keterangan||'-')+'</td><td>'+esc(i.unit||'-')+'</td><td>'+i.qty+'</td><td>'+esc(i.serial||'-')+'</td></tr>').join('')}</tbody></table></div></div>`;
-  document.body.appendChild(box);enhanceTables(box);const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.onclick=e=>{if(e.target===box)close()};
+  box.innerHTML='<div class="modal-card"><div class="modal-head"><div><span class="eyebrow">'+(r.type==='MASUK'?'PENERIMAAN':r.type==='OPNAME'?'STOCK OPNAME':'PENGELUARAN')+'</span><h2>Detail Transaksi #'+r.id+'</h2></div><button class="modal-close" aria-label="Tutup">×</button></div>'+
+    '<div class="detail-grid"><div><small>Tanggal</small><strong>'+fmtDate(r.date)+'</strong></div><div><small>Pihak</small><strong>'+esc(r.party)+'</strong></div><div><small>Tujuan/Penerima</small><strong>'+esc(r.target)+'</strong></div><div><small>Status</small><strong><span class="badge-soft '+(r.status==='AKTIF'?'success':'')+'">'+r.status+'</span></strong></div></div>'+
+    '<div class="table-wrap"><table><thead><tr><th>Barang</th><th>Keterangan</th><th>Satuan</th><th>Jumlah</th><th>Harga Satuan</th><th>Nilai</th><th>Nomor Seri</th></tr></thead><tbody>'+
+    r.items.map(i=>'<tr><td><strong>'+esc(i.name)+'</strong></td><td>'+esc(i.keterangan||'-')+'</td><td>'+esc(i.unit||'-')+'</td><td>'+i.qty+'</td><td>'+(i.price?rupiah(i.price):'-')+'</td><td>'+(i.total?rupiah(i.total):'-')+'</td><td>'+esc(i.serial||'-')+'</td></tr>').join('')+
+    '</tbody></table></div></div>';
+  document.body.appendChild(box);enhanceTables(box);
+  const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.onclick=e=>{if(e.target===box)close()};
 }
+
+function showAuditDetail(id){
+  const a=(window.__sipbAudit||[]).find(x=>Number(x.id)===Number(id));if(!a)return;
+  const box=document.createElement('div');box.className='modal-backdrop';
+  const pretty=x=>esc(JSON.stringify(x||{},null,2));
+  box.innerHTML='<div class="modal-card"><div class="modal-head"><div><span class="eyebrow">AUDIT SIPB · '+esc(a.entity_type)+'</span><h2>Catatan #'+a.id+'</h2></div><button class="modal-close" aria-label="Tutup">×</button></div>'+
+    '<div class="detail-grid"><div><small>Tindakan</small><strong>'+esc(a.action)+'</strong></div><div><small>Nomor Data</small><strong>#'+a.entity_id+(a.new_entity_id?' → #'+a.new_entity_id:'')+'</strong></div><div><small>Petugas</small><strong>'+esc(a.actor_name||'-')+'</strong></div><div><small>Waktu</small><strong>'+new Date(a.created_at).toLocaleString('id-ID')+'</strong></div></div>'+
+    '<p><strong>Alasan:</strong> '+esc(a.reason)+'</p><h3>Data Sebelum</h3><pre class="audit-json">'+pretty(a.old_data)+'</pre><h3>Data Sesudah</h3><pre class="audit-json">'+pretty(a.new_data)+'</pre></div>';
+  document.body.appendChild(box);
+  const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.onclick=e=>{if(e.target===box)close()};
+}
+
+async function showCorrectionModal(type,id){
+  if(profile?.role!=='admin')return toast('Hanya admin yang dapat mengoreksi transaksi.','error');
+  if(type==='MASUK'){
+    const [{data:r,error},{data:items,error:ie}]=await Promise.all([
+      client.from('barang_masuk').select('*,barang:barang_id(id,nama_barang,satuan,kode_barang,is_archived,kategori:kategori_id(nama_kategori))').eq('id',id).single(),
+      client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,is_archived,kategori:kategori_id(nama_kategori)').eq('is_archived',false).order('nama_barang')
+    ]);
+    if(error||ie)throw(error||ie);
+    if(!r||!r.barang)throw new Error('Data penerimaan atau Master Barang tidak ditemukan.');
+    if(r.barang.is_archived)throw new Error('Master Barang sudah diarsipkan. Pulihkan barang terlebih dahulu.');
+    const category=String(r.barang.kategori?.nama_kategori||'').toLowerCase();
+    if(category.includes('kuasi')||r.nomor_dus||r.nomor_awal||r.nomor_akhir)
+      throw new Error('Transaksi Kuasi/nomor seri belum dapat dikoreksi melalui formulir umum. Nomor seri harus diperiksa dengan prosedur batch khusus.');
+    const options=(items||[]).map(x=>'<option value="'+x.id+'" '+(Number(x.id)===Number(r.barang_id)?'selected':'')+'>'+esc(x.kode_barang||'Tanpa kode')+' — '+esc(x.nama_barang)+' · '+esc(x.keterangan||x.satuan||'')+'</option>').join('');
+    const sourceOptions=['APBD','APBN','Lainnya','Saldo Awal','Bertambah',r.sumber_dana].filter((v,i,a)=>v&&a.indexOf(v)===i).map(v=>'<option '+(v===r.sumber_dana?'selected':'')+'>'+esc(v)+'</option>').join('');
+    const box=document.createElement('div');box.className='modal-backdrop';
+    box.innerHTML='<div class="modal-card"><div class="modal-head"><div><span class="eyebrow">KOREKSI PENERIMAAN</span><h2>Barang Masuk #'+r.id+'</h2><p>Perubahan stok dan nilai akan disimpan dalam satu proses.</p></div><button class="modal-close" aria-label="Tutup">×</button></div>'+
+      '<form id="correctionMasukForm"><div class="form-grid correction-form-grid">'+
+      '<label>Master Barang <select id="cm_barang" required>'+options+'</select></label>'+
+      '<label>Tanggal Masuk <input id="cm_tanggal" type="date" value="'+esc(r.tanggal_masuk||'')+'" required></label>'+
+      '<label>Jumlah <input id="cm_jumlah" type="text" inputmode="numeric" data-number-format="integer" value="'+formatAngka(r.jumlah||0)+'" required></label>'+
+      '<label>Harga Satuan <input id="cm_harga" type="text" inputmode="numeric" data-number-format="integer" value="'+formatAngka(r.harga_satuan||0)+'" required></label>'+
+      '<label>Sumber Dana <select id="cm_sumber">'+sourceOptions+'</select></label>'+
+      '<label>Nama Penyerah <input id="cm_penyerah" value="'+esc(r.nama_penyerah||'')+'" required></label>'+
+      '<label>Nama Penerima <input id="cm_penerima" value="'+esc(r.nama_penerima||'')+'" required></label>'+
+      '<label class="field-wide">Keterangan <textarea id="cm_keterangan" rows="2" maxlength="500">'+esc(r.keterangan||'')+'</textarea></label>'+
+      '<div class="field-wide correction-total"><span>Nilai penerimaan baru</span><strong id="cm_total">'+rupiah((Number(r.jumlah)||0)*(Number(r.harga_satuan)||0))+'</strong></div>'+
+      '<label class="field-wide">Alasan Koreksi <textarea id="cm_alasan" rows="3" minlength="8" maxlength="500" required placeholder="Contoh: Kesalahan input jumlah dan harga pada dokumen penerimaan."></textarea><small class="field-hint">Wajib diisi minimal 8 karakter. Data sebelum koreksi tetap disimpan.</small></label>'+
+      '</div><div class="form-actions"><button class="primary" id="cm_save" type="submit">Simpan Koreksi</button><button class="ghost cm_cancel" type="button">Batal</button></div></form></div>';
+    document.body.appendChild(box);
+    const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.querySelector('.cm_cancel').onclick=close;box.onclick=e=>{if(e.target===box)close()};
+    const updateTotal=()=>{$('cm_total').textContent=rupiah(parseAngka($('cm_jumlah').value)*parseAngka($('cm_harga').value))};
+    $('cm_jumlah').addEventListener('input',updateTotal);$('cm_harga').addEventListener('input',updateTotal);
+    box.querySelectorAll('[data-number-format]').forEach(el=>el.addEventListener('blur',()=>{el.value=formatAngka(parseAngka(el.value));updateTotal()}));
+    $('correctionMasukForm').onsubmit=async e=>{
+      e.preventDefault();
+      const jumlah=parseAngka($('cm_jumlah').value),harga=parseAngka($('cm_harga').value),alasan=$('cm_alasan').value.trim();
+      if(!Number.isInteger(jumlah)||jumlah<1)return toast('Jumlah harus bilangan bulat positif.','error');
+      if(!Number.isFinite(harga)||harga<0)return toast('Harga satuan tidak valid.','error');
+      if(alasan.length<8)return toast('Alasan koreksi wajib diisi minimal 8 karakter.','error');
+      const btn=$('cm_save');btn.disabled=true;btn.textContent='Menyimpan...';
+      try{
+        const result=await client.rpc('correct_barang_masuk',{
+          p_barang_masuk_id:Number(id),p_barang_id:Number($('cm_barang').value),
+          p_jumlah:jumlah,p_harga_satuan:harga,p_sumber_dana:$('cm_sumber').value,
+          p_tanggal:$('cm_tanggal').value,p_nama_penyerah:$('cm_penyerah').value.trim(),
+          p_nama_penerima:$('cm_penerima').value.trim(),p_keterangan:$('cm_keterangan').value.trim()||null,
+          p_alasan:alasan
+        });
+        if(result.error)throw result.error;
+        close();toast('Barang Masuk #'+id+' berhasil dikoreksi. Saldo stok dan harga referensi diperbarui.');
+        renderApp('riwayat');
+      }catch(err){btn.disabled=false;btn.textContent='Simpan Koreksi';fail(err)}
+    };
+    return;
+  }
+
+  if(type==='KELUAR'){
+    const [{data:tx,error},{data:items,error:ie}]=await Promise.all([
+      client.from('transaksi_keluar').select('*,detail_barang_keluar(id,barang_id,jumlah,barang:barang_id(id,nama_barang,satuan,is_archived,kategori:kategori_id(nama_kategori)))').eq('id',id).single(),
+      client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,is_archived,kategori:kategori_id(nama_kategori)').eq('is_archived',false).order('nama_barang')
+    ]);
+    if(error||ie)throw(error||ie);
+    if(!tx||tx.status!=='AKTIF')throw new Error('Hanya transaksi Barang Keluar aktif yang dapat dikoreksi.');
+    if((tx.detail_barang_keluar||[]).some(d=>d.barang?.is_archived))throw new Error('Transaksi memakai Master Barang yang sudah diarsipkan. Pulihkan barang terlebih dahulu.');
+    const optionMarkup=(selected)=>'<option value="">- Pilih barang -</option>'+(items||[]).map(x=>'<option value="'+x.id+'" '+(Number(x.id)===Number(selected)?'selected':'')+'>'+esc(x.kode_barang||'Tanpa kode')+' — '+esc(x.nama_barang)+' · stok '+x.sisa+' '+esc(x.satuan||'')+'</option>').join('');
+    const makeRow=(selected,qty)=>'<div class="correction-item-row"><select class="ce_barang" required>'+optionMarkup(selected)+'</select><input class="ce_jumlah" type="text" inputmode="numeric" data-number-format="integer" value="'+formatAngka(qty||1)+'" required><button class="btn-sm danger ce_remove" type="button" title="Hapus item">×</button></div>';
+    const box=document.createElement('div');box.className='modal-backdrop';
+    box.innerHTML='<div class="modal-card"><div class="modal-head"><div><span class="eyebrow">KOREKSI DISTRIBUSI</span><h2>Barang Keluar #'+tx.id+'</h2><p>Transaksi lama akan berstatus dibatalkan dan sistem membuat transaksi pengganti secara atomik.</p></div><button class="modal-close" aria-label="Tutup">×</button></div>'+
+      '<form id="correctionKeluarForm"><div class="form-grid correction-form-grid">'+
+      '<label>Tanggal Keluar <input id="ce_tanggal" type="date" value="'+esc(tx.tanggal_keluar||'')+'" required></label>'+
+      '<label>Penyerah <input id="ce_penyerah" value="'+esc(tx.penyerah_nama||'')+'" required></label>'+
+      '<label>Jabatan Penyerah <input id="ce_penyerah_jabatan" value="'+esc(tx.penyerah_jabatan||'')+'"></label>'+
+      '<label>NIP Penyerah <input id="ce_penyerah_nip" value="'+esc(tx.penyerah_nip||'')+'"></label>'+
+      '<label>Penerima <input id="ce_penerima" value="'+esc(tx.penerima_nama||'')+'" required></label>'+
+      '<label>Jabatan Penerima <input id="ce_penerima_jabatan" value="'+esc(tx.penerima_jabatan||'')+'"></label>'+
+      '<label>NIP Penerima <input id="ce_penerima_nip" value="'+esc(tx.penerima_nip||'')+'"></label>'+
+      '<label>Tujuan / Ruangan <input id="ce_tujuan" value="'+esc(tx.tujuan_ruangan||'')+'" required></label>'+
+      '<label>Jenis Dokumen <select id="ce_dokumen"><option '+(tx.jenis_dokumen==='Nota Dinas'?'selected':'')+'>Nota Dinas</option><option '+(tx.jenis_dokumen==='BAST'?'selected':'')+'>BAST</option><option '+(tx.jenis_dokumen==='Lainnya'?'selected':'')+'>Lainnya</option></select></label>'+
+      '</div><div class="section-head compact"><div><h3>Barang yang dikeluarkan</h3><p>Periksa kembali item dan jumlah sebelum menyimpan koreksi.</p></div><button class="ghost" id="ce_add" type="button">＋ Tambah Item</button></div>'+
+      '<div id="ce_items" class="correction-items">'+(tx.detail_barang_keluar||[]).map(d=>makeRow(d.barang_id,d.jumlah)).join('')+'</div>'+
+      '<label class="field-wide">Alasan Koreksi <textarea id="ce_alasan" rows="3" minlength="8" maxlength="500" required placeholder="Contoh: Penerima dan jumlah pada transaksi sebelumnya tidak sesuai Nota Dinas."></textarea><small class="field-hint">Transaksi lama tetap tersimpan sebagai DIBATALKAN. Nomor transaksi pengganti akan dibuat otomatis.</small></label>'+
+      '<div class="form-actions"><button class="primary" id="ce_save" type="submit">Simpan Koreksi & Buat Transaksi Pengganti</button><button class="ghost ce_cancel" type="button">Batal</button></div></form></div>';
+    document.body.appendChild(box);
+    const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.querySelector('.ce_cancel').onclick=close;box.onclick=e=>{if(e.target===box)close()};
+    const rowsBox=$('ce_items');
+    $('ce_add').onclick=()=>rowsBox.insertAdjacentHTML('beforeend',makeRow('',1));
+    rowsBox.addEventListener('click',e=>{const btn=e.target.closest('.ce_remove');if(btn){if(rowsBox.querySelectorAll('.correction-item-row').length<=1)return toast('Minimal satu barang harus ada.','error');btn.closest('.correction-item-row').remove()}});
+    rowsBox.addEventListener('focusout',e=>{if(e.target.classList.contains('ce_jumlah'))e.target.value=formatAngka(parseAngka(e.target.value))});
+    $('correctionKeluarForm').onsubmit=async e=>{
+      e.preventDefault();
+      const p_items=[...rowsBox.querySelectorAll('.correction-item-row')].map(row=>({
+        barang_id:Number(row.querySelector('.ce_barang').value),
+        jumlah:parseAngka(row.querySelector('.ce_jumlah').value)
+      }));
+      if(!p_items.length||p_items.some(x=>!Number.isInteger(x.barang_id)||x.barang_id<1||!Number.isInteger(x.jumlah)||x.jumlah<1))
+        return toast('Setiap barang dan jumlah harus diisi dengan benar.','error');
+      const alasan=$('ce_alasan').value.trim();
+      if(alasan.length<8)return toast('Alasan koreksi wajib diisi minimal 8 karakter.','error');
+      const btn=$('ce_save');btn.disabled=true;btn.textContent='Memproses koreksi...';
+      try{
+        const result=await client.rpc('correct_barang_keluar',{
+          p_transaksi_id:Number(id),p_tanggal:$('ce_tanggal').value,
+          p_penyerah_nama:$('ce_penyerah').value.trim(),
+          p_penyerah_jabatan:$('ce_penyerah_jabatan').value.trim()||null,
+          p_penyerah_nip:$('ce_penyerah_nip').value.trim()||null,
+          p_penerima_nama:$('ce_penerima').value.trim(),
+          p_penerima_jabatan:$('ce_penerima_jabatan').value.trim()||null,
+          p_penerima_nip:$('ce_penerima_nip').value.trim()||null,
+          p_tujuan_ruangan:$('ce_tujuan').value.trim(),
+          p_jenis_dokumen:$('ce_dokumen').value,p_items, p_alasan:alasan
+        });
+        if(result.error)throw result.error;
+        close();toast('Koreksi berhasil. Transaksi lama #'+id+' dibatalkan; transaksi pengganti #'+result.data.new_id+' dibuat.');
+        renderApp('riwayat');
+      }catch(err){btn.disabled=false;btn.textContent='Simpan Koreksi & Buat Transaksi Pengganti';fail(err)}
+    };
+  }
+}
+
 const menu=[['dashboard','Dashboard'],['barang_masuk','Barang Masuk'],['barang_keluar','Barang Keluar'],['stock_opname','Stock Opname'],['barang','Master Barang'],['kategori','Kategori'],['pegawai','Pegawai'],['kartu','Kartu Persediaan'],['kuasi','Stok Kuasi'],['riwayat','Riwayat Transaksi'],['laporan','Laporan Persediaan'],['backup','Backup & Restore'],['pengguna','Kelola Pengguna']];
 const topNavItems=[
   ['dashboard','Dashboard','dashboard'],
@@ -1374,27 +1534,39 @@ function bind(page){
     });
   }
   if(page==='riwayat'){
-    const apply=()=>{const q=$('historySearch').value.toLowerCase().trim(),t=$('historyType').value;document.querySelectorAll('#historyTable tbody tr[data-search]').forEach(r=>{r.style.display=(!q||r.dataset.search.includes(q))&&(!t||r.dataset.type===t)?'':'none'})};
+    const apply=()=>{
+      const q=$('historySearch').value.toLowerCase().trim(),t=$('historyType').value;
+      document.querySelectorAll('#historyTable tbody tr[data-search]').forEach(r=>{
+        r.style.display=(!q||r.dataset.search.includes(q))&&(!t||r.dataset.type===t)?'':'none';
+      });
+    };
     $('historySearch').oninput=apply;$('historyType').onchange=apply;
-    const historyTable=$('historyTable');
-    if(historyTable){
-      historyTable.onclick=e=>{
-        const detail=e.target.closest('.history-detail');
-        if(!detail)return;
-        e.preventDefault();
-        e.stopPropagation();
-        showHistoryDetail(detail.dataset.key);
-      };
-    }
+    $('historyTable').onclick=async e=>{
+      const detail=e.target.closest('.history-detail');
+      const correction=e.target.closest('.history-correct');
+      if(detail){e.preventDefault();e.stopPropagation();showHistoryDetail(detail.dataset.key);return}
+      if(correction){
+        e.preventDefault();e.stopPropagation();correction.disabled=true;
+        try{await showCorrectionModal(correction.dataset.type,Number(correction.dataset.id))}
+        catch(err){fail(err)}
+        finally{correction.disabled=false}
+      }
+    };
+    $('auditTable').onclick=e=>{
+      const btn=e.target.closest('.audit-detail');if(!btn)return;
+      e.preventDefault();e.stopPropagation();showAuditDetail(Number(btn.dataset.id));
+    };
     document.querySelectorAll('.history-cancel').forEach(btn=>btn.onclick=async()=>{
-      const id=Number(btn.dataset.id); if(!id)return;
-      if(!(await sipbConfirm('Batalkan transaksi barang keluar #'+id+'? Stok akan dikembalikan dan riwayat transaksi ini akan dihapus permanen dalam satu proses.')))return;
+      const id=Number(btn.dataset.id);if(!id)return;
+      const reason=await sipbPrompt('Alasan pembatalan transaksi Barang Keluar #'+id+':');
+      if(!reason||reason.trim().length<8)return toast('Alasan pembatalan wajib diisi minimal 8 karakter.','error');
+      if(!(await sipbConfirm('Batalkan transaksi #'+id+'? Stok akan dikembalikan, transaksi tetap disimpan dengan status DIBATALKAN, dan alasan masuk ke audit.')))return;
       btn.disabled=true;btn.textContent='Memproses...';
       try{
-        await cancelAndDeleteOutgoing(id);
-        toast('Transaksi #'+id+' dibatalkan dan dihapus. Stok telah dikembalikan.');
+        await cancelOutgoing(id,reason);
+        toast('Transaksi #'+id+' dibatalkan. Stok telah dipulihkan dan riwayat tetap tersimpan.');
         renderApp('riwayat');
-      }catch(e){btn.disabled=false;btn.textContent='Batalkan';fail(e)}
+      }catch(err){btn.disabled=false;btn.textContent='Batalkan';fail(err)}
     });
   }
   if(page==='barang'){
