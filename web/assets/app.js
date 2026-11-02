@@ -319,7 +319,21 @@ function showLogin(message=''){
     }});
 }
 
-async function loadProfile(){const {data,error}=await client.from('user_profiles').select('*').eq('id',session.user.id).maybeSingle();if(error)throw error;profile=data||{nama_lengkap:session.user.email,role:'user',is_active:true};if(profile.is_active===false){await client.auth.signOut();throw new Error('Akun tidak aktif.')}}
+async function loadProfile(){
+  const active=await client.rpc('sipb_is_active_user');
+  if(active.error)throw active.error;
+  if(active.data!==true){
+    await client.auth.signOut();
+    throw new Error('Akun SIPB tidak aktif atau tidak memiliki akses.');
+  }
+  const {data,error}=await client.from('user_profiles').select('*').eq('id',session.user.id).maybeSingle();
+  if(error)throw error;
+  if(!data||data.is_active!==true){
+    await client.auth.signOut();
+    throw new Error('Profil akun SIPB tidak ditemukan atau tidak aktif.');
+  }
+  profile=data;
+}
 async function count(t){const {count,error}=await client.from(t).select('*',{count:'exact',head:true});if(error)throw error;return count||0}
 async function dashboard(){
   const now=new Date();
