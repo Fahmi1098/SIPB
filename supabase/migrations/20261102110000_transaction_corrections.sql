@@ -126,8 +126,8 @@ BEGIN
     RAISE EXCEPTION 'Tanggal, penyerah, dan penerima wajib diisi';
   END IF;
   IF length(COALESCE(p_keterangan,'')) > 500
-     OR length(COALESCE(p_alasan,'')) < 8
-     OR length(COALESCE(p_alasan,'')) > 500 THEN
+     OR length(COALESCE(trim(p_alasan),'')) < 8
+     OR length(COALESCE(trim(p_alasan),'')) > 500 THEN
     RAISE EXCEPTION 'Keterangan maksimal 500 karakter dan alasan koreksi minimal 8 karakter';
   END IF;
 
@@ -317,7 +317,7 @@ BEGIN
     RAISE EXCEPTION 'Hanya admin aktif yang dapat membatalkan Barang Keluar';
   END IF;
   IF length(COALESCE(trim(p_alasan),'')) < 8
-     OR length(COALESCE(p_alasan,'')) > 500 THEN
+     OR length(COALESCE(trim(p_alasan),'')) > 500 THEN
     RAISE EXCEPTION 'Alasan pembatalan wajib diisi minimal 8 karakter';
   END IF;
 
@@ -407,7 +407,7 @@ BEGIN
     RAISE EXCEPTION 'Hanya admin aktif yang dapat mengoreksi Barang Keluar';
   END IF;
   IF length(COALESCE(trim(p_alasan),'')) < 8
-     OR length(COALESCE(p_alasan,'')) > 500 THEN
+     OR length(COALESCE(trim(p_alasan),'')) > 500 THEN
     RAISE EXCEPTION 'Alasan koreksi wajib diisi minimal 8 karakter';
   END IF;
 

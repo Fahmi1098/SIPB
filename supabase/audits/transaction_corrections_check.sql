@@ -51,4 +51,4 @@ WHERE schemaname = 'public'
   AND tablename = 'sipb_transaction_audit'
 ORDER BY policyname;
 
--- Expected: sipb_active_transaction_audit_read for SELECT only.
+-- Expected: sipb_active_transaction_audit_read for SELECT only; qual must require both sipb_is_active_user() and sipb_is_admin().
