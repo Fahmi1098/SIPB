@@ -267,6 +267,11 @@ $$;
 REVOKE ALL ON FUNCTION public.set_barang_archived(integer, boolean) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.set_barang_archived(integer, boolean) TO authenticated;
 
+-- The old RPC permanently deleted a Master Barang row and could cascade away
+-- receipt history. Physical deletion is disabled; use set_barang_archived().
+REVOKE ALL ON FUNCTION public.delete_barang_if_no_outgoing(integer)
+FROM PUBLIC, anon, authenticated;
+
 -- Prevent future stock movements from changing an archived item even if an
 -- authenticated caller invokes a transaction RPC manually.
 CREATE OR REPLACE FUNCTION public.guard_archived_barang_stock_change()
