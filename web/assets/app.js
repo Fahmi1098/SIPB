@@ -1420,6 +1420,7 @@ function bind(page){
         if(ok)shown++;
       });
       $('barangCount').textContent=shown+' data';
+      $('barangTable').refreshPagination?.();
     };
     $('barangSearch').oninput=apply;
     $('barangFilter').onchange=apply;
