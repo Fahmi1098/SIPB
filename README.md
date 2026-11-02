@@ -17,7 +17,9 @@ Aplikasi pengelolaan persediaan barang UPTD PPD Malingping, Pemerintah Provinsi 
 3. Terapkan hanya migrasi baru yang belum diterapkan, secara berurutan:
    - `supabase/migrations/20261102090000_security_integrity_followup.sql`
    - `supabase/migrations/20261102110000_transaction_corrections.sql`
+   - `supabase/migrations/20261102120000_fix_cancel_definer_permissions.sql`
 4. Deploy ulang Edge Function `login-user` setelah perubahan branch digabungkan.
+   Jika migrasi koreksi transaksi sudah pernah diterapkan sebelum patch hak EXECUTE ini tersedia, jalankan migrasi `20261102120000_fix_cancel_definer_permissions.sql` satu kali; jangan ulangi migrasi pembersihan data.
 5. Jalankan kueri read-only `supabase/audits/security_integrity_followup_check.sql` dan `supabase/audits/transaction_corrections_check.sql`.
 6. Uji login, pembuatan penerimaan/pengeluaran, koreksi dan pembatalan, arsip Master Barang, import, serta backup/restore dengan data uji terlebih dahulu.
 
