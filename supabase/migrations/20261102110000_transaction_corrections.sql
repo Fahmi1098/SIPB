@@ -183,7 +183,7 @@ BEGIN
      OR v_receipt.nomor_akhir IS NOT NULL
      OR EXISTS (
        SELECT 1 FROM public.stok_kuasi
-       WHERE barang_id = v_receipt.barang_id
+       WHERE barang_id IN (v_receipt.barang_id, p_barang_id)
      ) THEN
     RAISE EXCEPTION
       'Koreksi umum belum diizinkan untuk transaksi Kuasi/nomor seri. Gunakan prosedur koreksi batch Kuasi khusus agar nomor seri tidak tertukar.';
@@ -227,13 +227,13 @@ BEGIN
     END IF;
 
     UPDATE public.barang
-    SET jumlah_total = jumlah_total - v_receipt.jumlah,
-        sisa = sisa - v_receipt.jumlah
+    SET jumlah_total = COALESCE(jumlah_total,0) - v_receipt.jumlah,
+        sisa = COALESCE(sisa,0) - v_receipt.jumlah
     WHERE id = v_receipt.barang_id;
 
     UPDATE public.barang
-    SET jumlah_total = jumlah_total + p_jumlah,
-        sisa = sisa + p_jumlah
+    SET jumlah_total = COALESCE(jumlah_total,0) + p_jumlah,
+        sisa = COALESCE(sisa,0) + p_jumlah
     WHERE id = p_barang_id;
   END IF;
 

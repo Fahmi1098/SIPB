@@ -1139,7 +1139,7 @@ async function riwayatPage(){
   window.__sipbAudit=audit||[];
 
   const tableRows=rows.map(r=>{
-    const canCorrect=profile?.role==='admin'&&r.status==='AKTIF'&&(r.type==='MASUK'||r.type==='KELUAR');
+    const canCorrect=profile?.role==='admin'&&r.status==='AKTIF'&&(r.type==='KELUAR'||(r.type==='MASUK'&&!r.items.some(i=>i.serial)));
     const correctionAction=canCorrect
       ?'<button class="btn-sm history-correct" data-type="'+r.type+'" data-id="'+r.id+'">Koreksi</button>':'';
     const cancelAction=profile?.role==='admin'&&r.type==='KELUAR'&&r.status==='AKTIF'
