@@ -38,3 +38,14 @@ Aplikasi pengelolaan persediaan barang UPTD PPD Malingping, Pemerintah Provinsi 
 GitHub Actions memeriksa sintaks `web/assets/app.js` pada pull request dan menerbitkan folder `web/` ke GitHub Pages setelah perubahan masuk ke `main`.
 
 File `web/config.js` hanya berisi URL proyek Supabase dan public/anon key. Jangan pernah menyimpan `service_role` key atau kredensial server di file web, repository, atau browser.
+
+
+## FIFO dan Harga Pokok Persediaan
+
+Migrasi `supabase/migrations/20261102140000_fifo_cost_layers.sql` menambahkan lapisan penerimaan untuk barang umum (non-Kuasi). Harga setiap penerimaan tetap tersimpan pada lapisannya sendiri. Barang Keluar mengambil lapisan tertua berdasarkan tanggal penerimaan lalu ID, dan pembatalan mengembalikan kuantitas ke lapisan asal.
+
+Migrasi membangun ulang alokasi historis berdasarkan penerimaan, Barang Keluar aktif, dan Stock Opname. Stok historis yang tidak memiliki bukti penerimaan lengkap atau penyesuaian opname positif diberi penanda harga **estimasi**; lapisan tersebut tidak diklaim sebagai harga pembelian yang pasti. Total kuantitas lapisan direkonsiliasi dengan saldo Master Barang saat migrasi tanpa mengubah saldo tersebut.
+
+Sebelum penerapan, buat backup. Jalankan migrasi FIFO satu kali setelah migrasi keamanan dan koreksi transaksi. Jangan menghapus penerimaan yang sudah mempunyai jejak alokasi FIFO. Koreksi jumlah/harga penerimaan akan memperbarui lapisan dan harga pokok terkait; perubahan tanggal yang membuat urutan FIFO historis tidak valid akan ditolak. Backup/Restore yang memakai fungsi aplikasi akan membangun ulang lapisan FIFO setelah data dipulihkan.
+
+Kartu Persediaan menampilkan sisa per lapisan, harga satuan, nilai sisa, nilai pokok pengeluaran, dan penanda estimasi. Barang Kuasi tetap menggunakan mekanisme batch/nomor seri yang sudah ada.
