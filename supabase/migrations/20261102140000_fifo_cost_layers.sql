@@ -347,6 +347,27 @@ BEGIN
   IF used_qty>NEW.jumlah THEN
     RAISE EXCEPTION 'Jumlah penerimaan #% tidak boleh di bawah alokasi FIFO aktif (%)',NEW.id,used_qty;
   END IF;
+  IF TG_OP='UPDATE'
+     AND (OLD.tanggal_masuk IS DISTINCT FROM NEW.tanggal_masuk
+          OR OLD.barang_id IS DISTINCT FROM NEW.barang_id)
+     AND (
+       EXISTS (
+         SELECT 1
+         FROM public.detail_barang_keluar d
+         JOIN public.transaksi_keluar t ON t.id=d.transaksi_keluar_id
+         WHERE d.barang_id IN (OLD.barang_id,NEW.barang_id)
+           AND COALESCE(t.status,'AKTIF')='AKTIF'
+           AND t.tanggal_keluar>=LEAST(OLD.tanggal_masuk,NEW.tanggal_masuk)
+       )
+       OR EXISTS (
+         SELECT 1 FROM public.riwayat_opname o
+         WHERE o.barang_id IN (OLD.barang_id,NEW.barang_id)
+           AND o.tanggal_opname>=LEAST(OLD.tanggal_masuk,NEW.tanggal_masuk)
+           AND o.selisih<>0
+       )
+     ) THEN
+    RAISE EXCEPTION 'Tanggal atau Master Barang penerimaan #% tidak dapat diubah setelah ada mutasi FIFO pada periode terkait. Koreksi memerlukan rekonstruksi FIFO terkontrol.',NEW.id;
+  END IF;
   IF EXISTS(
     SELECT 1 FROM public.sipb_fifo_allocations a
     LEFT JOIN public.detail_barang_keluar d ON d.id=a.detail_barang_keluar_id
@@ -356,9 +377,6 @@ BEGIN
       AND COALESCE(t.tanggal_keluar,o.tanggal_opname)<NEW.tanggal_masuk
   ) THEN
     RAISE EXCEPTION 'Tanggal penerimaan #% tidak dapat digeser melewati transaksi yang telah memakai lapisan FIFO',NEW.id;
-  END IF;
-  IF TG_OP='UPDATE' AND OLD.barang_id IS DISTINCT FROM NEW.barang_id AND used_qty>0 THEN
-    RAISE EXCEPTION 'Master Barang penerimaan #% tidak dapat dipindahkan karena lapisan FIFO sudah digunakan',NEW.id;
   END IF;
 
   UPDATE public.sipb_fifo_layers
