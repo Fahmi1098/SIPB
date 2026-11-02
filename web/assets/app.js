@@ -8,7 +8,28 @@ const rupiah=v=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',m
 const formatAngka=v=>{const n=Number(v);return Number.isFinite(n)?Math.trunc(n).toLocaleString('id-ID'):''};
 const parseAngka=v=>{const s=String(v??'').replace(/[^0-9-]/g,'');return s?Number(s):0};
 const formatInputAngka=input=>{if(!input)return;const raw=String(input.value??'').replace(/[^0-9]/g,'');input.value=raw?Number(raw).toLocaleString('id-ID'):''};
-document.addEventListener('input',e=>{const el=e.target;if(el?.matches?.('[data-number-format="integer"]')){const before=el.value;formatInputAngka(el);if(before!==el.value){try{el.setSelectionRange(el.value.length,el.value.length)}catch(_){}}}});
+document.addEventListener('input',e=>{
+  const el=e.target;
+  if(!el?.matches?.('[data-number-format="integer"]'))return;
+  const before=String(el.value??'');
+  const start=typeof el.selectionStart==='number'?el.selectionStart:before.length;
+  const end=typeof el.selectionEnd==='number'?el.selectionEnd:start;
+  const digitIndex=pos=>before.slice(0,pos).replace(/[^0-9]/g,'').length;
+  const startDigits=digitIndex(start),endDigits=digitIndex(end);
+  formatInputAngka(el);
+  if(before!==el.value){
+    const positionFor=index=>{
+      if(index<=0)return 0;
+      let seen=0;
+      for(let i=0;i<el.value.length;i++){
+        if(/[0-9]/.test(el.value[i]))seen++;
+        if(seen>=index)return i+1;
+      }
+      return el.value.length;
+    };
+    try{el.setSelectionRange(positionFor(startDigits),positionFor(endDigits))}catch(_){}
+  }
+});
 const fmtDate=v=>{if(!v)return '-';const s=String(v);const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);const d=m?new Date(Number(m[1]),Number(m[2])-1,Number(m[3])):new Date(v);return Number.isNaN(d.getTime())?'-':new Intl.DateTimeFormat('id-ID',{dateStyle:'medium'}).format(d)};
 const localDate=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const $=id=>document.getElementById(id);
@@ -326,12 +347,14 @@ async function loadProfile(){
   if(active.error)throw active.error;
   if(active.data!==true){
     await client.auth.signOut();
+    session=null;profile=null;
     throw new Error('Akun SIPB tidak aktif atau tidak memiliki akses.');
   }
   const {data,error}=await client.from('user_profiles').select('*').eq('id',session.user.id).maybeSingle();
   if(error)throw error;
   if(!data||data.is_active!==true){
     await client.auth.signOut();
+    session=null;profile=null;
     throw new Error('Profil akun SIPB tidak ditemukan atau tidak aktif.');
   }
   profile=data;
@@ -638,6 +661,7 @@ async function showImportPersediaanModal(){
         bertambah_qty:excelNumber(r['Bertambah (Qty)']),
         bertambah_value:excelNumber(r['Bertambah (Nilai)'])
       })).filter(r=>r.kode_barang||r.nama_barang);
+      if(!importRows.length)throw new Error('File Excel tidak berisi baris barang untuk diimpor. Tambahkan data di bawah judul kolom lalu pilih file kembali.');
       const missingDate=importRows.findIndex(r=>!r.tanggal_saldo_awal||!r.tanggal_bertambah);
       if(missingDate>=0)throw new Error('Baris Excel '+(missingDate+2)+': Tanggal Saldo Awal dan Tanggal Bertambah wajib diisi dalam format DD/MM/YYYY (tanggal/bulan/tahun). Tidak ada tanggal otomatis.');
       const bad=importRows.findIndex(r=>{
@@ -760,16 +784,25 @@ async function kuasiPage(){
 }
 
 async function showKuasiDetail(id){
-  const [{data:batch,error:be},{data:allocations,error:ae},{data:legacy,error:le}]=await Promise.all([
-    client.from('stok_kuasi').select('id,barang_id,prefix_huruf,panjang_digit,digit_awal,digit_akhir,digit_sekarang,sisa_lembar,tanggal_masuk,nomor_dus,barang:barang_id(nama_barang,satuan,merk,tipe)').eq('id',id).single(),
+  const {data:batch,error:be}=await client.from('stok_kuasi')
+    .select('id,barang_id,prefix_huruf,panjang_digit,digit_awal,digit_akhir,digit_sekarang,sisa_lembar,tanggal_masuk,nomor_dus,barang:barang_id(nama_barang,satuan,merk,tipe)')
+    .eq('id',id).single();
+  if(be)throw be;
+  const [{data:allocations,error:ae},{data:legacy,error:le},{data:batchRows,error:batchError}]=await Promise.all([
     client.from('transaksi_kuasi_alokasi').select('id,transaksi_keluar_id,detail_barang_keluar_id,jumlah,digit_awal,digit_akhir,created_at,transaksi:transaksi_keluar_id(id,tanggal_keluar,penerima_nama,penerima_jabatan,tujuan_ruangan,status,jenis_dokumen),detail:detail_barang_keluar_id(nomor_awal,nomor_akhir,nomor_dus)').eq('stok_kuasi_id',id).order('id',{ascending:false}),
-    client.from('detail_barang_keluar').select('id,jumlah,nomor_awal,nomor_akhir,nomor_dus,transaksi:transaksi_keluar_id(id,status)').eq('barang_id',id).limit(5000)
+    client.from('detail_barang_keluar').select('id,jumlah,nomor_awal,nomor_akhir,nomor_dus,transaksi:transaksi_keluar_id(id,status)').eq('barang_id',batch.barang_id).limit(5000),
+    client.from('stok_kuasi').select('id').eq('barang_id',batch.barang_id)
   ]);
-  if(be||ae||le)throw(be||ae||le);
+  if(ae||le||batchError)throw(ae||le||batchError);
+  const batchIds=(batchRows||[]).map(r=>Number(r.id)).filter(Number.isFinite);
+  const allAllocationsQuery=batchIds.length
+    ?await client.from('transaksi_kuasi_alokasi').select('detail_barang_keluar_id').in('stok_kuasi_id',batchIds)
+    :{data:[],error:null};
+  if(allAllocationsQuery.error)throw allAllocationsQuery.error;
   const pad=Number(batch.panjang_digit)||0,p=batch.prefix_huruf||'';
   const awal=p+String(batch.digit_awal).padStart(pad,'0'),akhir=p+String(batch.digit_akhir).padStart(pad,'0'),sekarang=p+String(batch.digit_sekarang).padStart(pad,'0');
   const related=(allocations||[]).filter(r=>(r.transaksi?.status||'AKTIF')==='AKTIF');
-  const allocatedDetailIds=new Set((allocations||[]).map(r=>Number(r.detail_barang_keluar_id)));
+  const allocatedDetailIds=new Set((allAllocationsQuery.data||[]).map(r=>Number(r.detail_barang_keluar_id)));
   const legacyUntracked=(legacy||[]).filter(r=>(r.transaksi?.status||'AKTIF')==='AKTIF'&&!allocatedDetailIds.has(Number(r.id)));
   const box=document.createElement('div');box.className='modal-backdrop';
   box.innerHTML='<div class="modal-card kuasi-detail-modal"><div class="modal-head"><div><span class="eyebrow">DETAIL BATCH KUASI</span><h2>'+esc(batch.barang?.nama_barang||'-')+'</h2><p>'+esc(batch.barang?.satuan||'')+' · '+esc(batch.barang?.merk||'-')+' / '+esc(batch.barang?.tipe||'-')+'</p></div><button class="modal-close" aria-label="Tutup">×</button></div>'+
@@ -789,7 +822,7 @@ async function showKuasiDetail(id){
 }
 
 async function kartuPage(){
-  const {data:items,error}=await client.from('barang').select('id,nama_barang,satuan,merk,tipe,sisa,stok_minimum,harga_terakhir,kategori:kategori_id(id,nama_kategori)').order('nama_barang');
+  const {data:items,error}=await client.from('barang').select('id,nama_barang,satuan,merk,tipe,sisa,stok_minimum,harga_terakhir,kategori_id,kategori:kategori_id(id,nama_kategori)').order('nama_barang');
   if(error)throw error;
   const totalNilai=(items||[]).reduce((n,r)=>n+(Number(r.sisa)||0)*(Number(r.harga_terakhir)||0),0);
   const totalStok=(items||[]).reduce((n,r)=>n+(Number(r.sisa)||0),0);
@@ -1341,10 +1374,19 @@ async function renderApp(page=currentPage, restoreScrollY=null){
   const renderToken=++renderVersion;
   currentPage=page||'dashboard';
   page=currentPage;
-  const r=await client.auth.getSession();
-  session=r.data.session;
-  if(!session)return showLogin();
-  await loadProfile();
+  session=null;
+  try{
+    const r=await client.auth.getSession();
+    if(r.error)throw r.error;
+    session=r.data?.session||null;
+    if(!session)return showLogin();
+    await loadProfile();
+  }catch(e){
+    if(renderToken!==renderVersion)return;
+    if(!session){showLogin(e?.message||'Sesi tidak dapat dimuat. Silakan masuk kembali.');return;}
+    root.innerHTML='<section class="card error-card"><h2>Gagal memuat profil pengguna</h2><p>'+esc(e?.message||'Terjadi kesalahan saat memeriksa akses akun.')+'</p><button type="button" class="primary retry" data-page="'+esc(page)+'">Coba lagi</button></section>';
+    return;
+  }
   if(renderToken!==renderVersion)return;
   document.documentElement.dataset.theme=uiTheme;
   root.innerHTML=`<div class="dashboard top-nav-layout"><main class="main"><header class="top">
