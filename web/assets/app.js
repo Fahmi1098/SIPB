@@ -373,10 +373,10 @@ async function dashboard(){
   const now=new Date();
   const since=new Date(now.getFullYear(),now.getMonth()-5,1).toISOString();
   const [barangQ,masukQ,keluarQ,catQ,masukCatQ,outQ,kuasiQ]=await Promise.all([
-    client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,stok_minimum,harga_terakhir').eq('is_archived',false),
+    client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,stok_minimum,harga_terakhir').eq('is_archived',false).order('nama_barang',{ascending:true}).order('id',{ascending:true}),
     client.from('barang_masuk').select('id,barang_id,jumlah,harga_satuan,keterangan,tanggal_masuk,barang:barang_id(id,nama_barang,satuan,keterangan)'),
     client.from('transaksi_keluar').select('id,status'),
-    client.from('barang').select('id,sisa,harga_terakhir,kategori_id,kategori:kategori_id(nama_kategori)').eq('is_archived',false),
+    client.from('barang').select('id,sisa,harga_terakhir,kategori_id,kategori:kategori_id(nama_kategori)').eq('is_archived',false).order('id',{ascending:true}),
     client.from('barang_masuk').select('id,barang_id,jumlah,harga_satuan,barang:barang_id(id,kategori_id,kategori:kategori_id(nama_kategori))'),
     client.from('transaksi_keluar').select('tanggal_keluar,status').gte('tanggal_keluar',since).order('tanggal_keluar'),
     client.from('stok_kuasi').select('id,barang_id,sisa_lembar,barang:barang_id(nama_barang,satuan)').gt('sisa_lembar',0)
@@ -394,7 +394,7 @@ async function dashboard(){
   const nominalMasuk=masukData.reduce((n,r)=>n+((Number(r.jumlah)||0)*(Number(r.harga_satuan)||0)),0);
   const totalKeluar=keluarData.length;
 
-  const stockAlerts=barangData.filter(r=>Number(r.sisa||0)<=Number(r.stok_minimum||0)).sort((a,b)=>(Number(a.sisa)||0)-(Number(b.sisa)||0));
+  const stockAlerts=barangData.filter(r=>Number(r.sisa||0)<=Number(r.stok_minimum||0)).sort((a,b)=>(Number(a.sisa)||0)-(Number(b.sisa)||0)||idCollator.compare(a.nama_barang||'',b.nama_barang||'')||Number(a.id)-Number(b.id));
   const outOfStock=stockAlerts.filter(r=>Number(r.sisa||0)<=0);
   const lowStock=stockAlerts.filter(r=>Number(r.sisa||0)>0);
 
@@ -404,7 +404,7 @@ async function dashboard(){
     if(!kuasiMap[id])kuasiMap[id]={nama:r.barang?.nama_barang||'-',satuan:r.barang?.satuan||'',sisa:0};
     kuasiMap[id].sisa+=Number(r.sisa_lembar)||0;
   });
-  const kuasiLow=Object.values(kuasiMap).filter(r=>r.sisa<=20).sort((a,b)=>a.sisa-b.sisa);
+  const kuasiLow=Object.values(kuasiMap).filter(r=>r.sisa<=20).sort((a,b)=>a.sisa-b.sisa||idCollator.compare(a.nama||'',b.nama||''));
 
   const catMap={};
   (masukCatQ.data||[]).forEach(x=>{
@@ -416,7 +416,7 @@ async function dashboard(){
   });
   const catEntries=Object.entries(catMap)
     .map(([name,v])=>[name,{jenis:v.jenis.size,jumlah:v.jumlah,nilai:v.nilai}])
-    .sort((a,b)=>b[1].nilai-a[1].nilai);
+    .sort((a,b)=>b[1].nilai-a[1].nilai||idCollator.compare(a[0],b[0]));
   const catSummaryRows=catEntries.map(([name,v])=>
     '<tr><td><strong>'+esc(name)+'</strong></td><td class="right">'+v.jenis.toLocaleString('id-ID')+'</td><td class="right">'+v.jumlah.toLocaleString('id-ID')+'</td><td class="right">'+rupiah(v.nilai)+'</td></tr>'
   ).join('');
@@ -856,7 +856,7 @@ async function kartuPage(){
   const fifoNote=fifoReady?'Nilai stok barang umum dihitung dari sisa lapisan FIFO.':'FIFO belum diaktifkan di database; nilai sementara memakai harga terakhir.';
   return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PERSEDIAAN</span><h2>Kartu Persediaan</h2><p>Rekap saldo, harga pokok FIFO, dan seluruh mutasi per barang.</p><small>'+esc(fifoNote)+'</small></div><div class="kartu-head-actions"><span class="status-pill">'+items.length+' barang</span></div></div>'+
   '<div class="kartu-summary-grid"><div class="kartu-summary"><span class="kartu-summary-icon">'+navSvg('barang')+'</span><div><small>Total Barang</small><strong>'+items.length+'</strong></div></div><div class="kartu-summary"><span class="kartu-summary-icon">'+navSvg('stock_opname')+'</span><div><small>Total Saldo</small><strong>'+totalStok.toLocaleString('id-ID')+'</strong></div></div><div class="kartu-summary"><span class="kartu-summary-icon">'+navSvg('barang_masuk')+'</span><div><small>Nilai Persediaan</small><strong>'+rupiah(totalNilai)+'</strong></div></div><div class="kartu-summary '+(needAttention?'attention':'')+'"><span class="kartu-summary-icon">'+navSvg('barang_keluar')+'</span><div><small>Perlu Perhatian</small><strong>'+needAttention+'</strong></div></div></div>'+
-  '<div class="filter-bar"><div class="search-box">⌕<input id="kartuSearch" placeholder="Cari nama, tipe, merk, atau kategori..."></div><select id="kartuFilterKategori"><option value="">Semua kategori</option>'+categories.map(x=>'<option value="'+esc(x[0]??'')+'">'+esc(x[1])+'</option>').join('')+'</select><select id="kartuFilterStatus"><option value="">Semua stok</option><option value="aman">Stok aman</option><option value="menipis">Stok menipis</option><option value="habis">Stok habis</option></select><select id="kartuBarang"><option value="">-- Pilih barang --</option>'+items.map(r=>'<option value="'+r.id+'">'+esc(r.nama_barang)+' — '+esc(r.satuan||'-')+'</option>').join('')+'</select></div>'+
+  '<div class="filter-bar"><div class="search-box">⌕<input id="kartuSearch" placeholder="Cari kode, nama, keterangan, tipe, merk, atau kategori..."></div><select id="kartuFilterKategori"><option value="">Semua kategori</option>'+categories.map(x=>'<option value="'+esc(x[0]??'')+'">'+esc(x[1])+'</option>').join('')+'</select><select id="kartuFilterStatus"><option value="">Semua stok</option><option value="aman">Stok aman</option><option value="menipis">Stok menipis</option><option value="habis">Stok habis</option></select><select id="kartuBarang"><option value="">-- Pilih barang --</option>'+items.map(r=>'<option value="'+r.id+'">'+esc(r.nama_barang)+' — '+esc(r.satuan||'-')+'</option>').join('')+'</select></div>'+
   '<div id="kartuDetail"></div><div class="table-wrap"><table id="kartuTable"><thead><tr><th>Barang</th><th>Kategori</th><th>Satuan</th><th>Saldo</th><th>Minimum</th><th>Harga Terakhir</th><th>Nilai Sisa FIFO</th><th>Status</th><th>Aksi</th></tr></thead><tbody>'+
   (items.map(r=>{const s=Number(r.sisa)||0,m=Number(r.stok_minimum)||0,status=s<=0?'habis':s<=m?'menipis':'aman';return '<tr data-sort-key="'+r.id+'" data-kategori="'+(r.kategori_id??'')+'" data-status="'+status+'" data-search="'+esc([r.kode_barang,r.nama_barang,r.keterangan,r.merk,r.tipe,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())+'"><td><strong>'+esc(r.nama_barang)+'</strong><br><small>'+esc([r.tipe,r.merk].filter(Boolean).join(' · '))+'</small></td><td>'+esc(r.kategori?.nama_kategori||'-')+'</td><td>'+esc(r.satuan||'-')+'</td><td><span class="stock '+(s<=m?'low':'')+'">'+s+'</span></td><td>'+m+'</td><td>'+rupiah(r.harga_terakhir)+'</td><td>'+rupiah(itemValue(r))+'</td><td><span class="badge-soft '+(status==='aman'?'success':'')+'">'+(status==='habis'?'Habis':status==='menipis'?'Menipis':'Aman')+'</span></td><td><button class="btn-sm view-kartu" data-id="'+r.id+'">Lihat Kartu</button></td></tr>'}).join('')||emptyRow(9))+
   '</tbody></table></div></section>';
@@ -1294,7 +1294,7 @@ async function showCorrectionModal(type,id){
   if(type==='MASUK'){
     const [{data:r,error},{data:items,error:ie}]=await Promise.all([
       client.from('barang_masuk').select('*,barang:barang_id(id,nama_barang,satuan,kode_barang,is_archived,kategori:kategori_id(nama_kategori))').eq('id',id).single(),
-      client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,is_archived,kategori:kategori_id(nama_kategori)').eq('is_archived',false).order('nama_barang')
+      client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,is_archived,kategori:kategori_id(nama_kategori)').eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true})
     ]);
     if(error||ie)throw(error||ie);
     if(!r||!r.barang)throw new Error('Data penerimaan atau Master Barang tidak ditemukan.');
@@ -1349,7 +1349,7 @@ async function showCorrectionModal(type,id){
   if(type==='KELUAR'){
     const [{data:tx,error},{data:items,error:ie}]=await Promise.all([
       client.from('transaksi_keluar').select('*,detail_barang_keluar(id,barang_id,jumlah,barang:barang_id(id,nama_barang,satuan,is_archived,kategori:kategori_id(nama_kategori)))').eq('id',id).single(),
-      client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,is_archived,kategori:kategori_id(nama_kategori)').eq('is_archived',false).order('nama_barang')
+      client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,is_archived,kategori:kategori_id(nama_kategori)').eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true})
     ]);
     if(error||ie)throw(error||ie);
     if(!tx||tx.status!=='AKTIF')throw new Error('Hanya transaksi Barang Keluar aktif yang dapat dikoreksi.');
@@ -1610,6 +1610,8 @@ function bind(page){
         const ok=matchesSearch(r.dataset.search,q)&&(!cv||r.dataset.kategori===cv)&&(!sv||r.dataset.status===sv);
         r.style.display=ok?'':'none';
       });
+      const table=$('kartuTable');
+      if(table){table.dataset.page='1';table.refreshPagination?.()}
     };
     search.oninput=apply;cat.onchange=apply;status.onchange=apply;
     document.querySelectorAll('.view-kartu').forEach(btn=>btn.onclick=async evt=>{evt.preventDefault();evt.stopPropagation();
@@ -1691,7 +1693,8 @@ function bind(page){
         if(ok)shown++;
       });
       $('barangCount').textContent=shown+' data';
-      $('barangTable').refreshPagination?.();
+      const table=$('barangTable');
+      if(table){table.dataset.page='1';table.refreshPagination?.()}
     };
     $('barangSearch').oninput=apply;
     $('barangFilter').onchange=apply;
