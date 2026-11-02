@@ -335,7 +335,7 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  IF layer_id IS NULL THEN
+  IF v_layer_id IS NULL THEN
     INSERT INTO public.sipb_fifo_layers(
       barang_id,barang_masuk_id,source_type,tanggal_masuk,jumlah_masuk,sisa,harga_satuan,harga_estimasi
     ) VALUES(NEW.barang_id,NEW.id,'BARANG_MASUK',NEW.tanggal_masuk,NEW.jumlah,NEW.jumlah,NEW.harga_satuan,false);
