@@ -17,7 +17,8 @@ Aplikasi pengelolaan persediaan barang UPTD PPD Malingping, Pemerintah Provinsi 
 3. Terapkan hanya migrasi baru yang belum diterapkan. Untuk perbaikan keamanan November 2026, jalankan:
    `supabase/migrations/20261102090000_security_integrity_followup.sql`
 4. Deploy ulang Edge Function `login-user` setelah perubahan branch digabungkan.
-5. Setelah SQL dan Edge Function diterapkan, uji login akun aktif/nonaktif, pembuatan transaksi, arsip Master Barang, import, dan backup/restore menggunakan data uji terlebih dahulu.
+5. Jalankan kueri read-only `supabase/audits/security_integrity_followup_check.sql` untuk memeriksa hak akses dan hasil pengarsipan.
+6. Setelah SQL dan Edge Function diterapkan, uji login akun aktif/nonaktif, pembuatan transaksi, arsip Master Barang, import, dan backup/restore menggunakan data uji terlebih dahulu.
 
 **Peringatan:** jangan menjalankan ulang migrasi lama yang berisi operasi pembersihan data, termasuk `20261002020000_clear_barang_masuk_keluar.sql` dan `20261002030000_clear_master_barang.sql`, pada database yang sudah berisi data produksi. Jangan menjalankan prosedur Restore hanya untuk memasang migrasi.
 
