@@ -491,16 +491,29 @@ REVOKE ALL ON FUNCTION public.correct_barang_keluar(integer,date,text,text,text,
 GRANT EXECUTE ON FUNCTION public.correct_barang_keluar(integer,date,text,text,text,text,text,text,text,text,jsonb,text)
   TO authenticated;
 
--- Disable old public cancellation/cleanup endpoints that permanently delete
--- operational history. Only the audited wrapper remains available to clients.
-REVOKE ALL ON FUNCTION public.cancel_barang_keluar(integer)
-  FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.cancel_and_delete_barang_keluar(integer)
-  FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.delete_cancelled_barang_keluar(integer)
-  FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.delete_barang_if_no_outgoing(integer)
-  FROM PUBLIC, anon, authenticated;
+-- Disable old public cancellation/cleanup endpoints when they exist.
+-- Some installations do not contain every legacy RPC (for example, the
+-- cancel_and_delete_barang_keluar wrapper may never have been installed).
+-- Use to_regprocedure so a missing legacy function cannot abort this migration.
+DO $sipb$
+BEGIN
+  IF to_regprocedure('public.cancel_barang_keluar(integer)') IS NOT NULL THEN
+    EXECUTE 'REVOKE ALL ON FUNCTION public.cancel_barang_keluar(integer) FROM PUBLIC, anon, authenticated';
+  END IF;
+
+  IF to_regprocedure('public.cancel_and_delete_barang_keluar(integer)') IS NOT NULL THEN
+    EXECUTE 'REVOKE ALL ON FUNCTION public.cancel_and_delete_barang_keluar(integer) FROM PUBLIC, anon, authenticated';
+  END IF;
+
+  IF to_regprocedure('public.delete_cancelled_barang_keluar(integer)') IS NOT NULL THEN
+    EXECUTE 'REVOKE ALL ON FUNCTION public.delete_cancelled_barang_keluar(integer) FROM PUBLIC, anon, authenticated';
+  END IF;
+
+  IF to_regprocedure('public.delete_barang_if_no_outgoing(integer)') IS NOT NULL THEN
+    EXECUTE 'REVOKE ALL ON FUNCTION public.delete_barang_if_no_outgoing(integer) FROM PUBLIC, anon, authenticated';
+  END IF;
+END;
+$sipb$;
 
 COMMENT ON TABLE public.sipb_transaction_audit IS
   'Audit trail for SIPB Master Barang identity changes, receipt corrections, outgoing corrections and cancellations.';
