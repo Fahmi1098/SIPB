@@ -4,6 +4,9 @@ let client=null,session=null,profile=null;
 let currentPage='dashboard';
 let renderVersion=0;
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+const idCollator=new Intl.Collator('id-ID',{numeric:true,sensitivity:'base'});
+function normalizeSearchText(value){return String(value??'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLocaleLowerCase('id-ID').replace(/\\s+/g,' ').trim()}
+function matchesSearch(value,query){const terms=normalizeSearchText(query).split(/\\s+/).filter(Boolean);if(!terms.length)return true;const hay=normalizeSearchText(value);return terms.every(term=>hay.includes(term))}
 const rupiah=v=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Number(v)||0);
 const formatAngka=v=>{const n=Number(v);return Number.isFinite(n)?Math.trunc(n).toLocaleString('id-ID'):''};
 const parseAngka=v=>{const s=String(v??'').replace(/[^0-9-]/g,'');return s?Number(s):0};
@@ -85,13 +88,19 @@ function sortableValue(text){
   if(numeric&&/^-?\d+(?:\.\d+)?$/.test(numeric))return Number(numeric);
   return normalized;
 }
+function compareSortableValues(av,bv){if(typeof av==='number'&&typeof bv==='number')return av-bv;return idCollator.compare(String(av??''),String(bv??''))}
 function sortTable(table,col,dir=1){
   const tbody=table.tBodies[0]; if(!tbody)return;
   const rows=[...tbody.rows];
+  rows.forEach((row,index)=>{if(row.dataset.sortOriginalIndex===undefined)row.dataset.sortOriginalIndex=String(index)});
+  const stableKey=row=>sortableValue(row.dataset.sortKey??row.dataset.sortId??(row.cells[0]?.textContent||'').replace(/^#/,''));
   rows.sort((a,b)=>{
     const av=sortableValue(a.cells[col]?.textContent||''),bv=sortableValue(b.cells[col]?.textContent||'');
-    if(typeof av==='number'&&typeof bv==='number')return (av-bv)*dir;
-    return String(av).localeCompare(String(bv),'id',{numeric:true,sensitivity:'base'})*dir;
+    const primary=compareSortableValues(av,bv);
+    if(primary)return primary*dir;
+    const secondary=compareSortableValues(stableKey(a),stableKey(b));
+    if(secondary)return secondary;
+    return Number(a.dataset.sortOriginalIndex)-Number(b.dataset.sortOriginalIndex);
   });
   rows.forEach(r=>tbody.appendChild(r));
   [...table.tHead.rows[0].cells].forEach((th,i)=>{
@@ -240,7 +249,7 @@ function enhanceTables(scope=document){
         const q=e.target.value.toLowerCase().trim();
         table.tBodies?.[0]?.querySelectorAll('tr').forEach(row=>{
           if(row.querySelector('.empty'))return;
-          row.dataset.tableSearchMatch=!q||row.textContent.toLowerCase().includes(q)?'1':'0';
+          row.dataset.tableSearchMatch=matchesSearch(row.textContent,q)?'1':'0';
         });
         table.dataset.page='1';
         table.refreshPagination?.();
@@ -522,7 +531,7 @@ async function dashboard(){
 }
 async function barangPage(){
   const [{data,error},{data:k,error:ke},{data:masuk,error:me}]=await Promise.all([
-    client.from('barang').select('*, kategori:kategori_id(nama_kategori)').order('id'),
+    client.from('barang').select('*, kategori:kategori_id(nama_kategori)').order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true}),
     client.from('kategori').select('*').order('nama_kategori'),
     client.from('barang_masuk').select('id,barang_id,keterangan,harga_satuan,tanggal_masuk').order('tanggal_masuk',{ascending:false}).order('id',{ascending:false})
   ]);
@@ -560,7 +569,7 @@ function barangRow(r){
   const archiveAction=profile?.role==='admin'
     ?'<button class="btn-sm '+(archived?'':'danger')+' archive-barang" data-id="'+r.id+'" data-archived="'+(archived?'1':'0')+'">'+(archived?'Pulihkan':'Arsipkan')+'</button>'
     :'';
-  return `<tr data-search="${esc([r.kode_barang,r.nama_barang,ket,r.tipe,r.merk,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())}" data-kategori="${r.kategori_id||''}" data-archived="${archived?'1':'0'}"><td class="id-cell">#${r.id}<br><small>${archived?'Diarsipkan':'Aktif'}</small></td><td><small>${esc(r.kode_barang||"-")}</small></td><td><strong>${esc(r.nama_barang)}</strong></td><td>${esc(ket||'-')}</td><td>${esc(r.kategori?.nama_kategori||'-')}</td><td>${esc(r.tipe||'-')}</td><td>${esc(r.merk||'-')}</td><td>${esc(r.satuan||'-')}</td><td>${rupiah(r.harga_terakhir)}</td><td><span class="stock ${low?'low':''}">${formatAngka(r.sisa??0)}</span></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-barang" data-id="'+r.id+'">Edit</button>'+archiveAction+'</div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`;
+  return `<tr data-sort-key="${r.id}" data-search="${esc([r.kode_barang,r.nama_barang,ket,r.tipe,r.merk,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())}" data-kategori="${r.kategori_id||''}" data-archived="${archived?'1':'0'}"><td class="id-cell">#${r.id}<br><small>${archived?'Diarsipkan':'Aktif'}</small></td><td><small>${esc(r.kode_barang||"-")}</small></td><td><strong>${esc(r.nama_barang)}</strong></td><td>${esc(ket||'-')}</td><td>${esc(r.kategori?.nama_kategori||'-')}</td><td>${esc(r.tipe||'-')}</td><td>${esc(r.merk||'-')}</td><td>${esc(r.satuan||'-')}</td><td>${rupiah(r.harga_terakhir)}</td><td><span class="stock ${low?'low':''}">${formatAngka(r.sisa??0)}</span></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-barang" data-id="'+r.id+'">Edit</button>'+archiveAction+'</div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`;
 }
 function emptyRow(n){return `<tr><td colspan="${n}" class="empty">Belum ada data.</td></tr>`}
 async function showImportPersediaanModal(){
@@ -722,7 +731,7 @@ async function simple(title,table,cols){const {data,error}=await client.from(tab
 async function barangMasukForm(){
   const canCreate=profile?.role==='admin';
   const [{data:items,error},{data:kats,error:ke}]=await Promise.all([
-    client.from('barang').select('id,nama_barang,satuan,kategori_id,tipe,merk,kode_barang,kategori:kategori_id(id,nama_kategori)').eq('is_archived',false).order('nama_barang'),
+    client.from('barang').select('id,nama_barang,satuan,kategori_id,tipe,merk,kode_barang,keterangan,kategori:kategori_id(id,nama_kategori)').eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true}),
     client.from('kategori').select('*').order('nama_kategori')
   ]);
   if(error||ke)throw(error||ke);
@@ -739,13 +748,13 @@ async function barangMasukForm(){
   <label class="field-wide">Keterangan / Spesifikasi <textarea id="m_keterangan" rows="3" maxlength="500" placeholder="Contoh: ukuran, warna, model, jenis, bahan, atau keterangan lain untuk membedakan nama barang yang sama"></textarea><small class="field-hint">Keterangan ini melekat pada transaksi Barang Masuk, bukan Master Barang.</small></label>
   </div><div id="masukKuasi" class="kuasi-box" style="display:none"><strong>📑 Batch Kuasi</strong><span>Isi rentang nomor seri yang diterima. Jumlah harus sama dengan rentang.</span><div class="form-grid"><label>No. Dus <input id="m_dus" placeholder="Contoh: 411"></label><label>No. Seri Awal <input id="m_awal" placeholder="A-001"></label><label>No. Seri Akhir <input id="m_akhir" placeholder="A-100"></label></div></div><div class="form-actions"><button class="primary" id="saveMasuk">Rekam & Tambah Stok</button><button class="ghost" id="cancelMasuk">Batal</button></div></section>`;
 }
-async function barangKeluarForm(){const [{data:items,error},{data:pegawai,error:pe}]=await Promise.all([client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,kategori:kategori_id(id,nama_kategori)').eq('is_archived',false).order('nama_barang'),client.from('pegawai').select('id,nama_pegawai,nip,status_pegawai,jabatan,unit_kerja').order('nama_pegawai')]);if(error||pe)throw(error||pe);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h2>Rekam Barang Keluar</h2><p>Stok akan dikurangi setelah seluruh item lolos validasi.</p></div><button class="ghost" id="backKeluar">← Kembali</button></div><div class="form-grid"><label>Tanggal Keluar <input id="k_tanggal" type="date" value="${localDate()}"></label><label>Penyerah (Gudang) <select id="k_penyerah"><option value="">- Pilih penyerah -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penyerah <input id="k_penyerah_jabatan" readonly></label><label>NIP Penyerah <input id="k_penyerah_nip" readonly></label><label>Penerima (Pemohon) <select id="k_penerima"><option value="">- Pilih pegawai -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penerima <input id="k_jabatan" readonly></label><label>NIP Penerima <input id="k_nip" readonly></label><label>Tujuan / Ruangan <input id="k_tujuan" placeholder="Otomatis dari Unit Kerja/Ruangan Penerima; dapat diedit" required></label></div><div class="section-head compact"><div><h3>Daftar Barang</h3><p>Tambahkan satu atau beberapa item.</p></div><button class="ghost" id="addItemKeluar">＋ Tambah Item</button></div><div id="keluarItems"></div><div class="form-actions"><button class="primary" id="saveKeluar">Rekam Transaksi & Kurangi Stok</button><button class="ghost" id="cancelKeluar">Batal</button></div></section>`}
+async function barangKeluarForm(){const [{data:items,error},{data:pegawai,error:pe}]=await Promise.all([client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,kategori:kategori_id(id,nama_kategori)').eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true}),client.from('pegawai').select('id,nama_pegawai,nip,status_pegawai,jabatan,unit_kerja').order('nama_pegawai')]);if(error||pe)throw(error||pe);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h2>Rekam Barang Keluar</h2><p>Stok akan dikurangi setelah seluruh item lolos validasi.</p></div><button class="ghost" id="backKeluar">← Kembali</button></div><div class="form-grid"><label>Tanggal Keluar <input id="k_tanggal" type="date" value="${localDate()}"></label><label>Penyerah (Gudang) <select id="k_penyerah"><option value="">- Pilih penyerah -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penyerah <input id="k_penyerah_jabatan" readonly></label><label>NIP Penyerah <input id="k_penyerah_nip" readonly></label><label>Penerima (Pemohon) <select id="k_penerima"><option value="">- Pilih pegawai -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penerima <input id="k_jabatan" readonly></label><label>NIP Penerima <input id="k_nip" readonly></label><label>Tujuan / Ruangan <input id="k_tujuan" placeholder="Otomatis dari Unit Kerja/Ruangan Penerima; dapat diedit" required></label></div><div class="section-head compact"><div><h3>Daftar Barang</h3><p>Tambahkan satu atau beberapa item.</p></div><button class="ghost" id="addItemKeluar">＋ Tambah Item</button></div><div id="keluarItems"></div><div class="form-actions"><button class="primary" id="saveKeluar">Rekam Transaksi & Kurangi Stok</button><button class="ghost" id="cancelKeluar">Batal</button></div></section>`}
 
 function keluarItemRow(items){
   const id='ki_'+Math.random().toString(36).slice(2,9);
   const options=items.map(x=>{
     const kat=String(x.kategori?.nama_kategori||'').toLowerCase(),isKuasi=kat.includes('kuasi');
-    return '<option value="'+x.id+'" data-stock="'+x.sisa+'" data-unit="'+esc(x.satuan||'')+'" data-kode="'+esc(x.kode_barang||'')+'" data-keterangan="'+esc(x.keterangan||'')+'" data-kuasi="'+(isKuasi?'kuasi':'')+'">'+esc(x.nama_barang)+(x.kode_barang?' — '+esc(x.kode_barang):'')+(x.keterangan?' · '+esc(x.keterangan):'')+' — stok '+x.sisa+' '+esc(x.satuan||'')+(isKuasi?' — FIFO Kuasi':'')+'</option>';
+    return '<option value="'+x.id+'" data-stock="'+x.sisa+'" data-unit="'+esc(x.satuan||'')+'" data-kode="'+esc(x.kode_barang||'')+'" data-nama="'+esc(x.nama_barang||'')+'" data-keterangan="'+esc(x.keterangan||'')+'" data-kuasi="'+(isKuasi?'kuasi':'')+'">'+esc(x.nama_barang)+(x.kode_barang?' — '+esc(x.kode_barang):'')+(x.keterangan?' · '+esc(x.keterangan):'')+' — stok '+x.sisa+' '+esc(x.satuan||'')+(isKuasi?' — FIFO Kuasi':'')+'</option>';
   }).join('');
   return '<div class="transaction-row" data-row="'+id+'">'+
     '<div class="barang-picker">'+
@@ -760,7 +769,7 @@ function keluarItemRow(items){
   '</div>';
 }
 
-async function stockOpnamePage(){const [{data:rows,error},{data:items,error:ie}]=await Promise.all([client.from('riwayat_opname').select('*,barang:barang_id(nama_barang)').order('id',{ascending:false}).limit(200),client.from('barang').select('id,nama_barang,sisa,satuan').order('nama_barang')]);if(error||ie)throw(error||ie);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PERSEDIAAN</span><h2>Stock Opname</h2><p>Penyesuaian stok fisik terhadap stok sistem.</p></div><button class="primary" id="addOpname">＋ Rekam Stock Opname</button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Barang</th><th>Sistem</th><th>Fisik</th><th>Selisih</th><th>Petugas</th><th>Keterangan</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${fmtDate(r.tanggal_opname)}</td><td>${esc(r.barang?.nama_barang||'-')}</td><td>${r.stok_sistem}</td><td>${r.stok_fisik}</td><td><span class="stock ${r.selisih<0?'low':''}">${r.selisih>0?'+':''}${r.selisih}</span></td><td>${esc(r.petugas||'-')}</td><td>${esc(r.keterangan||'-')}</td></tr>`).join('')||emptyRow(7)}</tbody></table></div></section>`}
+async function stockOpnamePage(){const [{data:rows,error},{data:items,error:ie}]=await Promise.all([client.from('riwayat_opname').select('*,barang:barang_id(nama_barang)').order('id',{ascending:false}).limit(200),client.from('barang').select('id,nama_barang,sisa,satuan').order('nama_barang',{ascending:true}).order('id',{ascending:true})]);if(error||ie)throw(error||ie);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PERSEDIAAN</span><h2>Stock Opname</h2><p>Penyesuaian stok fisik terhadap stok sistem.</p></div><button class="primary" id="addOpname">＋ Rekam Stock Opname</button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Barang</th><th>Sistem</th><th>Fisik</th><th>Selisih</th><th>Petugas</th><th>Keterangan</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${fmtDate(r.tanggal_opname)}</td><td>${esc(r.barang?.nama_barang||'-')}</td><td>${r.stok_sistem}</td><td>${r.stok_fisik}</td><td><span class="stock ${r.selisih<0?'low':''}">${r.selisih>0?'+':''}${r.selisih}</span></td><td>${esc(r.petugas||'-')}</td><td>${esc(r.keterangan||'-')}</td></tr>`).join('')||emptyRow(7)}</tbody></table></div></section>`}
 
 async function kuasiPage(){
   const {data,error}=await client.from('stok_kuasi').select('id,barang_id,prefix_huruf,panjang_digit,digit_awal,digit_akhir,digit_sekarang,sisa_lembar,tanggal_masuk,nomor_dus,barang:barang_id(nama_barang,satuan)').gt('sisa_lembar',0).order('tanggal_masuk',{ascending:true}).order('id',{ascending:true});
@@ -823,7 +832,7 @@ async function showKuasiDetail(id){
 
 async function kartuPage(){
   const [itemsQ,layersQ]=await Promise.all([
-    client.from('barang').select('id,nama_barang,satuan,merk,tipe,sisa,stok_minimum,harga_terakhir,kategori_id,kategori:kategori_id(id,nama_kategori)').order('nama_barang'),
+    client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,merk,tipe,sisa,stok_minimum,harga_terakhir,kategori_id,kategori:kategori_id(id,nama_kategori)').order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true}),
     client.from('sipb_fifo_layers').select('barang_id,sisa,harga_satuan')
   ]);
   if(itemsQ.error)throw itemsQ.error;
@@ -843,13 +852,13 @@ async function kartuPage(){
   const totalNilai=items.reduce((n,r)=>n+itemValue(r),0);
   const totalStok=items.reduce((n,r)=>n+(Number(r.sisa)||0),0);
   const needAttention=items.filter(r=>Number(r.sisa||0)<=Number(r.stok_minimum||0)).length;
-  const categories=[...new Map(items.map(r=>[r.kategori_id,r.kategori?.nama_kategori||'Tanpa Kategori'])).entries()].sort((a,b)=>String(a[1]).localeCompare(String(b[1])));
+  const categories=[...new Map(items.map(r=>[r.kategori_id,r.kategori?.nama_kategori||'Tanpa Kategori'])).entries()].sort((a,b)=>idCollator.compare(String(a[1]),String(b[1]))||Number(a[0]||0)-Number(b[0]||0));
   const fifoNote=fifoReady?'Nilai stok barang umum dihitung dari sisa lapisan FIFO.':'FIFO belum diaktifkan di database; nilai sementara memakai harga terakhir.';
   return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PERSEDIAAN</span><h2>Kartu Persediaan</h2><p>Rekap saldo, harga pokok FIFO, dan seluruh mutasi per barang.</p><small>'+esc(fifoNote)+'</small></div><div class="kartu-head-actions"><span class="status-pill">'+items.length+' barang</span></div></div>'+
   '<div class="kartu-summary-grid"><div class="kartu-summary"><span class="kartu-summary-icon">'+navSvg('barang')+'</span><div><small>Total Barang</small><strong>'+items.length+'</strong></div></div><div class="kartu-summary"><span class="kartu-summary-icon">'+navSvg('stock_opname')+'</span><div><small>Total Saldo</small><strong>'+totalStok.toLocaleString('id-ID')+'</strong></div></div><div class="kartu-summary"><span class="kartu-summary-icon">'+navSvg('barang_masuk')+'</span><div><small>Nilai Persediaan</small><strong>'+rupiah(totalNilai)+'</strong></div></div><div class="kartu-summary '+(needAttention?'attention':'')+'"><span class="kartu-summary-icon">'+navSvg('barang_keluar')+'</span><div><small>Perlu Perhatian</small><strong>'+needAttention+'</strong></div></div></div>'+
   '<div class="filter-bar"><div class="search-box">⌕<input id="kartuSearch" placeholder="Cari nama, tipe, merk, atau kategori..."></div><select id="kartuFilterKategori"><option value="">Semua kategori</option>'+categories.map(x=>'<option value="'+esc(x[0]??'')+'">'+esc(x[1])+'</option>').join('')+'</select><select id="kartuFilterStatus"><option value="">Semua stok</option><option value="aman">Stok aman</option><option value="menipis">Stok menipis</option><option value="habis">Stok habis</option></select><select id="kartuBarang"><option value="">-- Pilih barang --</option>'+items.map(r=>'<option value="'+r.id+'">'+esc(r.nama_barang)+' — '+esc(r.satuan||'-')+'</option>').join('')+'</select></div>'+
   '<div id="kartuDetail"></div><div class="table-wrap"><table id="kartuTable"><thead><tr><th>Barang</th><th>Kategori</th><th>Satuan</th><th>Saldo</th><th>Minimum</th><th>Harga Terakhir</th><th>Nilai Sisa FIFO</th><th>Status</th><th>Aksi</th></tr></thead><tbody>'+
-  (items.map(r=>{const s=Number(r.sisa)||0,m=Number(r.stok_minimum)||0,status=s<=0?'habis':s<=m?'menipis':'aman';return '<tr data-kategori="'+(r.kategori_id??'')+'" data-status="'+status+'" data-search="'+esc([r.nama_barang,r.merk,r.tipe,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())+'"><td><strong>'+esc(r.nama_barang)+'</strong><br><small>'+esc([r.tipe,r.merk].filter(Boolean).join(' · '))+'</small></td><td>'+esc(r.kategori?.nama_kategori||'-')+'</td><td>'+esc(r.satuan||'-')+'</td><td><span class="stock '+(s<=m?'low':'')+'">'+s+'</span></td><td>'+m+'</td><td>'+rupiah(r.harga_terakhir)+'</td><td>'+rupiah(itemValue(r))+'</td><td><span class="badge-soft '+(status==='aman'?'success':'')+'">'+(status==='habis'?'Habis':status==='menipis'?'Menipis':'Aman')+'</span></td><td><button class="btn-sm view-kartu" data-id="'+r.id+'">Lihat Kartu</button></td></tr>'}).join('')||emptyRow(9))+
+  (items.map(r=>{const s=Number(r.sisa)||0,m=Number(r.stok_minimum)||0,status=s<=0?'habis':s<=m?'menipis':'aman';return '<tr data-sort-key="'+r.id+'" data-kategori="'+(r.kategori_id??'')+'" data-status="'+status+'" data-search="'+esc([r.kode_barang,r.nama_barang,r.keterangan,r.merk,r.tipe,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())+'"><td><strong>'+esc(r.nama_barang)+'</strong><br><small>'+esc([r.tipe,r.merk].filter(Boolean).join(' · '))+'</small></td><td>'+esc(r.kategori?.nama_kategori||'-')+'</td><td>'+esc(r.satuan||'-')+'</td><td><span class="stock '+(s<=m?'low':'')+'">'+s+'</span></td><td>'+m+'</td><td>'+rupiah(r.harga_terakhir)+'</td><td>'+rupiah(itemValue(r))+'</td><td><span class="badge-soft '+(status==='aman'?'success':'')+'">'+(status==='habis'?'Habis':status==='menipis'?'Menipis':'Aman')+'</span></td><td><button class="btn-sm view-kartu" data-id="'+r.id+'">Lihat Kartu</button></td></tr>'}).join('')||emptyRow(9))+
   '</tbody></table></div></section>';
 }
 
@@ -1596,9 +1605,9 @@ function bind(page){
   if(page==='kartu'){
     const search=$('kartuSearch'),select=$('kartuBarang'),cat=$('kartuFilterKategori'),status=$('kartuFilterStatus');
     const apply=()=>{
-      const q=search.value.toLowerCase().trim(),cv=cat.value,sv=status.value;
+      const q=search.value,cv=cat.value,sv=status.value;
       document.querySelectorAll('#kartuTable tbody tr[data-search]').forEach(r=>{
-        const ok=(!q||r.dataset.search.includes(q))&&(!cv||r.dataset.kategori===cv)&&(!sv||r.dataset.status===sv);
+        const ok=matchesSearch(r.dataset.search,q)&&(!cv||r.dataset.kategori===cv)&&(!sv||r.dataset.status===sv);
         r.style.display=ok?'':'none';
       });
     };
@@ -1672,12 +1681,12 @@ function bind(page){
       }catch(err){fail(err)}
     };
     const apply=()=>{
-      const q=$('barangSearch').value.toLowerCase().trim(),cat=$('barangFilter').value,status=$('barangStatus').value;
+      const q=$('barangSearch').value,cat=$('barangFilter').value,status=$('barangStatus').value;
       let shown=0;
       document.querySelectorAll('#barangTable tbody tr[data-search]').forEach(r=>{
         const archived=r.dataset.archived==='1';
         const statusOk=status==='all'||(status==='archived'?archived:!archived);
-        const ok=statusOk&&(!q||r.dataset.search.includes(q))&&(!cat||r.dataset.kategori===cat);
+        const ok=statusOk&&matchesSearch(r.dataset.search,q)&&(!cat||r.dataset.kategori===cat);
         r.style.display=ok?'':'none';
         if(ok)shown++;
       });
@@ -1826,7 +1835,7 @@ async function stockOpnameForm(){
   const {data:items,error}=await client.from('barang')
     .select('id,nama_barang,satuan,sisa,stok_minimum,kategori:kategori_id(nama_kategori)')
     .eq('is_archived',false)
-    .order('nama_barang');
+    .order('nama_barang',{ascending:true}).order('id',{ascending:true});
   if(error)throw error;
   const eligible=(items||[]).filter(x=>!String(x.kategori?.nama_kategori||'').toLowerCase().includes('kuasi'));
   return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PERSEDIAAN</span><h2>Rekam Stock Opname</h2><p>Catat stok fisik dan biarkan database menghitung selisih serta memperbarui saldo secara atomik.</p></div><button class="ghost" id="backOpname">← Kembali</button></div>'+
@@ -1864,7 +1873,7 @@ async function bindOpnameForm(){
   };
 }
 async function bindKeluarForm(){
-  const result=await client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,kategori:kategori_id(id,nama_kategori)').eq('is_archived',false).order('nama_barang');
+  const result=await client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,kategori:kategori_id(id,nama_kategori)').eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true});
   if(result.error)throw result.error;
   const items=result.data||[];
   const pegawaiQ=await client.from('pegawai').select('id,nama_pegawai,nip,status_pegawai,jabatan,unit_kerja').order('nama_pegawai');
@@ -1908,12 +1917,25 @@ async function bindKeluarForm(){
   const updatePicker=(row,query='')=>{
     const select=row.querySelector('.ki-barang'), search=row.querySelector('.ki-search'), results=row.querySelector('.ki-results'), info=row.querySelector('.ki-selected-info');
     if(!select||!search||!results)return;
-    const q=String(query||'').trim().toLocaleLowerCase('id-ID');
+    const q=String(query||'').trim();
+    const normalizedQuery=normalizeSearchText(q);
+    const score=o=>{
+      if(!normalizedQuery)return 0;
+      const code=normalizeSearchText(o.dataset.kode),name=normalizeSearchText(o.dataset.nama),ket=normalizeSearchText(o.dataset.keterangan);
+      if(code===normalizedQuery)return 0;
+      if(name===normalizedQuery)return 1;
+      if(code.startsWith(normalizedQuery))return 2;
+      if(name.startsWith(normalizedQuery))return 3;
+      if(matchesSearch(code,normalizedQuery))return 4;
+      if(matchesSearch(name,normalizedQuery))return 5;
+      if(matchesSearch(ket,normalizedQuery))return 6;
+      return 7;
+    };
     const matches=[...select.options].filter(o=>{
       if(!o.value)return false;
-      const hay=[o.textContent,o.dataset.kode,o.dataset.keterangan].join(' ').toLocaleLowerCase('id-ID');
-      return !q||hay.includes(q);
-    }).slice(0,30);
+      const hay=[o.textContent,o.dataset.kode,o.dataset.nama,o.dataset.keterangan].join(' ');
+      return matchesSearch(hay,q);
+    }).sort((a,b)=>score(a)-score(b)||idCollator.compare(a.dataset.nama||a.textContent,b.dataset.nama||b.textContent)||idCollator.compare(a.dataset.kode||'',b.dataset.kode||'')||Number(a.value)-Number(b.value)).slice(0,30);
     results.innerHTML=matches.length?matches.map(o=>'<button type="button" class="ki-result" data-value="'+esc(o.value)+'">'+
       '<strong>'+esc(o.dataset.kode||'Tanpa kode')+'</strong>'+
       '<span>'+esc(o.textContent.replace(/^.*?— /,'').replace(/ — stok.*$/,''))+'</span>'+
