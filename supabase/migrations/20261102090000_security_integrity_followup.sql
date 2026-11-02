@@ -169,6 +169,7 @@ FROM authenticated;
 -- Master Barang may be maintained by admin, but stock-derived columns remain
 -- inaccessible to direct INSERT/UPDATE. Harga Terakhir is a reference field.
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON TABLE public.barang FROM authenticated;
+REVOKE INSERT (is_archived), UPDATE (is_archived) ON public.barang FROM authenticated;
 REVOKE INSERT (
   jumlah_total, terpakai, sisa
 ) ON public.barang FROM authenticated;
