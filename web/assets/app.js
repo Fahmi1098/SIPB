@@ -822,32 +822,73 @@ async function showKuasiDetail(id){
 }
 
 async function kartuPage(){
-  const {data:items,error}=await client.from('barang').select('id,nama_barang,satuan,merk,tipe,sisa,stok_minimum,harga_terakhir,kategori_id,kategori:kategori_id(id,nama_kategori)').order('nama_barang');
-  if(error)throw error;
-  const totalNilai=(items||[]).reduce((n,r)=>n+(Number(r.sisa)||0)*(Number(r.harga_terakhir)||0),0);
-  const totalStok=(items||[]).reduce((n,r)=>n+(Number(r.sisa)||0),0);
-  const needAttention=(items||[]).filter(r=>Number(r.sisa||0)<=Number(r.stok_minimum||0)).length;
-  const categories=[...new Map((items||[]).map(r=>[r.kategori_id,r.kategori?.nama_kategori||'Tanpa Kategori'])).entries()].sort((a,b)=>String(a[1]).localeCompare(String(b[1])));
-  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PERSEDIAAN</span><h2>Kartu Persediaan</h2><p>Rekap saldo, nilai persediaan, dan seluruh mutasi per barang.</p></div><div class="kartu-head-actions"><span class="status-pill">'+items.length+' barang</span></div></div>'+
+  const [itemsQ,layersQ]=await Promise.all([
+    client.from('barang').select('id,nama_barang,satuan,merk,tipe,sisa,stok_minimum,harga_terakhir,kategori_id,kategori:kategori_id(id,nama_kategori)').order('nama_barang'),
+    client.from('sipb_fifo_layers').select('barang_id,sisa,harga_satuan')
+  ]);
+  if(itemsQ.error)throw itemsQ.error;
+  const items=itemsQ.data||[];
+  const fifoMissing=e=>['42P01','PGRST205'].includes(e?.code)||/does not exist|could not find the table/i.test(e?.message||'');
+  const fifoReady=!layersQ.error;
+  if(layersQ.error&&!fifoMissing(layersQ.error))throw layersQ.error;
+  const fifoValues=new Map();
+  (layersQ.data||[]).forEach(l=>{
+    const key=Number(l.barang_id),value=(Number(l.sisa)||0)*(Number(l.harga_satuan)||0);
+    fifoValues.set(key,(fifoValues.get(key)||0)+value);
+  });
+  const isKuasi=r=>/kuasi/i.test(r.kategori?.nama_kategori||'');
+  const itemValue=r=>isKuasi(r)
+    ?(Number(r.sisa)||0)*(Number(r.harga_terakhir)||0)
+    :(fifoReady?(fifoValues.get(Number(r.id))||0):(Number(r.sisa)||0)*(Number(r.harga_terakhir)||0));
+  const totalNilai=items.reduce((n,r)=>n+itemValue(r),0);
+  const totalStok=items.reduce((n,r)=>n+(Number(r.sisa)||0),0);
+  const needAttention=items.filter(r=>Number(r.sisa||0)<=Number(r.stok_minimum||0)).length;
+  const categories=[...new Map(items.map(r=>[r.kategori_id,r.kategori?.nama_kategori||'Tanpa Kategori'])).entries()].sort((a,b)=>String(a[1]).localeCompare(String(b[1])));
+  const fifoNote=fifoReady?'Nilai stok barang umum dihitung dari sisa lapisan FIFO.':'FIFO belum diaktifkan di database; nilai sementara memakai harga terakhir.';
+  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PERSEDIAAN</span><h2>Kartu Persediaan</h2><p>Rekap saldo, harga pokok FIFO, dan seluruh mutasi per barang.</p><small>'+esc(fifoNote)+'</small></div><div class="kartu-head-actions"><span class="status-pill">'+items.length+' barang</span></div></div>'+
   '<div class="kartu-summary-grid"><div class="kartu-summary"><span class="kartu-summary-icon">'+navSvg('barang')+'</span><div><small>Total Barang</small><strong>'+items.length+'</strong></div></div><div class="kartu-summary"><span class="kartu-summary-icon">'+navSvg('stock_opname')+'</span><div><small>Total Saldo</small><strong>'+totalStok.toLocaleString('id-ID')+'</strong></div></div><div class="kartu-summary"><span class="kartu-summary-icon">'+navSvg('barang_masuk')+'</span><div><small>Nilai Persediaan</small><strong>'+rupiah(totalNilai)+'</strong></div></div><div class="kartu-summary '+(needAttention?'attention':'')+'"><span class="kartu-summary-icon">'+navSvg('barang_keluar')+'</span><div><small>Perlu Perhatian</small><strong>'+needAttention+'</strong></div></div></div>'+
   '<div class="filter-bar"><div class="search-box">⌕<input id="kartuSearch" placeholder="Cari nama, tipe, merk, atau kategori..."></div><select id="kartuFilterKategori"><option value="">Semua kategori</option>'+categories.map(x=>'<option value="'+esc(x[0]??'')+'">'+esc(x[1])+'</option>').join('')+'</select><select id="kartuFilterStatus"><option value="">Semua stok</option><option value="aman">Stok aman</option><option value="menipis">Stok menipis</option><option value="habis">Stok habis</option></select><select id="kartuBarang"><option value="">-- Pilih barang --</option>'+items.map(r=>'<option value="'+r.id+'">'+esc(r.nama_barang)+' — '+esc(r.satuan||'-')+'</option>').join('')+'</select></div>'+
-  '<div id="kartuDetail"></div><div class="table-wrap"><table id="kartuTable"><thead><tr><th>Barang</th><th>Kategori</th><th>Satuan</th><th>Saldo</th><th>Minimum</th><th>Harga Terakhir</th><th>Nilai Sisa</th><th>Status</th><th>Aksi</th></tr></thead><tbody>'+
-  (items.map(r=>{const s=Number(r.sisa)||0,m=Number(r.stok_minimum)||0,status=s<=0?'habis':s<=m?'menipis':'aman';return '<tr data-kategori="'+(r.kategori_id??'')+'" data-status="'+status+'" data-search="'+esc([r.nama_barang,r.merk,r.tipe,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())+'"><td><strong>'+esc(r.nama_barang)+'</strong><br><small>'+esc([r.tipe,r.merk].filter(Boolean).join(' · '))+'</small></td><td>'+esc(r.kategori?.nama_kategori||'-')+'</td><td>'+esc(r.satuan||'-')+'</td><td><span class="stock '+(s<=m?'low':'')+'">'+s+'</span></td><td>'+m+'</td><td>'+rupiah(r.harga_terakhir)+'</td><td>'+rupiah(s*(Number(r.harga_terakhir)||0))+'</td><td><span class="badge-soft '+(status==='aman'?'success':'')+'">'+(status==='habis'?'Habis':status==='menipis'?'Menipis':'Aman')+'</span></td><td><button class="btn-sm view-kartu" data-id="'+r.id+'">Lihat Kartu</button></td></tr>'}).join('')||emptyRow(9))+
+  '<div id="kartuDetail"></div><div class="table-wrap"><table id="kartuTable"><thead><tr><th>Barang</th><th>Kategori</th><th>Satuan</th><th>Saldo</th><th>Minimum</th><th>Harga Terakhir</th><th>Nilai Sisa FIFO</th><th>Status</th><th>Aksi</th></tr></thead><tbody>'+
+  (items.map(r=>{const s=Number(r.sisa)||0,m=Number(r.stok_minimum)||0,status=s<=0?'habis':s<=m?'menipis':'aman';return '<tr data-kategori="'+(r.kategori_id??'')+'" data-status="'+status+'" data-search="'+esc([r.nama_barang,r.merk,r.tipe,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())+'"><td><strong>'+esc(r.nama_barang)+'</strong><br><small>'+esc([r.tipe,r.merk].filter(Boolean).join(' · '))+'</small></td><td>'+esc(r.kategori?.nama_kategori||'-')+'</td><td>'+esc(r.satuan||'-')+'</td><td><span class="stock '+(s<=m?'low':'')+'">'+s+'</span></td><td>'+m+'</td><td>'+rupiah(r.harga_terakhir)+'</td><td>'+rupiah(itemValue(r))+'</td><td><span class="badge-soft '+(status==='aman'?'success':'')+'">'+(status==='habis'?'Habis':status==='menipis'?'Menipis':'Aman')+'</span></td><td><button class="btn-sm view-kartu" data-id="'+r.id+'">Lihat Kartu</button></td></tr>'}).join('')||emptyRow(9))+
   '</tbody></table></div></section>';
 }
 
 async function loadKartuDetail(id){
-  const [{data:item,error:ie},{data:masuk,error:me},{data:keluar,error:ke},{data:opname,error:oe}]=await Promise.all([
+  const [itemQ,masukQ,keluarQ,opnameQ,layersQ]=await Promise.all([
     client.from('barang').select('id,nama_barang,satuan,merk,tipe,sisa,stok_minimum,harga_terakhir,kategori:kategori_id(nama_kategori)').eq('id',id).single(),
     client.from('barang_masuk').select('id,tanggal_masuk,jumlah,harga_satuan,nama_penyerah,nama_penerima,keterangan,nomor_awal,nomor_akhir,nomor_dus').eq('barang_id',id).order('tanggal_masuk',{ascending:true}).order('id',{ascending:true}),
     client.from('detail_barang_keluar').select('id,transaksi_keluar_id,jumlah,nomor_awal,nomor_akhir,nomor_dus,transaksi:transaksi_keluar_id(id,tanggal_keluar,penerima_nama,penerima_jabatan,penerima_nip,tujuan_ruangan,status,jenis_dokumen)').eq('barang_id',id).order('id',{ascending:true}),
-    client.from('riwayat_opname').select('id,tanggal_opname,stok_sistem,stok_fisik,selisih,keterangan,petugas').eq('barang_id',id).order('tanggal_opname',{ascending:true}).order('id',{ascending:true})
+    client.from('riwayat_opname').select('id,tanggal_opname,stok_sistem,stok_fisik,selisih,keterangan,petugas').eq('barang_id',id).order('tanggal_opname',{ascending:true}).order('id',{ascending:true}),
+    client.from('sipb_fifo_layers').select('id,barang_masuk_id,source_type,tanggal_masuk,jumlah_masuk,sisa,harga_satuan,harga_estimasi,catatan').eq('barang_id',id).order('tanggal_masuk',{ascending:true}).order('id',{ascending:true})
   ]);
-  if(ie||me||ke||oe)throw(ie||me||ke||oe);
+  if(itemQ.error||masukQ.error||keluarQ.error||opnameQ.error)throw(itemQ.error||masukQ.error||keluarQ.error||opnameQ.error);
+  const item=itemQ.data,masuk=masukQ.data||[],keluar=keluarQ.data||[],opname=opnameQ.data||[];
+  const fifoMissing=e=>['42P01','PGRST205'].includes(e?.code)||/does not exist|could not find the table/i.test(e?.message||'');
+  const fifoReady=!layersQ.error;
+  if(layersQ.error&&!fifoMissing(layersQ.error))throw layersQ.error;
+  const fifoLayers=layersQ.data||[];
+  let allocations=[];
+  if(fifoReady){
+    const detailIds=keluar.map(r=>r.id);
+    const opnameIds=opname.filter(r=>Number(r.selisih)<0).map(r=>r.id);
+    const requests=[];
+    if(detailIds.length)requests.push(client.from('sipb_fifo_allocations').select('detail_barang_keluar_id,jumlah,harga_satuan,reversed_at').in('detail_barang_keluar_id',detailIds).is('reversed_at',null));
+    if(opnameIds.length)requests.push(client.from('sipb_fifo_allocations').select('riwayat_opname_id,jumlah,harga_satuan,reversed_at').in('riwayat_opname_id',opnameIds).is('reversed_at',null));
+    const results=await Promise.all(requests);
+    for(const q of results){if(q.error)throw q.error;allocations.push(...(q.data||[]));}
+  }
+  const byDetail=new Map(),byOpname=new Map();
+  allocations.forEach(a=>{
+    const key=a.detail_barang_keluar_id??a.riwayat_opname_id;
+    const map=a.detail_barang_keluar_id!=null?byDetail:byOpname;
+    const v=map.get(key)||{qty:0,value:0};
+    v.qty+=Number(a.jumlah)||0;v.value+=(Number(a.jumlah)||0)*(Number(a.harga_satuan)||0);map.set(key,v);
+  });
+  const itemKuasi=/kuasi/i.test(item.kategori?.nama_kategori||'');
   const rows=[
-    ...(masuk||[]).map(r=>({date:r.tanggal_masuk,type:'MASUK',qtyIn:Number(r.jumlah)||0,qtyOut:0,price:Number(r.harga_satuan)||0,desc:'Penerimaan dari '+(r.nama_penyerah||'-')+(r.keterangan?' [Keterangan: '+r.keterangan+']':'')+(r.nomor_awal?' [Seri: '+r.nomor_awal+' - '+(r.nomor_akhir||'-')+']':'')+(r.nomor_dus?' [Dus: '+r.nomor_dus+']':''),id:r.id})),
-    ...(keluar||[]).filter(r=>(r.transaksi?.status||'AKTIF')==='AKTIF').map(r=>({date:r.transaksi?.tanggal_keluar,type:'KELUAR',qtyIn:0,qtyOut:Number(r.jumlah)||0,price:0,desc:'Distribusi ke '+(r.transaksi?.penerima_nama||'-')+' ('+(r.transaksi?.tujuan_ruangan||'Umum')+')'+(r.nomor_awal?' [Seri: '+r.nomor_awal+(r.nomor_akhir?' - '+r.nomor_akhir:'')+']':'')+(r.nomor_dus?' [Dus '+r.nomor_dus+']':''),id:r.id})),
-    ...(opname||[]).map(r=>({date:r.tanggal_opname,type:r.selisih>0?'OPNAME IN':r.selisih<0?'OPNAME OUT':'OPNAME',qtyIn:r.selisih>0?Number(r.selisih):0,qtyOut:r.selisih<0?Math.abs(Number(r.selisih)):0,price:0,desc:'Penyesuaian opname: '+(r.keterangan||'-')+' · Petugas '+(r.petugas||'-'),id:r.id}))
+    ...masuk.map(r=>({date:r.tanggal_masuk,type:'MASUK',qtyIn:Number(r.jumlah)||0,qtyOut:0,price:Number(r.harga_satuan)||0,qtyOutValue:0,desc:'Penerimaan dari '+(r.nama_penyerah||'-')+(r.keterangan?' [Keterangan: '+r.keterangan+']':'')+(r.nomor_awal?' [Seri: '+r.nomor_awal+' - '+(r.nomor_akhir||'-')+']':'')+(r.nomor_dus?' [Dus: '+r.nomor_dus+']':''),id:r.id})),
+    ...keluar.filter(r=>(r.transaksi?.status||'AKTIF')==='AKTIF').map(r=>{const c=byDetail.get(r.id)||{qty:0,value:0};return {date:r.transaksi?.tanggal_keluar,type:'KELUAR',qtyIn:0,qtyOut:Number(r.jumlah)||0,price:c.qty?c.value/c.qty:0,qtyOutValue:c.value,desc:'Distribusi ke '+(r.transaksi?.penerima_nama||'-')+' ('+(r.transaksi?.tujuan_ruangan||'Umum')+')'+(r.nomor_awal?' [Seri: '+r.nomor_awal+(r.nomor_akhir?' - '+r.nomor_akhir:'')+']':'')+(r.nomor_dus?' [Dus '+r.nomor_dus+']':''),id:r.id}}),
+    ...opname.map(r=>{const c=byOpname.get(r.id)||{qty:0,value:0};return {date:r.tanggal_opname,type:r.selisih>0?'OPNAME IN':r.selisih<0?'OPNAME OUT':'OPNAME',qtyIn:r.selisih>0?Number(r.selisih):0,qtyOut:r.selisih<0?Math.abs(Number(r.selisih)):0,price:c.qty?c.value/c.qty:0,qtyOutValue:c.value,desc:'Penyesuaian opname: '+(r.keterangan||'-')+' · Petugas '+(r.petugas||'-'),id:r.id}})
   ].filter(r=>r.date).sort((x,y)=>String(x.date).localeCompare(String(y.date))||Number(x.id)-Number(y.id));
   const net=rows.reduce((n,r)=>n+r.qtyIn-r.qtyOut,0);
   const opening=Number(item.sisa||0)-net;
@@ -856,16 +897,21 @@ async function loadKartuDetail(id){
   const totalIn=rows.reduce((n,r)=>n+r.qtyIn,0);
   const totalOut=rows.reduce((n,r)=>n+r.qtyOut,0);
   const adj=rows.reduce((n,r)=>n+(r.type==='OPNAME IN'?r.qtyIn:r.type==='OPNAME OUT'?-r.qtyOut:0),0);
-  const nilai=(Number(item.sisa)||0)*(Number(item.harga_terakhir)||0);
+  const nilai=fifoReady&&!itemKuasi
+    ?fifoLayers.reduce((n,l)=>n+(Number(l.sisa)||0)*(Number(l.harga_satuan)||0),0)
+    :(Number(item.sisa)||0)*(Number(item.harga_terakhir)||0);
   const status=Number(item.sisa||0)<=0?'Habis':Number(item.sisa||0)<=Number(item.stok_minimum||0)?'Menipis':'Aman';
-  const movementRows=rows.map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+fmtDate(r.date)+'</td><td><span class="badge-soft '+(r.type==='MASUK'||r.type==='OPNAME IN'?'success':'')+'">'+r.type+'</span></td><td>'+esc(r.desc)+'</td><td>'+(r.price?rupiah(r.price):'-')+'</td><td>'+(r.qtyIn||'-')+'</td><td>'+(r.qtyOut||'-')+'</td><td><strong>'+r.saldo+'</strong></td></tr>').join('');
-  $('kartuDetail').innerHTML=`<section class="card page-card kartu-detail-card" data-barang-id="${id}"><div class="section-head"><div><span class="eyebrow">KARTU PERSEDIAAN · MUTASI</span><h3>${esc(item.nama_barang)}</h3><p>${esc(item.kategori?.nama_kategori||'-')} · ${esc(item.merk||'-')} / ${esc(item.tipe||'-')}</p></div><div class="row-actions"><span class="badge-soft ${status==='Aman'?'success':''}">${status}</span><button class="ghost" id="closeKartu">Tutup Detail</button></div></div><div class="kartu-detail-summary"><div><small>Saldo Sekarang</small><strong>${item.sisa} ${esc(item.satuan||'')}</strong></div><div><small>Saldo Awal Berdasarkan Mutasi</small><strong>${opening}</strong></div><div><small>Total Masuk</small><strong>${totalIn}</strong></div><div><small>Total Keluar</small><strong>${totalOut}</strong></div><div><small>Penyesuaian</small><strong>${adj}</strong></div><div><small>Nilai Sisa</small><strong>${rupiah(nilai)}</strong></div></div><div class="kartu-legend"><span><i class="in"></i> Masuk</span><span><i class="out"></i> Keluar</span><span><i class="adj"></i> Opname</span></div><div class="table-wrap"><table><thead><tr><th>No</th><th>Tanggal</th><th>Jenis</th><th>Uraian / Kronologi</th><th>Harga Beli</th><th>Masuk</th><th>Keluar</th><th>Sisa Saldo</th></tr></thead><tbody>${movementRows||emptyRow(8)}</tbody></table></div></section>`;
-  $('closeKartu').onclick=()=>$('kartuDetail').innerHTML='';
-  enhanceTables($('kartuDetail'));
+  const movementRows=rows.map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+fmtDate(r.date)+'</td><td><span class="badge-soft '+(r.type==='MASUK'||r.type==='OPNAME IN'?'success':'')+'">'+r.type+'</span></td><td>'+esc(r.desc)+'</td><td>'+(r.price?rupiah(r.price):'-')+'</td><td>'+(r.qtyOutValue?rupiah(r.qtyOutValue):'-')+'</td><td>'+(r.qtyIn||'-')+'</td><td>'+(r.qtyOut||'-')+'</td><td><strong>'+r.saldo+'</strong></td></tr>').join('');
+  const sourceLabel=l=>l.source_type==='BARANG_MASUK'?'Penerimaan #'+l.barang_masuk_id:l.source_type==='OPNAME'?'Stock Opname #'+l.id:l.source_type==='MIGRASI_LEGACY'?'Saldo historis hasil rekonstruksi':'Penyesuaian saldo FIFO';
+  const layerRows=fifoLayers.map(l=>'<tr><td>'+fmtDate(l.tanggal_masuk)+'</td><td>'+esc(sourceLabel(l))+'</td><td>'+Number(l.jumlah_masuk||0).toLocaleString('id-ID')+'</td><td>'+Number(l.sisa||0).toLocaleString('id-ID')+'</td><td>'+rupiah(l.harga_satuan)+'</td><td>'+rupiah((Number(l.sisa)||0)*(Number(l.harga_satuan)||0))+'</td><td>'+(l.harga_estimasi?'<span class="badge-soft warning">Estimasi</span>':'Pasti')+'</td><td>'+esc(l.catatan||'-')+'</td></tr>').join('');
+  const fifoSection=itemKuasi
+    ?'<p class="muted">Barang Kuasi tetap menggunakan FIFO nomor seri/batch khusus.</p>'
+    :fifoReady?'<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Sumber Lapisan</th><th>Jumlah Masuk</th><th>Sisa</th><th>Harga Satuan</th><th>Nilai Sisa</th><th>Harga</th><th>Catatan</th></tr></thead><tbody>'+(layerRows||emptyRow(8))+'</tbody></table></div>'
+    :'<p class="muted">Lapisan FIFO belum tersedia. Jalankan migrasi FIFO sebelum menggunakan penilaian per lapisan.</p>';
+  $('kartuDetail').innerHTML=`<section class="card page-card kartu-detail-card" data-barang-id="${id}"><div class="section-head"><div><span class="eyebrow">KARTU PERSEDIAAN · MUTASI FIFO</span><h3>${esc(item.nama_barang)}</h3><p>${esc(item.kategori?.nama_kategori||'-')} · ${esc(item.merk||'-')} / ${esc(item.tipe||'-')}</p></div><div class="row-actions"><span class="badge-soft ${status==='Aman'?'success':''}">${status}</span><button class="ghost" id="closeKartu">Tutup Detail</button></div></div><div class="kartu-detail-summary"><div><small>Saldo Sekarang</small><strong>${item.sisa} ${esc(item.satuan||'')}</strong></div><div><small>Saldo Awal Berdasarkan Mutasi</small><strong>${opening}</strong></div><div><small>Total Masuk</small><strong>${totalIn}</strong></div><div><small>Total Keluar</small><strong>${totalOut}</strong></div><div><small>Penyesuaian</small><strong>${adj}</strong></div><div><small>Nilai Sisa FIFO</small><strong>${rupiah(nilai)}</strong></div></div><div class="kartu-legend"><span><i class="in"></i> Masuk</span><span><i class="out"></i> Keluar</span><span><i class="adj"></i> Opname</span></div><h4>Lapisan Persediaan FIFO</h4>${fifoSection}<h4>Riwayat Mutasi</h4><div class="table-wrap"><table><thead><tr><th>No</th><th>Tanggal</th><th>Jenis</th><th>Uraian / Kronologi</th><th>Harga Satuan / HPP</th><th>Nilai Keluar</th><th>Masuk</th><th>Keluar</th><th>Sisa Saldo</th></tr></thead><tbody>${movementRows||emptyRow(9)}</tbody></table></div></section>`;
   $('closeKartu').onclick=()=>$('kartuDetail').innerHTML='';
   enhanceTables($('kartuDetail'));
 }
-
 
 async function fetchAllSipbRows(table,select='*'){
   const all=[],pageSize=1000;
