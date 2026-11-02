@@ -192,7 +192,7 @@ BEGIN
       INSERT INTO public.sipb_fifo_layers(
         barang_id,source_type,tanggal_masuk,jumlah_masuk,sisa,harga_satuan,harga_estimasi,catatan
       ) VALUES(
-        b.id,'MIGRASI_PENYESUAIAN',CURRENT_DATE,need_qty,need_qty,b.harga_terakhir,true,
+        b.id,'MIGRASI_PENYESUAIAN',DATE '1900-01-01',need_qty,need_qty,b.harga_terakhir,true,
         'Penyesuaian saldo aktivasi FIFO; harga estimasi dari harga terakhir Master Barang'
       );
       estimate_count := estimate_count+1;
