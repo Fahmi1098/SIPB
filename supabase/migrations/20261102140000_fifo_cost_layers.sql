@@ -74,7 +74,7 @@ RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE
   e record;
   l record;
-  b record;
+  v_master record;
   need_qty integer;
   available_qty integer;
   take_qty integer;
@@ -176,7 +176,7 @@ BEGIN
     END LOOP;
   END LOOP;
 
-  FOR b IN
+  FOR v_master IN
     SELECT b.id,COALESCE(b.sisa,0)::integer sisa,
            COALESCE(b.harga_terakhir,0)::numeric(20,4) harga_terakhir
     FROM public.barang b
@@ -185,22 +185,22 @@ BEGIN
     ORDER BY b.id
   LOOP
     SELECT COALESCE(SUM(sisa),0)::integer INTO remaining_qty
-    FROM public.sipb_fifo_layers WHERE barang_id=b.id;
+    FROM public.sipb_fifo_layers WHERE barang_id=v_master.id;
 
-    IF remaining_qty<b.sisa THEN
-      need_qty := b.sisa-remaining_qty;
+    IF remaining_qty<v_master.sisa THEN
+      need_qty := v_master.sisa-remaining_qty;
       INSERT INTO public.sipb_fifo_layers(
         barang_id,source_type,tanggal_masuk,jumlah_masuk,sisa,harga_satuan,harga_estimasi,catatan
       ) VALUES(
-        b.id,'MIGRASI_PENYESUAIAN',DATE '1900-01-01',need_qty,need_qty,b.harga_terakhir,true,
+        v_master.id,'MIGRASI_PENYESUAIAN',DATE '1900-01-01',need_qty,need_qty,v_master.harga_terakhir,true,
         'Penyesuaian saldo aktivasi FIFO; harga estimasi dari harga terakhir Master Barang'
       );
       estimate_count := estimate_count+1;
-    ELSIF remaining_qty>b.sisa THEN
-      need_qty := remaining_qty-b.sisa;
+    ELSIF remaining_qty>v_master.sisa THEN
+      need_qty := remaining_qty-v_master.sisa;
       FOR l IN
         SELECT id,sisa,harga_satuan FROM public.sipb_fifo_layers
-        WHERE barang_id=b.id AND sisa>0 ORDER BY tanggal_masuk,id FOR UPDATE
+        WHERE barang_id=v_master.id AND sisa>0 ORDER BY tanggal_masuk,id FOR UPDATE
       LOOP
         EXIT WHEN need_qty<=0;
         take_qty := LEAST(need_qty,l.sisa);
