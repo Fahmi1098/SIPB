@@ -24,6 +24,14 @@ jobs:
           node-version: 22
       - name: Validate application JavaScript
         run: node --check web/assets/app.js
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate PostgreSQL migration statement syntax
+        run: |
+          python -m pip install --quiet pglast
+          python -c "from pathlib import Path; from pglast import parse_sql; parse_sql(Path('supabase/migrations/20261102090000_security_integrity_followup.sql').read_text(encoding='utf-8')); print('SQL statement syntax OK')"
   deploy:
     needs: validate
     if: github.event_name != 'pull_request'
