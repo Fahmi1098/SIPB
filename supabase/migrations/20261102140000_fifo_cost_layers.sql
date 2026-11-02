@@ -307,30 +307,30 @@ FOR EACH ROW EXECUTE FUNCTION public.sipb_fifo_detail_insert_trigger();
 CREATE OR REPLACE FUNCTION public.sipb_fifo_sync_receipt_trigger()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE
-  layer_id bigint;
+  v_layer_id bigint;
   used_qty integer;
 BEGIN
   IF current_setting('sipb.fifo_rebuilding',true)='on' THEN
     IF TG_OP='DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
   END IF;
   IF TG_OP='DELETE' THEN
-    SELECT id INTO layer_id FROM public.sipb_fifo_layers WHERE barang_masuk_id=OLD.id FOR UPDATE;
-    IF layer_id IS NOT NULL THEN
-      IF EXISTS(SELECT 1 FROM public.sipb_fifo_allocations WHERE layer_id=layer_id) THEN
+    SELECT id INTO v_layer_id FROM public.sipb_fifo_layers WHERE barang_masuk_id=OLD.id FOR UPDATE;
+    IF v_layer_id IS NOT NULL THEN
+      IF EXISTS(SELECT 1 FROM public.sipb_fifo_allocations WHERE layer_id=v_layer_id) THEN
         RAISE EXCEPTION 'Penerimaan #% sudah memiliki riwayat alokasi FIFO dan tidak dapat dihapus',OLD.id;
       END IF;
-      DELETE FROM public.sipb_fifo_layers WHERE id=layer_id;
+      DELETE FROM public.sipb_fifo_layers WHERE id=v_layer_id;
     END IF;
     RETURN OLD;
   END IF;
 
-  SELECT id INTO layer_id FROM public.sipb_fifo_layers WHERE barang_masuk_id=NEW.id FOR UPDATE;
+  SELECT id INTO v_layer_id FROM public.sipb_fifo_layers WHERE barang_masuk_id=NEW.id FOR UPDATE;
   IF public.sipb_fifo_is_kuasi(NEW.barang_id) THEN
-    IF layer_id IS NOT NULL THEN
-      IF EXISTS(SELECT 1 FROM public.sipb_fifo_allocations WHERE layer_id=layer_id) THEN
+    IF v_layer_id IS NOT NULL THEN
+      IF EXISTS(SELECT 1 FROM public.sipb_fifo_allocations WHERE layer_id=v_layer_id) THEN
         RAISE EXCEPTION 'Penerimaan #% memiliki riwayat FIFO dan tidak dapat diubah menjadi Kuasi',NEW.id;
       END IF;
-      DELETE FROM public.sipb_fifo_layers WHERE id=layer_id;
+      DELETE FROM public.sipb_fifo_layers WHERE id=v_layer_id;
     END IF;
     RETURN NEW;
   END IF;
@@ -343,7 +343,7 @@ BEGIN
   END IF;
 
   SELECT COALESCE(SUM(jumlah),0)::integer INTO used_qty
-  FROM public.sipb_fifo_allocations WHERE layer_id=layer_id AND reversed_at IS NULL;
+  FROM public.sipb_fifo_allocations WHERE layer_id=v_layer_id AND reversed_at IS NULL;
   IF used_qty>NEW.jumlah THEN
     RAISE EXCEPTION 'Jumlah penerimaan #% tidak boleh di bawah alokasi FIFO aktif (%)',NEW.id,used_qty;
   END IF;
@@ -352,7 +352,7 @@ BEGIN
     LEFT JOIN public.detail_barang_keluar d ON d.id=a.detail_barang_keluar_id
     LEFT JOIN public.transaksi_keluar t ON t.id=d.transaksi_keluar_id
     LEFT JOIN public.riwayat_opname o ON o.id=a.riwayat_opname_id
-    WHERE a.layer_id=layer_id AND a.reversed_at IS NULL
+    WHERE a.layer_id=v_layer_id AND a.reversed_at IS NULL
       AND COALESCE(t.tanggal_keluar,o.tanggal_opname)<NEW.tanggal_masuk
   ) THEN
     RAISE EXCEPTION 'Tanggal penerimaan #% tidak dapat digeser melewati transaksi yang telah memakai lapisan FIFO',NEW.id;
@@ -365,8 +365,8 @@ BEGIN
   SET barang_id=NEW.barang_id,tanggal_masuk=NEW.tanggal_masuk,
       jumlah_masuk=NEW.jumlah,sisa=NEW.jumlah-used_qty,harga_satuan=NEW.harga_satuan,
       harga_estimasi=false,catatan=NULL
-  WHERE id=layer_id;
-  UPDATE public.sipb_fifo_allocations SET harga_satuan=NEW.harga_satuan WHERE layer_id=layer_id;
+  WHERE id=v_layer_id;
+  UPDATE public.sipb_fifo_allocations SET harga_satuan=NEW.harga_satuan WHERE layer_id=v_layer_id;
   RETURN NEW;
 END;
 $$;
@@ -460,3 +460,221 @@ COMMENT ON TABLE public.sipb_fifo_allocations IS
   'Jejak alokasi pengeluaran dan stock opname ke lapisan FIFO beserta harga pokok.';
 COMMENT ON FUNCTION public.rebuild_sipb_fifo() IS
   'Admin-only rebuild of FIFO layers. Missing legacy history is retained as explicitly estimated layers.';
+
+-- Make the existing backup restore re-create FIFO layers from the restored ledger.
+CREATE OR REPLACE FUNCTION public.restore_sipb_backup(p_backup jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_required text[] := ARRAY[
+    'kategori', 'pegawai', 'barang', 'barang_masuk', 'stok_kuasi',
+    'transaksi_keluar', 'detail_barang_keluar',
+    'transaksi_kuasi_alokasi', 'riwayat_opname'
+  ];
+  v_name text;
+  v_count bigint;
+BEGIN
+  IF NOT public.sipb_is_active_user() OR NOT public.sipb_is_admin() THEN
+    RAISE EXCEPTION 'Hanya admin aktif yang dapat melakukan restore SIPB';
+  END IF;
+
+  IF COALESCE(p_backup->>'format', '') <> 'SIPB_BACKUP'
+     OR COALESCE(p_backup->>'format_version', '') <> '1' THEN
+    RAISE EXCEPTION 'Format backup SIPB tidak dikenali';
+  END IF;
+
+  IF jsonb_typeof(p_backup->'tables') IS DISTINCT FROM 'object' THEN
+    RAISE EXCEPTION 'Bagian tables pada backup tidak valid';
+  END IF;
+
+  FOREACH v_name IN ARRAY v_required LOOP
+    IF jsonb_typeof(p_backup->'tables'->v_name) IS DISTINCT FROM 'array' THEN
+      RAISE EXCEPTION 'Data tabel % tidak tersedia atau bukan array', v_name;
+    END IF;
+  END LOOP;
+
+  -- Disable per-row FIFO triggers during bulk restore; rebuild once all history is restored.
+  PERFORM set_config('sipb.fifo_rebuilding','on',true);
+  DELETE FROM public.sipb_fifo_allocations;
+  DELETE FROM public.sipb_fifo_layers;
+
+  -- Delete in FK-safe order. Any later validation/insert failure rolls back all.
+  DELETE FROM public.transaksi_kuasi_alokasi;
+  DELETE FROM public.detail_barang_keluar;
+  DELETE FROM public.transaksi_keluar;
+  DELETE FROM public.barang_masuk;
+  DELETE FROM public.riwayat_opname;
+  DELETE FROM public.stok_kuasi;
+  DELETE FROM public.barang;
+  DELETE FROM public.kategori;
+  DELETE FROM public.pegawai;
+
+  INSERT INTO public.kategori(id, nama_kategori)
+  SELECT x.id, x.nama_kategori
+  FROM jsonb_to_recordset(p_backup->'tables'->'kategori')
+    AS x(id integer, nama_kategori text);
+
+  INSERT INTO public.pegawai(
+    id, nama_pegawai, nip, status_pegawai, jabatan, unit_kerja
+  )
+  SELECT
+    x.id, x.nama_pegawai, x.nip, x.status_pegawai, x.jabatan, x.unit_kerja
+  FROM jsonb_to_recordset(p_backup->'tables'->'pegawai')
+    AS x(
+      id integer, nama_pegawai text, nip text, status_pegawai text,
+      jabatan text, unit_kerja text
+    );
+
+  INSERT INTO public.barang(
+    id, kode_barang, kategori_id, nama_barang, keterangan, tipe, merk, satuan,
+    harga_terakhir, jumlah_total, terpakai, sisa, stok_minimum, kategori,
+    is_archived
+  )
+  SELECT
+    x.id, x.kode_barang, x.kategori_id, x.nama_barang, x.keterangan,
+    x.tipe, x.merk, x.satuan,
+    COALESCE(x.harga_terakhir, 0), COALESCE(x.jumlah_total, 0),
+    COALESCE(x.terpakai, 0), COALESCE(x.sisa, 0),
+    COALESCE(x.stok_minimum, 0), COALESCE(x.kategori, 'non-kuasi'),
+    COALESCE(x.is_archived, false)
+  FROM jsonb_to_recordset(p_backup->'tables'->'barang')
+    AS x(
+      id integer, kode_barang text, kategori_id integer, nama_barang text,
+      keterangan text, tipe text, merk text, satuan text, harga_terakhir numeric,
+      jumlah_total integer, terpakai integer, sisa integer, stok_minimum integer,
+      kategori text, is_archived boolean
+    );
+
+  INSERT INTO public.barang_masuk(
+    id, barang_id, jumlah, harga_satuan, sumber_dana, nomor_awal, nomor_akhir,
+    tanggal_masuk, nama_penyerah, nama_penerima, nomor_dus, keterangan
+  )
+  SELECT
+    x.id, x.barang_id, x.jumlah, COALESCE(x.harga_satuan, 0), x.sumber_dana,
+    x.nomor_awal, x.nomor_akhir, x.tanggal_masuk, x.nama_penyerah,
+    x.nama_penerima, x.nomor_dus, x.keterangan
+  FROM jsonb_to_recordset(p_backup->'tables'->'barang_masuk')
+    AS x(
+      id integer, barang_id integer, jumlah integer, harga_satuan numeric,
+      sumber_dana text, nomor_awal text, nomor_akhir text, tanggal_masuk date,
+      nama_penyerah text, nama_penerima text, nomor_dus text, keterangan text
+    );
+
+  INSERT INTO public.stok_kuasi(
+    id, barang_id, prefix_huruf, panjang_digit, digit_awal, digit_akhir,
+    digit_sekarang, sisa_lembar, tanggal_masuk, nomor_dus
+  )
+  SELECT
+    x.id, x.barang_id, COALESCE(x.prefix_huruf, ''), x.panjang_digit,
+    x.digit_awal, x.digit_akhir, x.digit_sekarang, x.sisa_lembar,
+    x.tanggal_masuk, x.nomor_dus
+  FROM jsonb_to_recordset(p_backup->'tables'->'stok_kuasi')
+    AS x(
+      id integer, barang_id integer, prefix_huruf text, panjang_digit integer,
+      digit_awal integer, digit_akhir integer, digit_sekarang integer,
+      sisa_lembar integer, tanggal_masuk date, nomor_dus text
+    );
+
+  INSERT INTO public.riwayat_opname(
+    id, tanggal_opname, barang_id, stok_sistem, stok_fisik,
+    selisih, keterangan, petugas
+  )
+  SELECT
+    x.id, x.tanggal_opname, x.barang_id, x.stok_sistem, x.stok_fisik,
+    x.selisih, x.keterangan, x.petugas
+  FROM jsonb_to_recordset(p_backup->'tables'->'riwayat_opname')
+    AS x(
+      id integer, tanggal_opname date, barang_id integer, stok_sistem integer,
+      stok_fisik integer, selisih integer, keterangan text, petugas text
+    );
+
+  INSERT INTO public.transaksi_keluar(
+    id, tanggal_keluar, penyerah_nama, penyerah_jabatan, penyerah_nip,
+    penerima_nama, penerima_jabatan, penerima_nip, tujuan_ruangan,
+    jenis_dokumen, status, dibatalkan_pada, dibatalkan_oleh
+  )
+  SELECT
+    x.id, x.tanggal_keluar, x.penyerah_nama, x.penyerah_jabatan, x.penyerah_nip,
+    x.penerima_nama, x.penerima_jabatan, x.penerima_nip, x.tujuan_ruangan,
+    COALESCE(x.jenis_dokumen, 'Nota Dinas'), COALESCE(x.status, 'AKTIF'),
+    x.dibatalkan_pada, x.dibatalkan_oleh
+  FROM jsonb_to_recordset(p_backup->'tables'->'transaksi_keluar')
+    AS x(
+      id integer, tanggal_keluar date, penyerah_nama text, penyerah_jabatan text,
+      penyerah_nip text, penerima_nama text, penerima_jabatan text,
+      penerima_nip text, tujuan_ruangan text, jenis_dokumen text, status text,
+      dibatalkan_pada timestamptz, dibatalkan_oleh uuid
+    );
+
+  INSERT INTO public.detail_barang_keluar(
+    id, transaksi_keluar_id, barang_id, jumlah, nomor_awal, nomor_akhir, nomor_dus
+  )
+  SELECT
+    x.id, x.transaksi_keluar_id, x.barang_id, x.jumlah,
+    x.nomor_awal, x.nomor_akhir, x.nomor_dus
+  FROM jsonb_to_recordset(p_backup->'tables'->'detail_barang_keluar')
+    AS x(
+      id integer, transaksi_keluar_id integer, barang_id integer, jumlah integer,
+      nomor_awal text, nomor_akhir text, nomor_dus text
+    );
+
+  INSERT INTO public.transaksi_kuasi_alokasi(
+    id, transaksi_keluar_id, detail_barang_keluar_id, stok_kuasi_id,
+    jumlah, digit_awal, digit_akhir, created_at
+  )
+  SELECT
+    x.id, x.transaksi_keluar_id, x.detail_barang_keluar_id, x.stok_kuasi_id,
+    x.jumlah, x.digit_awal, x.digit_akhir, COALESCE(x.created_at, now())
+  FROM jsonb_to_recordset(p_backup->'tables'->'transaksi_kuasi_alokasi')
+    AS x(
+      id bigint, transaksi_keluar_id integer, detail_barang_keluar_id integer,
+      stok_kuasi_id integer, jumlah integer, digit_awal integer,
+      digit_akhir integer, created_at timestamptz
+    );
+
+  PERFORM setval(pg_get_serial_sequence('public.kategori','id'),
+    COALESCE((SELECT max(id) FROM public.kategori), 1),
+    (SELECT count(*) > 0 FROM public.kategori));
+  PERFORM setval(pg_get_serial_sequence('public.pegawai','id'),
+    COALESCE((SELECT max(id) FROM public.pegawai), 1),
+    (SELECT count(*) > 0 FROM public.pegawai));
+  PERFORM setval(pg_get_serial_sequence('public.barang','id'),
+    COALESCE((SELECT max(id) FROM public.barang), 1),
+    (SELECT count(*) > 0 FROM public.barang));
+  PERFORM setval(pg_get_serial_sequence('public.barang_masuk','id'),
+    COALESCE((SELECT max(id) FROM public.barang_masuk), 1),
+    (SELECT count(*) > 0 FROM public.barang_masuk));
+  PERFORM setval(pg_get_serial_sequence('public.stok_kuasi','id'),
+    COALESCE((SELECT max(id) FROM public.stok_kuasi), 1),
+    (SELECT count(*) > 0 FROM public.stok_kuasi));
+  PERFORM setval(pg_get_serial_sequence('public.transaksi_keluar','id'),
+    COALESCE((SELECT max(id) FROM public.transaksi_keluar), 1),
+    (SELECT count(*) > 0 FROM public.transaksi_keluar));
+  PERFORM setval(pg_get_serial_sequence('public.detail_barang_keluar','id'),
+    COALESCE((SELECT max(id) FROM public.detail_barang_keluar), 1),
+    (SELECT count(*) > 0 FROM public.detail_barang_keluar));
+  PERFORM setval(pg_get_serial_sequence('public.riwayat_opname','id'),
+    COALESCE((SELECT max(id) FROM public.riwayat_opname), 1),
+    (SELECT count(*) > 0 FROM public.riwayat_opname));
+  PERFORM setval(pg_get_serial_sequence('public.transaksi_kuasi_alokasi','id'),
+    COALESCE((SELECT max(id) FROM public.transaksi_kuasi_alokasi), 1),
+    (SELECT count(*) > 0 FROM public.transaksi_kuasi_alokasi));
+
+  PERFORM public.sipb_fifo_rebuild_internal();
+  PERFORM set_config('sipb.fifo_rebuilding','off',true);
+
+  SELECT count(*) INTO v_count FROM public.barang;
+  RETURN jsonb_build_object(
+    'status', 'success',
+    'barang_dipulihkan', v_count,
+    'message', 'Restore SIPB berhasil, termasuk kode, keterangan, arsip, dan unit kerja.'
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.restore_sipb_backup(jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.restore_sipb_backup(jsonb) TO authenticated;
+
