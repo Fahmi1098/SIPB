@@ -4,8 +4,8 @@ let client=null,session=null,profile=null;
 let currentPage='dashboard';
 let renderVersion=0;
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
-const idCollator=new Intl.Collator('id-ID',{numeric:true,sensitivity:'base'});
-function normalizeSearchText(value){return String(value??'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLocaleLowerCase('id-ID').replace(/\\s+/g,' ').trim()}
+function normalizeSearchText(value){return String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('id-ID').replace(/\s+/g,' ').trim()}
+function matchesSearch(value,query){const terms=normalizeSearchText(query).split(/\s+/).filter(Boolean);if(!terms.length)return true;const hay=normalizeSearchText(value);return terms.every(term=>hay.includes(term))}
 function matchesSearch(value,query){const terms=normalizeSearchText(query).split(/\\s+/).filter(Boolean);if(!terms.length)return true;const hay=normalizeSearchText(value);return terms.every(term=>hay.includes(term))}
 const rupiah=v=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Number(v)||0);
 const formatAngka=v=>{const n=Number(v);return Number.isFinite(n)?Math.trunc(n).toLocaleString('id-ID'):''};
