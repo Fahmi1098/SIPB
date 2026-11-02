@@ -31,16 +31,22 @@ SELECT
     'public.cancel_barang_keluar_audited(integer,text)',
     'EXECUTE'
   ) AS can_cancel_with_audit,
-  has_function_privilege(
-    'authenticated',
-    'public.cancel_barang_keluar(integer)',
-    'EXECUTE'
-  ) AS can_call_legacy_cancel_without_audit,
-  has_function_privilege(
-    'authenticated',
-    'public.cancel_and_delete_barang_keluar(integer)',
-    'EXECUTE'
-  ) AS can_call_legacy_cancel_and_delete;
+  CASE
+    WHEN to_regprocedure('public.cancel_barang_keluar(integer)') IS NULL THEN false
+    ELSE has_function_privilege(
+      'authenticated',
+      to_regprocedure('public.cancel_barang_keluar(integer)'),
+      'EXECUTE'
+    )
+  END AS can_call_legacy_cancel_without_audit,
+  CASE
+    WHEN to_regprocedure('public.cancel_and_delete_barang_keluar(integer)') IS NULL THEN false
+    ELSE has_function_privilege(
+      'authenticated',
+      to_regprocedure('public.cancel_and_delete_barang_keluar(integer)'),
+      'EXECUTE'
+    )
+  END AS can_call_legacy_cancel_and_delete;
 
 -- Expected: first three = true; legacy cancel and cancel-and-delete = false.
 
