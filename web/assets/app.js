@@ -377,11 +377,11 @@ async function dashboard(){
   const [barangRows,masukRows,keluarRows,categoryBarangRows,masukCategoryRows,outgoingMonthRows,kuasiRows]=await Promise.all([
     fetchAllSipbRows('barang','id,kode_barang,nama_barang,keterangan,satuan,sisa,stok_minimum,harga_terakhir',q=>q.eq('is_archived',false).order('nama_barang',{ascending:true}).order('id',{ascending:true})),
     fetchAllSipbRows('barang_masuk','id,barang_id,jumlah,harga_satuan,keterangan,tanggal_masuk,barang:barang_id(id,nama_barang,satuan,keterangan)',q=>q.order('tanggal_masuk',{ascending:false}).order('id',{ascending:false})),
-    fetchAllSipbRows('transaksi_keluar','id,status'),
+    fetchAllSipbRows('transaksi_keluar','id,status',q=>q.order('id',{ascending:true})),
     fetchAllSipbRows('barang','id,sisa,harga_terakhir,kategori_id,kategori:kategori_id(nama_kategori)',q=>q.eq('is_archived',false).order('id',{ascending:true})),
-    fetchAllSipbRows('barang_masuk','id,barang_id,jumlah,harga_satuan,barang:barang_id(id,kategori_id,kategori:kategori_id(nama_kategori))'),
-    fetchAllSipbRows('transaksi_keluar','tanggal_keluar,status',q=>q.gte('tanggal_keluar',since).order('tanggal_keluar')),
-    fetchAllSipbRows('stok_kuasi','id,barang_id,sisa_lembar,barang:barang_id(nama_barang,satuan)',q=>q.gt('sisa_lembar',0))
+    fetchAllSipbRows('barang_masuk','id,barang_id,jumlah,harga_satuan,barang:barang_id(id,kategori_id,kategori:kategori_id(nama_kategori))',q=>q.order('id',{ascending:true})),
+    fetchAllSipbRows('transaksi_keluar','tanggal_keluar,status',q=>q.gte('tanggal_keluar',since).order('tanggal_keluar').order('id',{ascending:true})),
+    fetchAllSipbRows('stok_kuasi','id,barang_id,sisa_lembar,barang:barang_id(nama_barang,satuan)',q=>q.gt('sisa_lembar',0).order('id',{ascending:true}))
   ]);
   const barangQ={data:barangRows},masukQ={data:masukRows},keluarQ={data:keluarRows},catQ={data:categoryBarangRows},masukCatQ={data:masukCategoryRows},outQ={data:outgoingMonthRows},kuasiQ={data:kuasiRows};
 
@@ -733,8 +733,7 @@ async function barangForm(id=null){
     if(error)throw error;
     row=data;
   }
-  const {data:k,error}=await client.from('kategori').select('*').order('nama_kategori');
-  if(error)throw error;
+  const k=await fetchAllSipbRows('kategori','*',q=>q.order('nama_kategori').order('id',{ascending:true}));
   return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER BARANG</span><h2>${id?'Edit Barang':'Tambah Barang'}</h2><p>Informasi operasional persediaan.</p></div><button class="ghost" id="backBarang">← Kembali</button></div><div class="form-grid">
   <label>Kode Barang <input id="b_kode" value="${esc(row.kode_barang||"")}" maxlength="80" placeholder="Kode barang sumber"></label>
   <label>Nama Barang <input id="b_nama" value="${esc(row.nama_barang||'')}" maxlength="255"></label>
@@ -848,7 +847,7 @@ async function kartuPage(){
   const items=await fetchAllSipbRows('barang','id,kode_barang,nama_barang,keterangan,satuan,merk,tipe,sisa,stok_minimum,harga_terakhir,kategori_id,kategori:kategori_id(id,nama_kategori)',q=>q.order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true}));
   const fifoMissing=e=>['42P01','PGRST205'].includes(e?.code)||/does not exist|could not find the table/i.test(e?.message||'');
   let fifoReady=true,layers=[];
-  try{layers=await fetchAllSipbRows('sipb_fifo_layers','barang_id,sisa,harga_satuan')}catch(e){if(!fifoMissing(e))throw e;fifoReady=false;}
+  try{layers=await fetchAllSipbRows('sipb_fifo_layers','barang_id,sisa,harga_satuan',q=>q.order('id',{ascending:true}))}catch(e){if(!fifoMissing(e))throw e;fifoReady=false;}
   const fifoValues=new Map();
   layers.forEach(l=>{
     const key=Number(l.barang_id),value=(Number(l.sisa)||0)*(Number(l.harga_satuan)||0);
@@ -934,6 +933,7 @@ async function fetchAllSipbRows(table,select='*',configure=null){
   while(true){
     let query=client.from(table).select(select);
     if(typeof configure==='function')query=configure(query)||query;
+    else query=query.order('id',{ascending:true});
     const q=await query.range(offset,offset+pageSize-1);
     if(q.error)throw q.error;
     const rows=q.data||[];
@@ -948,7 +948,7 @@ async function fetchAllSipbRowsByValues(table,select,column,values,configure=nul
   for(let i=0;i<unique.length;i+=batchSize){
     const batch=unique.slice(i,i+batchSize);
     const rows=await fetchAllSipbRows(table,select,q=>{
-      q=q.in(column,batch);
+      q=q.in(column,batch).order('id',{ascending:true});
       return typeof configure==='function'?(configure(q)||q):q;
     });
     all.push(...rows);
@@ -1306,11 +1306,11 @@ function showAuditDetail(id){
 async function showCorrectionModal(type,id){
   if(profile?.role!=='admin')return toast('Hanya admin yang dapat mengoreksi transaksi.','error');
   if(type==='MASUK'){
-    const [{data:r,error},{data:items,error:ie}]=await Promise.all([
+    const [{data:r,error},items]=await Promise.all([
       client.from('barang_masuk').select('*,barang:barang_id(id,nama_barang,satuan,kode_barang,is_archived,kategori:kategori_id(nama_kategori))').eq('id',id).single(),
-      client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,is_archived,kategori:kategori_id(nama_kategori)').eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true})
+      fetchAllSipbRows('barang','id,kode_barang,nama_barang,keterangan,satuan,is_archived,kategori:kategori_id(nama_kategori)',q=>q.eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true}))
     ]);
-    if(error||ie)throw(error||ie);
+    if(error)throw error;
     if(!r||!r.barang)throw new Error('Data penerimaan atau Master Barang tidak ditemukan.');
     if(r.barang.is_archived)throw new Error('Master Barang sudah diarsipkan. Pulihkan barang terlebih dahulu.');
     const category=String(r.barang.kategori?.nama_kategori||'').toLowerCase();
@@ -1361,11 +1361,11 @@ async function showCorrectionModal(type,id){
   }
 
   if(type==='KELUAR'){
-    const [{data:tx,error},{data:items,error:ie}]=await Promise.all([
+    const [{data:tx,error},items]=await Promise.all([
       client.from('transaksi_keluar').select('*,detail_barang_keluar(id,barang_id,jumlah,barang:barang_id(id,nama_barang,satuan,is_archived,kategori:kategori_id(nama_kategori)))').eq('id',id).single(),
-      client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,is_archived,kategori:kategori_id(nama_kategori)').eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true})
+      fetchAllSipbRows('barang','id,kode_barang,nama_barang,keterangan,satuan,sisa,is_archived,kategori:kategori_id(nama_kategori)',q=>q.eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true}))
     ]);
-    if(error||ie)throw(error||ie);
+    if(error)throw error;
     if(!tx||tx.status!=='AKTIF')throw new Error('Hanya transaksi Barang Keluar aktif yang dapat dikoreksi.');
     if((tx.detail_barang_keluar||[]).some(d=>d.barang?.is_archived))throw new Error('Transaksi memakai Master Barang yang sudah diarsipkan. Pulihkan barang terlebih dahulu.');
     const optionMarkup=(selected)=>'<option value="">- Pilih barang -</option>'+(items||[]).map(x=>'<option value="'+x.id+'" '+(Number(x.id)===Number(selected)?'selected':'')+'>'+esc(x.kode_barang||'Tanpa kode')+' — '+esc(x.nama_barang)+' · stok '+x.sisa+' '+esc(x.satuan||'')+'</option>').join('');
@@ -1970,9 +1970,8 @@ async function bindKeluarForm(){
     results.classList.remove('open');
     const hint=row.querySelector('.kuasi-hint');
     if(opt.dataset.kuasi==='kuasi'){
-      client.from('stok_kuasi').select('sisa_lembar').eq('barang_id',value).gt('sisa_lembar',0).then(q=>{
-        if(q.error)return fail(q.error);
-        const total=(q.data||[]).reduce((sum,r)=>sum+Number(r.sisa_lembar||0),0);
+      fetchAllSipbRows('stok_kuasi','sisa_lembar',q=>q.eq('barang_id',value).gt('sisa_lembar',0).order('id',{ascending:true})).then(rows=>{
+        const total=rows.reduce((sum,r)=>sum+Number(r.sisa_lembar||0),0);
         hint.textContent='FIFO: '+total+' lembar pada batch aktif';
         hint.className='kuasi-hint'+(total<1?' warning':'');
       });
