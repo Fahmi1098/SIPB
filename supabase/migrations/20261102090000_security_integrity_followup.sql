@@ -2,7 +2,11 @@
 -- safe Master Barang archive, lossless restore, and strict import validation.
 -- Apply once in Supabase SQL Editor after migrations through 20261009090000.
 
-BEGIN;
+
+-- Ensure the archive flag exists even on databases that were upgraded
+-- from a pre-archive snapshot.
+ALTER TABLE public.barang
+  ADD COLUMN IF NOT EXISTS is_archived boolean NOT NULL DEFAULT false;
 
 -- ---------------------------------------------------------------------------
 -- 1. One authoritative active-account and admin predicate for API policies.
@@ -617,6 +621,13 @@ BEGIN
       RAISE EXCEPTION 'Jumlah dan nominal saldo/bertambah wajib berupa angka untuk %', v_name;
     END IF;
 
+    IF v_saldo_qty_num::text IN ('NaN', 'Infinity', '-Infinity')
+       OR v_saldo_value::text IN ('NaN', 'Infinity', '-Infinity')
+       OR v_add_qty_num::text IN ('NaN', 'Infinity', '-Infinity')
+       OR v_add_value::text IN ('NaN', 'Infinity', '-Infinity') THEN
+      RAISE EXCEPTION 'Jumlah dan nominal untuk % harus berupa angka yang terbatas', v_name;
+    END IF;
+
     IF v_saldo_qty_num < 0 OR v_add_qty_num < 0
        OR v_saldo_qty_num <> trunc(v_saldo_qty_num)
        OR v_add_qty_num <> trunc(v_add_qty_num)
@@ -718,4 +729,3 @@ $$;
 REVOKE ALL ON FUNCTION public.import_rekap_persediaan(jsonb) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.import_rekap_persediaan(jsonb) TO authenticated;
 
-COMMIT;
