@@ -29,7 +29,7 @@ DROP POLICY IF EXISTS sipb_active_transaction_audit_read
 CREATE POLICY sipb_active_transaction_audit_read
   ON public.sipb_transaction_audit
   FOR SELECT TO authenticated
-  USING (public.sipb_is_active_user());
+  USING (public.sipb_is_active_user() AND public.sipb_is_admin());
 
 -- Master Barang name/specification changes also leave a before/after record.
 CREATE OR REPLACE FUNCTION public.audit_master_barang_identity_change()

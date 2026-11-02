@@ -1109,7 +1109,9 @@ async function riwayatPage(){
     client.from('transaksi_keluar').select('*,detail_barang_keluar(id,jumlah,nomor_awal,nomor_akhir,nomor_dus,barang:barang_id(nama_barang,satuan))').order('tanggal_keluar',{ascending:false}).order('id',{ascending:false}).limit(200),
     client.from('barang_masuk').select('*,barang:barang_id(nama_barang,satuan)').order('tanggal_masuk',{ascending:false}).order('id',{ascending:false}).limit(200),
     client.from('riwayat_opname').select('*,barang:barang_id(nama_barang,satuan)').order('tanggal_opname',{ascending:false}).order('id',{ascending:false}).limit(200),
-    client.from('sipb_transaction_audit').select('*').order('created_at',{ascending:false}).limit(100)
+    (profile?.role==='admin'
+      ?client.from('sipb_transaction_audit').select('*').order('created_at',{ascending:false}).limit(100)
+      :Promise.resolve({data:[],error:null}))
   ]);
   if(ke||me||oe||ae)throw(ke||me||oe||ae);
   const rows=[
@@ -1171,9 +1173,9 @@ async function riwayatPage(){
     '<select id="historyType"><option value="">Semua transaksi</option><option value="MASUK">Barang Masuk</option><option value="KELUAR">Barang Keluar</option><option value="OPNAME">Stock Opname</option></select></div>'+
     '<div class="table-wrap"><table id="historyTable"><thead><tr><th>Jenis</th><th>Tanggal</th><th>No.</th><th>Pihak</th><th>Tujuan/Penerima</th><th>Dokumen</th><th>Item</th><th>Status</th><th>Aksi</th></tr></thead>'+
     '<tbody>'+tableRows+(tableRows?'':emptyRow(9))+'</tbody></table></div></section>'+
-    '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">JEJAK PERUBAHAN</span><h2>Riwayat Koreksi & Pembatalan</h2><p>100 perubahan terakhir. Data lama dan data baru dapat dibuka untuk pemeriksaan.</p></div><span class="status-pill">'+(audit||[]).length+' catatan</span></div>'+
+    (profile?.role==='admin'?'<section class="card page-card"><div class="section-head"><div><span class="eyebrow">JEJAK PERUBAHAN</span><h2>Riwayat Koreksi & Pembatalan</h2><p>100 perubahan terakhir. Data lama dan data baru dapat dibuka untuk pemeriksaan.</p></div><span class="status-pill">'+(audit||[]).length+' catatan</span></div>'+
     '<div class="table-wrap"><table id="auditTable"><thead><tr><th>Waktu</th><th>Jenis Data</th><th>Nomor Transaksi</th><th>Tindakan</th><th>Alasan</th><th>Petugas</th><th>Aksi</th></tr></thead>'+
-    '<tbody>'+(auditRows||emptyRow(7))+'</tbody></table></div></section>';
+    '<tbody>'+(auditRows||emptyRow(7))+'</tbody></table></div></section>':'');
 }
 
 function showHistoryDetail(k){
