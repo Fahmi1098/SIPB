@@ -62,7 +62,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.audit_master_barang_identity_change()
   FROM PUBLIC, anon, authenticated;
