@@ -95,6 +95,26 @@ Deno.serve(async (req) => {
     }, 401);
   }
 
+  // The email/password path must enforce the same SIPB active-account rule
+  // as username login. Do not return an Auth token for a disabled/missing profile.
+  const authenticatedUser = tokenBody.user as { id?: string } | undefined;
+  if (!authenticatedUser?.id) {
+    return json({ error: "Identitas akun SIPB tidak ditemukan." }, 401);
+  }
+
+  const { data: sipbProfile, error: sipbProfileError } = await adminClient
+    .from("user_profiles")
+    .select("id,is_active")
+    .eq("id", authenticatedUser.id)
+    .maybeSingle();
+
+  if (sipbProfileError) {
+    return json({ error: "Status akun SIPB gagal diverifikasi." }, 500);
+  }
+  if (!sipbProfile || sipbProfile.is_active !== true) {
+    return json({ error: "Akun SIPB tidak ditemukan atau sudah dinonaktifkan." }, 403);
+  }
+
   return json({
     access_token: tokenBody.access_token,
     refresh_token: tokenBody.refresh_token,

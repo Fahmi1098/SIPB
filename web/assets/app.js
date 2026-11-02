@@ -8,7 +8,28 @@ const rupiah=v=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',m
 const formatAngka=v=>{const n=Number(v);return Number.isFinite(n)?Math.trunc(n).toLocaleString('id-ID'):''};
 const parseAngka=v=>{const s=String(v??'').replace(/[^0-9-]/g,'');return s?Number(s):0};
 const formatInputAngka=input=>{if(!input)return;const raw=String(input.value??'').replace(/[^0-9]/g,'');input.value=raw?Number(raw).toLocaleString('id-ID'):''};
-document.addEventListener('input',e=>{const el=e.target;if(el?.matches?.('[data-number-format="integer"]')){const before=el.value;formatInputAngka(el);if(before!==el.value){try{el.setSelectionRange(el.value.length,el.value.length)}catch(_){}}}});
+document.addEventListener('input',e=>{
+  const el=e.target;
+  if(!el?.matches?.('[data-number-format="integer"]'))return;
+  const before=String(el.value??'');
+  const start=typeof el.selectionStart==='number'?el.selectionStart:before.length;
+  const end=typeof el.selectionEnd==='number'?el.selectionEnd:start;
+  const digitIndex=pos=>before.slice(0,pos).replace(/[^0-9]/g,'').length;
+  const startDigits=digitIndex(start),endDigits=digitIndex(end);
+  formatInputAngka(el);
+  if(before!==el.value){
+    const positionFor=index=>{
+      if(index<=0)return 0;
+      let seen=0;
+      for(let i=0;i<el.value.length;i++){
+        if(/[0-9]/.test(el.value[i]))seen++;
+        if(seen>=index)return i+1;
+      }
+      return el.value.length;
+    };
+    try{el.setSelectionRange(positionFor(startDigits),positionFor(endDigits))}catch(_){}
+  }
+});
 const fmtDate=v=>{if(!v)return '-';const s=String(v);const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);const d=m?new Date(Number(m[1]),Number(m[2])-1,Number(m[3])):new Date(v);return Number.isNaN(d.getTime())?'-':new Intl.DateTimeFormat('id-ID',{dateStyle:'medium'}).format(d)};
 const localDate=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const $=id=>document.getElementById(id);
@@ -290,12 +311,12 @@ function enhanceTables(scope=document){
     table.refreshPagination?.();
   });
 }
-async function cancelAndDeleteOutgoing(id){
-  const cancel=await client.rpc('cancel_barang_keluar',{p_transaksi_id:Number(id)});
-  if(cancel.error)throw cancel.error;
-  const cleanup=await client.rpc('delete_cancelled_barang_keluar',{p_transaksi_id:Number(id)});
-  if(cleanup.error)throw cleanup.error;
-  return cleanup.data;
+async function cancelOutgoing(id,reason){
+  const result=await client.rpc('cancel_barang_keluar_audited',{
+    p_transaksi_id:Number(id),p_alasan:String(reason||'').trim()
+  });
+  if(result.error)throw result.error;
+  return result.data;
 }
 function showLogin(message=''){
  root.innerHTML=`<main class="login"><button class="login-theme-toggle theme-toggle top-action-icon" id="loginThemeToggle" type="button" aria-label="${uiTheme==='dark'?'Mode terang':'Mode gelap'}"><span class="theme-icon">${uiTheme==='dark'?'☀':'☾'}</span><span class="top-action-label">${uiTheme==='dark'?'Mode terang':'Mode gelap'}</span></button><section class="login-shell"><aside class="login-aside"><div class="login-emblem"><img src="${BANTEN_LOGO}" alt="Lambang Provinsi Banten"></div><div class="login-org">PEMERINTAH PROVINSI BANTEN</div><h1>UPTD PENGELOLAAN PENDAPATAN DAERAH MALINGPING</h1><p>Sistem Informasi Pengurus Barang</p><div class="login-rule"></div><small>Portal internal pengelolaan persediaan barang.</small></aside><section class="login-card"><div class="brand"><div><h2>Sistem Informasi Pengurus Barang</h2><p>UPTD PPD Malingping</p></div></div><div class="login-title">Masuk ke sistem</div><p class="login-desc">Gunakan akun yang terdaftar untuk melanjutkan.</p><form id="loginForm"><label for="identifier">Email / Username</label><input id="identifier" type="text" required autocomplete="username" placeholder="akun@instansi.go.id atau username"><label for="password">Password</label><div class="password-wrap"><input id="password" type="password" required autocomplete="current-password" placeholder="••••••••"><button type="button" class="password-toggle" id="togglePassword" aria-label="Tampilkan password" title="Tampilkan password"><svg class="eye-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z"></path><circle cx="12" cy="12" r="2.8"></circle></svg></button></div><button class="primary login-btn" type="submit"><span>Masuk</span><span aria-hidden="true">→</span></button>${message?`<div class="alert">${esc(message)}</div>`:''}</form><div class="login-footer">© ${new Date().getFullYear()} UPTD PPD Malingping</div></section></section></main>`;
@@ -321,16 +342,32 @@ function showLogin(message=''){
     }});
 }
 
-async function loadProfile(){const {data,error}=await client.from('user_profiles').select('*').eq('id',session.user.id).maybeSingle();if(error)throw error;profile=data||{nama_lengkap:session.user.email,role:'user',is_active:true};if(profile.is_active===false){await client.auth.signOut();throw new Error('Akun tidak aktif.')}}
+async function loadProfile(){
+  const active=await client.rpc('sipb_is_active_user');
+  if(active.error)throw active.error;
+  if(active.data!==true){
+    await client.auth.signOut();
+    session=null;profile=null;
+    throw new Error('Akun SIPB tidak aktif atau tidak memiliki akses.');
+  }
+  const {data,error}=await client.from('user_profiles').select('*').eq('id',session.user.id).maybeSingle();
+  if(error)throw error;
+  if(!data||data.is_active!==true){
+    await client.auth.signOut();
+    session=null;profile=null;
+    throw new Error('Profil akun SIPB tidak ditemukan atau tidak aktif.');
+  }
+  profile=data;
+}
 async function count(t){const {count,error}=await client.from(t).select('*',{count:'exact',head:true});if(error)throw error;return count||0}
 async function dashboard(){
   const now=new Date();
   const since=new Date(now.getFullYear(),now.getMonth()-5,1).toISOString();
   const [barangQ,masukQ,keluarQ,catQ,masukCatQ,outQ,kuasiQ]=await Promise.all([
-    client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,stok_minimum,harga_terakhir'),
+    client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,stok_minimum,harga_terakhir').eq('is_archived',false),
     client.from('barang_masuk').select('id,barang_id,jumlah,harga_satuan,keterangan,tanggal_masuk,barang:barang_id(id,nama_barang,satuan,keterangan)'),
     client.from('transaksi_keluar').select('id,status'),
-    client.from('barang').select('id,sisa,harga_terakhir,kategori_id,kategori:kategori_id(nama_kategori)'),
+    client.from('barang').select('id,sisa,harga_terakhir,kategori_id,kategori:kategori_id(nama_kategori)').eq('is_archived',false),
     client.from('barang_masuk').select('id,barang_id,jumlah,harga_satuan,barang:barang_id(id,kategori_id,kategori:kategori_id(nama_kategori))'),
     client.from('transaksi_keluar').select('tanggal_keluar,status').gte('tanggal_keluar',since).order('tanggal_keluar'),
     client.from('stok_kuasi').select('id,barang_id,sisa_lembar,barang:barang_id(nama_barang,satuan)').gt('sisa_lembar',0)
@@ -514,9 +551,17 @@ async function barangPage(){
     return {...r,keterangan_tampil:merged.join(' · ')};
   });
 
-  return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER DATA</span><h2>Master Barang</h2><p>Kelola data barang, kode sumber, dan stok persediaan.</p></div>${profile?.role==='admin'?'<div class="kartu-head-actions"><button type="button" class="ghost" id="importPersediaan">⇧ Import Persediaan</button><button class="primary" id="addBarang">＋ Tambah Barang</button></div>':''}</div><div class="filter-bar"><div class="search-box">⌕<input id="barangSearch" placeholder="Cari kode, nama, keterangan, tipe, merk, atau satuan..."></div><select id="barangFilter"><option value="">Semua kategori</option>${(k||[]).map(x=>`<option value="${x.id}">${esc(x.nama_kategori)}</option>`).join('')}</select><span id="barangCount" class="result-count">${data?.length||0} data</span></div><div class="table-wrap master-barang-table-wrap"><table id="barangTable" class="master-barang-table"><thead><tr><th>ID</th><th>Kode Barang</th><th>Nama Barang</th><th>Keterangan</th><th>Kategori</th><th>Tipe</th><th>Merk</th><th>Satuan</th><th>Harga Terakhir</th><th>Stok</th><th>Aksi</th></tr></thead><tbody>${rows.map(barangRow).join('')||emptyRow(11)}</tbody></table></div></section>`
+  return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">MASTER DATA</span><h2>Master Barang</h2><p>Kelola data barang, kode sumber, dan stok persediaan.</p></div>${profile?.role==='admin'?'<div class="kartu-head-actions"><button type="button" class="ghost" id="importPersediaan">⇧ Import Persediaan</button><button class="primary" id="addBarang">＋ Tambah Barang</button></div>':''}</div><div class="filter-bar"><div class="search-box">⌕<input id="barangSearch" placeholder="Cari kode, nama, keterangan, tipe, merk, atau satuan..."></div><select id="barangFilter"><option value="">Semua kategori</option>${(k||[]).map(x=>`<option value="${x.id}">${esc(x.nama_kategori)}</option>`).join('')}</select><select id="barangStatus"><option value="active">Barang Aktif</option><option value="archived">Barang Diarsipkan</option><option value="all">Semua Status</option></select><span id="barangCount" class="result-count">${data?.length||0} data</span></div><div class="table-wrap master-barang-table-wrap"><table id="barangTable" class="master-barang-table"><thead><tr><th>ID</th><th>Kode Barang</th><th>Nama Barang</th><th>Keterangan</th><th>Kategori</th><th>Tipe</th><th>Merk</th><th>Satuan</th><th>Harga Terakhir</th><th>Stok</th><th>Aksi</th></tr></thead><tbody>${rows.map(barangRow).join('')||emptyRow(11)}</tbody></table></div></section>`
 }
-function barangRow(r){const low=Number(r.sisa??0)<=Number(r.stok_minimum??0);const ket=String(r.keterangan_tampil??r.keterangan??'').trim();return `<tr data-search="${esc([r.kode_barang,r.nama_barang,ket,r.tipe,r.merk,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())}" data-kategori="${r.kategori_id||''}"><td class="id-cell">#${r.id}</td><td><small>${esc(r.kode_barang||"-")}</small></td><td><strong>${esc(r.nama_barang)}</strong></td><td>${esc(ket||'-')}</td><td>${esc(r.kategori?.nama_kategori||'-')}</td><td>${esc(r.tipe||'-')}</td><td>${esc(r.merk||'-')}</td><td>${esc(r.satuan||'-')}</td><td>${rupiah(r.harga_terakhir)}</td><td><span class="stock ${low?'low':''}">${formatAngka(r.sisa??0)}</span></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-barang" data-id="'+r.id+'">Edit</button><button class="btn-sm danger delete-barang" data-id="'+r.id+'">Hapus</button></div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`}
+function barangRow(r){
+  const low=Number(r.sisa??0)<=Number(r.stok_minimum??0);
+  const ket=String(r.keterangan_tampil??r.keterangan??'').trim();
+  const archived=!!r.is_archived;
+  const archiveAction=profile?.role==='admin'
+    ?'<button class="btn-sm '+(archived?'':'danger')+' archive-barang" data-id="'+r.id+'" data-archived="'+(archived?'1':'0')+'">'+(archived?'Pulihkan':'Arsipkan')+'</button>'
+    :'';
+  return `<tr data-search="${esc([r.kode_barang,r.nama_barang,ket,r.tipe,r.merk,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())}" data-kategori="${r.kategori_id||''}" data-archived="${archived?'1':'0'}"><td class="id-cell">#${r.id}<br><small>${archived?'Diarsipkan':'Aktif'}</small></td><td><small>${esc(r.kode_barang||"-")}</small></td><td><strong>${esc(r.nama_barang)}</strong></td><td>${esc(ket||'-')}</td><td>${esc(r.kategori?.nama_kategori||'-')}</td><td>${esc(r.tipe||'-')}</td><td>${esc(r.merk||'-')}</td><td>${esc(r.satuan||'-')}</td><td>${rupiah(r.harga_terakhir)}</td><td><span class="stock ${low?'low':''}">${formatAngka(r.sisa??0)}</span></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-barang" data-id="'+r.id+'">Edit</button>'+archiveAction+'</div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`;
+}
 function emptyRow(n){return `<tr><td colspan="${n}" class="empty">Belum ada data.</td></tr>`}
 async function showImportPersediaanModal(){
   const old=document.getElementById('importPersediaanModal');if(old)old.remove();
@@ -616,9 +661,19 @@ async function showImportPersediaanModal(){
         bertambah_qty:excelNumber(r['Bertambah (Qty)']),
         bertambah_value:excelNumber(r['Bertambah (Nilai)'])
       })).filter(r=>r.kode_barang||r.nama_barang);
+      if(!importRows.length)throw new Error('File Excel tidak berisi baris barang untuk diimpor. Tambahkan data di bawah judul kolom lalu pilih file kembali.');
       const missingDate=importRows.findIndex(r=>!r.tanggal_saldo_awal||!r.tanggal_bertambah);
       if(missingDate>=0)throw new Error('Baris Excel '+(missingDate+2)+': Tanggal Saldo Awal dan Tanggal Bertambah wajib diisi dalam format DD/MM/YYYY (tanggal/bulan/tahun). Tidak ada tanggal otomatis.');
-      const bad=importRows.findIndex(r=>!r.kode_barang||!r.nama_barang||!r.kategori||![r.saldo_qty,r.saldo_value,r.bertambah_qty,r.bertambah_value].every(Number.isFinite)||r.saldo_qty<0||r.bertambah_qty<0||!isValidImportISODate(r.tanggal_saldo_awal)||!isValidImportISODate(r.tanggal_bertambah));
+      const bad=importRows.findIndex(r=>{
+        const nums=[r.saldo_qty,r.saldo_value,r.bertambah_qty,r.bertambah_value];
+        return !r.kode_barang||!r.nama_barang||!r.kategori||
+          !nums.every(n=>Number.isFinite(n)&&n>=0)||
+          !Number.isInteger(r.saldo_qty)||!Number.isInteger(r.bertambah_qty)||
+          (r.saldo_qty===0&&r.saldo_value!==0)||
+          (r.bertambah_qty===0&&r.bertambah_value!==0)||
+          !isValidImportISODate(r.tanggal_saldo_awal)||
+          !isValidImportISODate(r.tanggal_bertambah);
+      });
       if(bad>=0)throw new Error('Data Excel pada baris '+(bad+2)+' tidak lengkap atau tidak valid. Periksa angka dan pastikan tanggal benar dengan format DD/MM/YYYY.');
       const dateOrderError=importRows.findIndex(r=>r.bertambah_qty>0&&r.tanggal_bertambah<r.tanggal_saldo_awal);
       if(dateOrderError>=0)throw new Error('Baris Excel '+(dateOrderError+2)+': Tanggal Bertambah tidak boleh lebih awal dari Tanggal Saldo Awal.');
@@ -667,7 +722,7 @@ async function simple(title,table,cols){const {data,error}=await client.from(tab
 async function barangMasukForm(){
   const canCreate=profile?.role==='admin';
   const [{data:items,error},{data:kats,error:ke}]=await Promise.all([
-    client.from('barang').select('id,nama_barang,satuan,kategori_id,tipe,merk,kode_barang,kategori:kategori_id(id,nama_kategori)').order('nama_barang'),
+    client.from('barang').select('id,nama_barang,satuan,kategori_id,tipe,merk,kode_barang,kategori:kategori_id(id,nama_kategori)').eq('is_archived',false).order('nama_barang'),
     client.from('kategori').select('*').order('nama_kategori')
   ]);
   if(error||ke)throw(error||ke);
@@ -684,7 +739,7 @@ async function barangMasukForm(){
   <label class="field-wide">Keterangan / Spesifikasi <textarea id="m_keterangan" rows="3" maxlength="500" placeholder="Contoh: ukuran, warna, model, jenis, bahan, atau keterangan lain untuk membedakan nama barang yang sama"></textarea><small class="field-hint">Keterangan ini melekat pada transaksi Barang Masuk, bukan Master Barang.</small></label>
   </div><div id="masukKuasi" class="kuasi-box" style="display:none"><strong>📑 Batch Kuasi</strong><span>Isi rentang nomor seri yang diterima. Jumlah harus sama dengan rentang.</span><div class="form-grid"><label>No. Dus <input id="m_dus" placeholder="Contoh: 411"></label><label>No. Seri Awal <input id="m_awal" placeholder="A-001"></label><label>No. Seri Akhir <input id="m_akhir" placeholder="A-100"></label></div></div><div class="form-actions"><button class="primary" id="saveMasuk">Rekam & Tambah Stok</button><button class="ghost" id="cancelMasuk">Batal</button></div></section>`;
 }
-async function barangKeluarForm(){const [{data:items,error},{data:pegawai,error:pe}]=await Promise.all([client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,kategori:kategori_id(id,nama_kategori)').order('nama_barang'),client.from('pegawai').select('id,nama_pegawai,nip,status_pegawai,jabatan,unit_kerja').order('nama_pegawai')]);if(error||pe)throw(error||pe);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h2>Rekam Barang Keluar</h2><p>Stok akan dikurangi setelah seluruh item lolos validasi.</p></div><button class="ghost" id="backKeluar">← Kembali</button></div><div class="form-grid"><label>Tanggal Keluar <input id="k_tanggal" type="date" value="${localDate()}"></label><label>Penyerah (Gudang) <select id="k_penyerah"><option value="">- Pilih penyerah -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penyerah <input id="k_penyerah_jabatan" readonly></label><label>NIP Penyerah <input id="k_penyerah_nip" readonly></label><label>Penerima (Pemohon) <select id="k_penerima"><option value="">- Pilih pegawai -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penerima <input id="k_jabatan" readonly></label><label>NIP Penerima <input id="k_nip" readonly></label><label>Tujuan / Ruangan <input id="k_tujuan" placeholder="Otomatis dari Unit Kerja/Ruangan Penerima; dapat diedit" required></label></div><div class="section-head compact"><div><h3>Daftar Barang</h3><p>Tambahkan satu atau beberapa item.</p></div><button class="ghost" id="addItemKeluar">＋ Tambah Item</button></div><div id="keluarItems"></div><div class="form-actions"><button class="primary" id="saveKeluar">Rekam Transaksi & Kurangi Stok</button><button class="ghost" id="cancelKeluar">Batal</button></div></section>`}
+async function barangKeluarForm(){const [{data:items,error},{data:pegawai,error:pe}]=await Promise.all([client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,kategori:kategori_id(id,nama_kategori)').eq('is_archived',false).order('nama_barang'),client.from('pegawai').select('id,nama_pegawai,nip,status_pegawai,jabatan,unit_kerja').order('nama_pegawai')]);if(error||pe)throw(error||pe);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h2>Rekam Barang Keluar</h2><p>Stok akan dikurangi setelah seluruh item lolos validasi.</p></div><button class="ghost" id="backKeluar">← Kembali</button></div><div class="form-grid"><label>Tanggal Keluar <input id="k_tanggal" type="date" value="${localDate()}"></label><label>Penyerah (Gudang) <select id="k_penyerah"><option value="">- Pilih penyerah -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penyerah <input id="k_penyerah_jabatan" readonly></label><label>NIP Penyerah <input id="k_penyerah_nip" readonly></label><label>Penerima (Pemohon) <select id="k_penerima"><option value="">- Pilih pegawai -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penerima <input id="k_jabatan" readonly></label><label>NIP Penerima <input id="k_nip" readonly></label><label>Tujuan / Ruangan <input id="k_tujuan" placeholder="Otomatis dari Unit Kerja/Ruangan Penerima; dapat diedit" required></label></div><div class="section-head compact"><div><h3>Daftar Barang</h3><p>Tambahkan satu atau beberapa item.</p></div><button class="ghost" id="addItemKeluar">＋ Tambah Item</button></div><div id="keluarItems"></div><div class="form-actions"><button class="primary" id="saveKeluar">Rekam Transaksi & Kurangi Stok</button><button class="ghost" id="cancelKeluar">Batal</button></div></section>`}
 
 function keluarItemRow(items){
   const id='ki_'+Math.random().toString(36).slice(2,9);
@@ -729,16 +784,25 @@ async function kuasiPage(){
 }
 
 async function showKuasiDetail(id){
-  const [{data:batch,error:be},{data:allocations,error:ae},{data:legacy,error:le}]=await Promise.all([
-    client.from('stok_kuasi').select('id,barang_id,prefix_huruf,panjang_digit,digit_awal,digit_akhir,digit_sekarang,sisa_lembar,tanggal_masuk,nomor_dus,barang:barang_id(nama_barang,satuan,merk,tipe)').eq('id',id).single(),
+  const {data:batch,error:be}=await client.from('stok_kuasi')
+    .select('id,barang_id,prefix_huruf,panjang_digit,digit_awal,digit_akhir,digit_sekarang,sisa_lembar,tanggal_masuk,nomor_dus,barang:barang_id(nama_barang,satuan,merk,tipe)')
+    .eq('id',id).single();
+  if(be)throw be;
+  const [{data:allocations,error:ae},{data:legacy,error:le},{data:batchRows,error:batchError}]=await Promise.all([
     client.from('transaksi_kuasi_alokasi').select('id,transaksi_keluar_id,detail_barang_keluar_id,jumlah,digit_awal,digit_akhir,created_at,transaksi:transaksi_keluar_id(id,tanggal_keluar,penerima_nama,penerima_jabatan,tujuan_ruangan,status,jenis_dokumen),detail:detail_barang_keluar_id(nomor_awal,nomor_akhir,nomor_dus)').eq('stok_kuasi_id',id).order('id',{ascending:false}),
-    client.from('detail_barang_keluar').select('id,jumlah,nomor_awal,nomor_akhir,nomor_dus,transaksi:transaksi_keluar_id(id,status)').eq('barang_id',id).limit(5000)
+    client.from('detail_barang_keluar').select('id,jumlah,nomor_awal,nomor_akhir,nomor_dus,transaksi:transaksi_keluar_id(id,status)').eq('barang_id',batch.barang_id).limit(5000),
+    client.from('stok_kuasi').select('id').eq('barang_id',batch.barang_id)
   ]);
-  if(be||ae||le)throw(be||ae||le);
+  if(ae||le||batchError)throw(ae||le||batchError);
+  const batchIds=(batchRows||[]).map(r=>Number(r.id)).filter(Number.isFinite);
+  const allAllocationsQuery=batchIds.length
+    ?await client.from('transaksi_kuasi_alokasi').select('detail_barang_keluar_id').in('stok_kuasi_id',batchIds)
+    :{data:[],error:null};
+  if(allAllocationsQuery.error)throw allAllocationsQuery.error;
   const pad=Number(batch.panjang_digit)||0,p=batch.prefix_huruf||'';
   const awal=p+String(batch.digit_awal).padStart(pad,'0'),akhir=p+String(batch.digit_akhir).padStart(pad,'0'),sekarang=p+String(batch.digit_sekarang).padStart(pad,'0');
   const related=(allocations||[]).filter(r=>(r.transaksi?.status||'AKTIF')==='AKTIF');
-  const allocatedDetailIds=new Set((allocations||[]).map(r=>Number(r.detail_barang_keluar_id)));
+  const allocatedDetailIds=new Set((allAllocationsQuery.data||[]).map(r=>Number(r.detail_barang_keluar_id)));
   const legacyUntracked=(legacy||[]).filter(r=>(r.transaksi?.status||'AKTIF')==='AKTIF'&&!allocatedDetailIds.has(Number(r.id)));
   const box=document.createElement('div');box.className='modal-backdrop';
   box.innerHTML='<div class="modal-card kuasi-detail-modal"><div class="modal-head"><div><span class="eyebrow">DETAIL BATCH KUASI</span><h2>'+esc(batch.barang?.nama_barang||'-')+'</h2><p>'+esc(batch.barang?.satuan||'')+' · '+esc(batch.barang?.merk||'-')+' / '+esc(batch.barang?.tipe||'-')+'</p></div><button class="modal-close" aria-label="Tutup">×</button></div>'+
@@ -758,7 +822,7 @@ async function showKuasiDetail(id){
 }
 
 async function kartuPage(){
-  const {data:items,error}=await client.from('barang').select('id,nama_barang,satuan,merk,tipe,sisa,stok_minimum,harga_terakhir,kategori:kategori_id(id,nama_kategori)').order('nama_barang');
+  const {data:items,error}=await client.from('barang').select('id,nama_barang,satuan,merk,tipe,sisa,stok_minimum,harga_terakhir,kategori_id,kategori:kategori_id(id,nama_kategori)').order('nama_barang');
   if(error)throw error;
   const totalNilai=(items||[]).reduce((n,r)=>n+(Number(r.sisa)||0)*(Number(r.harga_terakhir)||0),0);
   const totalStok=(items||[]).reduce((n,r)=>n+(Number(r.sisa)||0),0);
@@ -1074,19 +1138,24 @@ async function pegawaiForm(id=null){
     '<div class="form-actions"><button class="primary" id="savePegawai">'+(id?'Simpan Perubahan':'Simpan Pegawai')+'</button><button class="ghost" id="cancelPegawai">Batal</button></div></section>';
 }
 async function riwayatPage(){
-  const [{data:keluar,error:ke},{data:masuk,error:me},{data:opname,error:oe}]=await Promise.all([
+  const [{data:keluar,error:ke},{data:masuk,error:me},{data:opname,error:oe},{data:audit,error:ae}]=await Promise.all([
     client.from('transaksi_keluar').select('*,detail_barang_keluar(id,jumlah,nomor_awal,nomor_akhir,nomor_dus,barang:barang_id(nama_barang,satuan))').order('tanggal_keluar',{ascending:false}).order('id',{ascending:false}).limit(200),
     client.from('barang_masuk').select('*,barang:barang_id(nama_barang,satuan)').order('tanggal_masuk',{ascending:false}).order('id',{ascending:false}).limit(200),
-    client.from('riwayat_opname').select('*,barang:barang_id(nama_barang,satuan)').order('tanggal_opname',{ascending:false}).order('id',{ascending:false}).limit(200)
+    client.from('riwayat_opname').select('*,barang:barang_id(nama_barang,satuan)').order('tanggal_opname',{ascending:false}).order('id',{ascending:false}).limit(200),
+    (profile?.role==='admin'
+      ?client.from('sipb_transaction_audit').select('*').order('created_at',{ascending:false}).limit(100)
+      :Promise.resolve({data:[],error:null}))
   ]);
-  if(ke||me||oe)throw(ke||me||oe);
+  if(ke||me||oe||ae)throw(ke||me||oe||ae);
   const rows=[
     ...(masuk||[]).map(r=>({
       type:'MASUK',date:r.tanggal_masuk,id:r.id,party:r.nama_penyerah||'-',
       target:r.nama_penerima||'-',doc:'Penerimaan',status:'AKTIF',
-      items:[{name:r.barang?.nama_barang||'-',unit:r.barang?.satuan||'',qty:r.jumlah,keterangan:r.keterangan||'',serial:r.nomor_awal&&r.nomor_akhir?r.nomor_awal+' → '+r.nomor_akhir:''}]
+      items:[{name:r.barang?.nama_barang||'-',unit:r.barang?.satuan||'',qty:r.jumlah,
+        price:Number(r.harga_satuan)||0,total:(Number(r.jumlah)||0)*(Number(r.harga_satuan)||0),
+        keterangan:r.keterangan||'',serial:r.nomor_awal&&r.nomor_akhir?r.nomor_awal+' → '+r.nomor_akhir:''}]
     })),
-    ...(keluar||[]).filter(r=>(r.status||'AKTIF')==='AKTIF').map(r=>({
+    ...(keluar||[]).map(r=>({
       type:'KELUAR',date:r.tanggal_keluar,id:r.id,party:r.penerima_nama||'-',
       target:r.tujuan_ruangan||'-',doc:r.jenis_dokumen||'Nota Dinas',status:r.status||'AKTIF',
       items:(r.detail_barang_keluar||[]).map(d=>({
@@ -1101,35 +1170,190 @@ async function riwayatPage(){
         serial:'Sistem '+(r.stok_sistem??0)+' → Fisik '+(r.stok_fisik??0)+' (Selisih '+(r.selisih??0)+')'}]
     }))
   ].sort((a,b)=>String(b.date).localeCompare(String(a.date))||Number(b.id)-Number(a.id));
-  const key=(type,id)=>type+'_'+id;
-  window.__sipbHistory=Object.fromEntries(rows.map(r=>[key(r.type,r.id),r]));
+  window.__sipbHistory=Object.fromEntries(rows.map(r=>[r.type+'_'+r.id,r]));
+  window.__sipbAudit=audit||[];
+
   const tableRows=rows.map(r=>{
+    const canCorrect=profile?.role==='admin'&&r.status==='AKTIF'&&(r.type==='KELUAR'||(r.type==='MASUK'&&!r.items.some(i=>i.serial)));
+    const correctionAction=canCorrect
+      ?'<button class="btn-sm history-correct" data-type="'+r.type+'" data-id="'+r.id+'">Koreksi</button>':'';
     const cancelAction=profile?.role==='admin'&&r.type==='KELUAR'&&r.status==='AKTIF'
-      ? '<button class="btn-sm danger history-cancel" data-id="'+r.id+'">Batalkan</button>'
-      : '';
-    const printAction=r.type==='KELUAR'
-      ? '<button class="btn-sm sipb-inline-print" data-id="'+r.id+'">Cetak</button>'
-      : '';
+      ?'<button class="btn-sm danger history-cancel" data-id="'+r.id+'">Batalkan</button>':'';
+    const printAction=r.type==='KELUAR'&&r.status==='AKTIF'
+      ?'<button class="btn-sm sipb-inline-print" data-id="'+r.id+'">Cetak</button>':'';
     return '<tr data-type="'+r.type+'" data-search="'+esc([r.date,r.party,r.target,r.doc,r.status,r.items.map(i=>[i.name,i.keterangan].filter(Boolean).join(' ')).join(' ')].join(' ').toLowerCase())+'">'+
       '<td><span class="badge-soft '+(r.type==='MASUK'?'success':'')+'">'+r.type+'</span></td>'+
       '<td>'+fmtDate(r.date)+'</td><td>#'+r.id+'</td><td><strong>'+esc(r.party)+'</strong></td>'+
       '<td>'+esc(r.target)+'</td><td>'+esc(r.doc)+'</td><td>'+r.items.length+'</td>'+
       '<td><span class="badge-soft '+(r.status==='AKTIF'?'success':'')+'">'+r.status+'</span></td>'+
-      '<td><div class="actions"><button class="btn-sm history-detail" data-key="'+key(r.type,r.id)+'">Detail</button>'+
-      cancelAction+printAction+'</div></td></tr>';
+      '<td><div class="actions"><button class="btn-sm history-detail" data-key="'+r.type+'_'+r.id+'">Detail</button>'+
+      correctionAction+cancelAction+printAction+'</div></td></tr>';
   }).join('');
-  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">AUDIT PERSEDIAAN</span><h2>Riwayat Transaksi</h2><p>Gabungan penerimaan dan pengeluaran barang, termasuk keterangan item dan nomor seri Kuasi.</p></div><span class="status-pill">'+rows.length+' transaksi</span></div>'+
+
+  const auditRows=(audit||[]).map(a=>{
+    const label=a.entity_type==='BARANG_MASUK'?'Barang Masuk':a.entity_type==='BARANG_KELUAR'?'Barang Keluar':'Master Barang';
+    const action=a.action==='PEMBATALAN'?'Pembatalan':a.action==='PERUBAHAN_MASTER'?'Perubahan Master':'Koreksi';
+    return '<tr data-search="'+esc([label,action,a.entity_id,a.new_entity_id,a.reason,a.actor_name].join(' ').toLowerCase())+'">'+
+      '<td>'+new Date(a.created_at).toLocaleString('id-ID')+'</td><td>'+esc(label)+'</td>'+
+      '<td>#'+a.entity_id+(a.new_entity_id?' → #'+a.new_entity_id:'')+'</td>'+
+      '<td><span class="badge-soft">'+esc(action)+'</span></td><td>'+esc(a.reason)+'</td>'+
+      '<td>'+esc(a.actor_name||'-')+'</td>'+
+      '<td><button class="btn-sm audit-detail" data-id="'+a.id+'">Data Lama/Baru</button></td></tr>';
+  }).join('');
+
+  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">AUDIT PERSEDIAAN</span><h2>Riwayat Transaksi</h2><p>Koreksi dan pembatalan tersimpan dengan data sebelum/sesudah, alasan, petugas, dan waktu.</p></div><span class="status-pill">'+rows.length+' transaksi</span></div>'+
     '<div class="filter-bar"><div class="search-box">⌕<input id="historySearch" placeholder="Cari tanggal, penerima, barang, atau tujuan..."></div>'+
     '<select id="historyType"><option value="">Semua transaksi</option><option value="MASUK">Barang Masuk</option><option value="KELUAR">Barang Keluar</option><option value="OPNAME">Stock Opname</option></select></div>'+
     '<div class="table-wrap"><table id="historyTable"><thead><tr><th>Jenis</th><th>Tanggal</th><th>No.</th><th>Pihak</th><th>Tujuan/Penerima</th><th>Dokumen</th><th>Item</th><th>Status</th><th>Aksi</th></tr></thead>'+
-    '<tbody>'+tableRows+(tableRows?'':emptyRow(9))+'</tbody></table></div></section>';
+    '<tbody>'+tableRows+(tableRows?'':emptyRow(9))+'</tbody></table></div></section>'+
+    (profile?.role==='admin'?'<section class="card page-card"><div class="section-head"><div><span class="eyebrow">JEJAK PERUBAHAN</span><h2>Riwayat Koreksi & Pembatalan</h2><p>100 perubahan terakhir. Data lama dan data baru dapat dibuka untuk pemeriksaan.</p></div><span class="status-pill">'+(audit||[]).length+' catatan</span></div>'+
+    '<div class="table-wrap"><table id="auditTable"><thead><tr><th>Waktu</th><th>Jenis Data</th><th>Nomor Transaksi</th><th>Tindakan</th><th>Alasan</th><th>Petugas</th><th>Aksi</th></tr></thead>'+
+    '<tbody>'+(auditRows||emptyRow(7))+'</tbody></table></div></section>':'');
 }
+
 function showHistoryDetail(k){
   const r=window.__sipbHistory?.[k];if(!r)return;
   const box=document.createElement('div');box.className='modal-backdrop';
-  box.innerHTML=`<div class="modal-card"><div class="modal-head"><div><span class="eyebrow">${r.type==='MASUK'?'PENERIMAAN':r.type==='OPNAME'?'STOCK OPNAME':'PENGELUARAN'}</span><h2>Detail Transaksi #${r.id}</h2></div><button class="modal-close" aria-label="Tutup">×</button></div><div class="detail-grid"><div><small>Tanggal</small><strong>${fmtDate(r.date)}</strong></div><div><small>Pihak</small><strong>${esc(r.party)}</strong></div><div><small>Tujuan/Penerima</small><strong>${esc(r.target)}</strong></div><div><small>Status</small><strong><span class="badge-soft ${r.status==='AKTIF'?'success':''}">${r.status}</span></strong></div></div><div class="table-wrap"><table><thead><tr><th>Barang</th><th>Keterangan</th><th>Satuan</th><th>Jumlah</th><th>Nomor Seri</th></tr></thead><tbody>${r.items.map(i=>'<tr><td><strong>'+esc(i.name)+'</strong></td><td>'+esc(i.keterangan||'-')+'</td><td>'+esc(i.unit||'-')+'</td><td>'+i.qty+'</td><td>'+esc(i.serial||'-')+'</td></tr>').join('')}</tbody></table></div></div>`;
-  document.body.appendChild(box);enhanceTables(box);const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.onclick=e=>{if(e.target===box)close()};
+  box.innerHTML='<div class="modal-card"><div class="modal-head"><div><span class="eyebrow">'+(r.type==='MASUK'?'PENERIMAAN':r.type==='OPNAME'?'STOCK OPNAME':'PENGELUARAN')+'</span><h2>Detail Transaksi #'+r.id+'</h2></div><button class="modal-close" aria-label="Tutup">×</button></div>'+
+    '<div class="detail-grid"><div><small>Tanggal</small><strong>'+fmtDate(r.date)+'</strong></div><div><small>Pihak</small><strong>'+esc(r.party)+'</strong></div><div><small>Tujuan/Penerima</small><strong>'+esc(r.target)+'</strong></div><div><small>Status</small><strong><span class="badge-soft '+(r.status==='AKTIF'?'success':'')+'">'+r.status+'</span></strong></div></div>'+
+    '<div class="table-wrap"><table><thead><tr><th>Barang</th><th>Keterangan</th><th>Satuan</th><th>Jumlah</th><th>Harga Satuan</th><th>Nilai</th><th>Nomor Seri</th></tr></thead><tbody>'+
+    r.items.map(i=>'<tr><td><strong>'+esc(i.name)+'</strong></td><td>'+esc(i.keterangan||'-')+'</td><td>'+esc(i.unit||'-')+'</td><td>'+i.qty+'</td><td>'+(i.price?rupiah(i.price):'-')+'</td><td>'+(i.total?rupiah(i.total):'-')+'</td><td>'+esc(i.serial||'-')+'</td></tr>').join('')+
+    '</tbody></table></div></div>';
+  document.body.appendChild(box);enhanceTables(box);
+  const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.onclick=e=>{if(e.target===box)close()};
 }
+
+function showAuditDetail(id){
+  const a=(window.__sipbAudit||[]).find(x=>Number(x.id)===Number(id));if(!a)return;
+  const box=document.createElement('div');box.className='modal-backdrop';
+  const pretty=x=>esc(JSON.stringify(x||{},null,2));
+  box.innerHTML='<div class="modal-card"><div class="modal-head"><div><span class="eyebrow">AUDIT SIPB · '+esc(a.entity_type)+'</span><h2>Catatan #'+a.id+'</h2></div><button class="modal-close" aria-label="Tutup">×</button></div>'+
+    '<div class="detail-grid"><div><small>Tindakan</small><strong>'+esc(a.action)+'</strong></div><div><small>Nomor Data</small><strong>#'+a.entity_id+(a.new_entity_id?' → #'+a.new_entity_id:'')+'</strong></div><div><small>Petugas</small><strong>'+esc(a.actor_name||'-')+'</strong></div><div><small>Waktu</small><strong>'+new Date(a.created_at).toLocaleString('id-ID')+'</strong></div></div>'+
+    '<p><strong>Alasan:</strong> '+esc(a.reason)+'</p><h3>Data Sebelum</h3><pre class="audit-json">'+pretty(a.old_data)+'</pre><h3>Data Sesudah</h3><pre class="audit-json">'+pretty(a.new_data)+'</pre></div>';
+  document.body.appendChild(box);
+  const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.onclick=e=>{if(e.target===box)close()};
+}
+
+async function showCorrectionModal(type,id){
+  if(profile?.role!=='admin')return toast('Hanya admin yang dapat mengoreksi transaksi.','error');
+  if(type==='MASUK'){
+    const [{data:r,error},{data:items,error:ie}]=await Promise.all([
+      client.from('barang_masuk').select('*,barang:barang_id(id,nama_barang,satuan,kode_barang,is_archived,kategori:kategori_id(nama_kategori))').eq('id',id).single(),
+      client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,is_archived,kategori:kategori_id(nama_kategori)').eq('is_archived',false).order('nama_barang')
+    ]);
+    if(error||ie)throw(error||ie);
+    if(!r||!r.barang)throw new Error('Data penerimaan atau Master Barang tidak ditemukan.');
+    if(r.barang.is_archived)throw new Error('Master Barang sudah diarsipkan. Pulihkan barang terlebih dahulu.');
+    const category=String(r.barang.kategori?.nama_kategori||'').toLowerCase();
+    if(category.includes('kuasi')||r.nomor_dus||r.nomor_awal||r.nomor_akhir)
+      throw new Error('Transaksi Kuasi/nomor seri belum dapat dikoreksi melalui formulir umum. Nomor seri harus diperiksa dengan prosedur batch khusus.');
+    const options=(items||[]).map(x=>'<option value="'+x.id+'" '+(Number(x.id)===Number(r.barang_id)?'selected':'')+'>'+esc(x.kode_barang||'Tanpa kode')+' — '+esc(x.nama_barang)+' · '+esc(x.keterangan||x.satuan||'')+'</option>').join('');
+    const sourceOptions=['APBD','APBN','Lainnya','Saldo Awal','Bertambah',r.sumber_dana].filter((v,i,a)=>v&&a.indexOf(v)===i).map(v=>'<option '+(v===r.sumber_dana?'selected':'')+'>'+esc(v)+'</option>').join('');
+    const box=document.createElement('div');box.className='modal-backdrop';
+    box.innerHTML='<div class="modal-card"><div class="modal-head"><div><span class="eyebrow">KOREKSI PENERIMAAN</span><h2>Barang Masuk #'+r.id+'</h2><p>Perubahan stok dan nilai akan disimpan dalam satu proses.</p></div><button class="modal-close" aria-label="Tutup">×</button></div>'+
+      '<form id="correctionMasukForm"><div class="form-grid correction-form-grid">'+
+      '<label>Master Barang <select id="cm_barang" required>'+options+'</select></label>'+
+      '<label>Tanggal Masuk <input id="cm_tanggal" type="date" value="'+esc(r.tanggal_masuk||'')+'" required></label>'+
+      '<label>Jumlah <input id="cm_jumlah" type="text" inputmode="numeric" data-number-format="integer" value="'+formatAngka(r.jumlah||0)+'" required></label>'+
+      '<label>Harga Satuan <input id="cm_harga" type="text" inputmode="numeric" data-number-format="integer" value="'+formatAngka(r.harga_satuan||0)+'" required></label>'+
+      '<label>Sumber Dana <select id="cm_sumber">'+sourceOptions+'</select></label>'+
+      '<label>Nama Penyerah <input id="cm_penyerah" value="'+esc(r.nama_penyerah||'')+'" required></label>'+
+      '<label>Nama Penerima <input id="cm_penerima" value="'+esc(r.nama_penerima||'')+'" required></label>'+
+      '<label class="field-wide">Keterangan <textarea id="cm_keterangan" rows="2" maxlength="500">'+esc(r.keterangan||'')+'</textarea></label>'+
+      '<div class="field-wide correction-total"><span>Nilai penerimaan baru</span><strong id="cm_total">'+rupiah((Number(r.jumlah)||0)*(Number(r.harga_satuan)||0))+'</strong></div>'+
+      '<label class="field-wide">Alasan Koreksi <textarea id="cm_alasan" rows="3" minlength="8" maxlength="500" required placeholder="Contoh: Kesalahan input jumlah dan harga pada dokumen penerimaan."></textarea><small class="field-hint">Wajib diisi minimal 8 karakter. Data sebelum koreksi tetap disimpan.</small></label>'+
+      '</div><div class="form-actions"><button class="primary" id="cm_save" type="submit">Simpan Koreksi</button><button class="ghost cm_cancel" type="button">Batal</button></div></form></div>';
+    document.body.appendChild(box);
+    const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.querySelector('.cm_cancel').onclick=close;box.onclick=e=>{if(e.target===box)close()};
+    const updateTotal=()=>{$('cm_total').textContent=rupiah(parseAngka($('cm_jumlah').value)*parseAngka($('cm_harga').value))};
+    $('cm_jumlah').addEventListener('input',updateTotal);$('cm_harga').addEventListener('input',updateTotal);
+    box.querySelectorAll('[data-number-format]').forEach(el=>el.addEventListener('blur',()=>{el.value=formatAngka(parseAngka(el.value));updateTotal()}));
+    $('correctionMasukForm').onsubmit=async e=>{
+      e.preventDefault();
+      const jumlah=parseAngka($('cm_jumlah').value),harga=parseAngka($('cm_harga').value),alasan=$('cm_alasan').value.trim();
+      if(!Number.isInteger(jumlah)||jumlah<1)return toast('Jumlah harus bilangan bulat positif.','error');
+      if(!Number.isFinite(harga)||harga<0)return toast('Harga satuan tidak valid.','error');
+      if(alasan.length<8)return toast('Alasan koreksi wajib diisi minimal 8 karakter.','error');
+      const btn=$('cm_save');btn.disabled=true;btn.textContent='Menyimpan...';
+      try{
+        const result=await client.rpc('correct_barang_masuk',{
+          p_barang_masuk_id:Number(id),p_barang_id:Number($('cm_barang').value),
+          p_jumlah:jumlah,p_harga_satuan:harga,p_sumber_dana:$('cm_sumber').value,
+          p_tanggal:$('cm_tanggal').value,p_nama_penyerah:$('cm_penyerah').value.trim(),
+          p_nama_penerima:$('cm_penerima').value.trim(),p_keterangan:$('cm_keterangan').value.trim()||null,
+          p_alasan:alasan
+        });
+        if(result.error)throw result.error;
+        close();toast('Barang Masuk #'+id+' berhasil dikoreksi. Saldo stok dan harga referensi diperbarui.');
+        renderApp('riwayat');
+      }catch(err){btn.disabled=false;btn.textContent='Simpan Koreksi';fail(err)}
+    };
+    return;
+  }
+
+  if(type==='KELUAR'){
+    const [{data:tx,error},{data:items,error:ie}]=await Promise.all([
+      client.from('transaksi_keluar').select('*,detail_barang_keluar(id,barang_id,jumlah,barang:barang_id(id,nama_barang,satuan,is_archived,kategori:kategori_id(nama_kategori)))').eq('id',id).single(),
+      client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,is_archived,kategori:kategori_id(nama_kategori)').eq('is_archived',false).order('nama_barang')
+    ]);
+    if(error||ie)throw(error||ie);
+    if(!tx||tx.status!=='AKTIF')throw new Error('Hanya transaksi Barang Keluar aktif yang dapat dikoreksi.');
+    if((tx.detail_barang_keluar||[]).some(d=>d.barang?.is_archived))throw new Error('Transaksi memakai Master Barang yang sudah diarsipkan. Pulihkan barang terlebih dahulu.');
+    const optionMarkup=(selected)=>'<option value="">- Pilih barang -</option>'+(items||[]).map(x=>'<option value="'+x.id+'" '+(Number(x.id)===Number(selected)?'selected':'')+'>'+esc(x.kode_barang||'Tanpa kode')+' — '+esc(x.nama_barang)+' · stok '+x.sisa+' '+esc(x.satuan||'')+'</option>').join('');
+    const makeRow=(selected,qty)=>'<div class="correction-item-row"><select class="ce_barang" required>'+optionMarkup(selected)+'</select><input class="ce_jumlah" type="text" inputmode="numeric" data-number-format="integer" value="'+formatAngka(qty||1)+'" required><button class="btn-sm danger ce_remove" type="button" title="Hapus item">×</button></div>';
+    const box=document.createElement('div');box.className='modal-backdrop';
+    box.innerHTML='<div class="modal-card"><div class="modal-head"><div><span class="eyebrow">KOREKSI DISTRIBUSI</span><h2>Barang Keluar #'+tx.id+'</h2><p>Transaksi lama akan berstatus dibatalkan dan sistem membuat transaksi pengganti secara atomik.</p></div><button class="modal-close" aria-label="Tutup">×</button></div>'+
+      '<form id="correctionKeluarForm"><div class="form-grid correction-form-grid">'+
+      '<label>Tanggal Keluar <input id="ce_tanggal" type="date" value="'+esc(tx.tanggal_keluar||'')+'" required></label>'+
+      '<label>Penyerah <input id="ce_penyerah" value="'+esc(tx.penyerah_nama||'')+'" required></label>'+
+      '<label>Jabatan Penyerah <input id="ce_penyerah_jabatan" value="'+esc(tx.penyerah_jabatan||'')+'"></label>'+
+      '<label>NIP Penyerah <input id="ce_penyerah_nip" value="'+esc(tx.penyerah_nip||'')+'"></label>'+
+      '<label>Penerima <input id="ce_penerima" value="'+esc(tx.penerima_nama||'')+'" required></label>'+
+      '<label>Jabatan Penerima <input id="ce_penerima_jabatan" value="'+esc(tx.penerima_jabatan||'')+'"></label>'+
+      '<label>NIP Penerima <input id="ce_penerima_nip" value="'+esc(tx.penerima_nip||'')+'"></label>'+
+      '<label>Tujuan / Ruangan <input id="ce_tujuan" value="'+esc(tx.tujuan_ruangan||'')+'" required></label>'+
+      '<label>Jenis Dokumen <select id="ce_dokumen"><option '+(tx.jenis_dokumen==='Nota Dinas'?'selected':'')+'>Nota Dinas</option><option '+(tx.jenis_dokumen==='BAST'?'selected':'')+'>BAST</option><option '+(tx.jenis_dokumen==='Lainnya'?'selected':'')+'>Lainnya</option></select></label>'+
+      '</div><div class="section-head compact"><div><h3>Barang yang dikeluarkan</h3><p>Periksa kembali item dan jumlah sebelum menyimpan koreksi.</p></div><button class="ghost" id="ce_add" type="button">＋ Tambah Item</button></div>'+
+      '<div id="ce_items" class="correction-items">'+(tx.detail_barang_keluar||[]).map(d=>makeRow(d.barang_id,d.jumlah)).join('')+'</div>'+
+      '<label class="field-wide">Alasan Koreksi <textarea id="ce_alasan" rows="3" minlength="8" maxlength="500" required placeholder="Contoh: Penerima dan jumlah pada transaksi sebelumnya tidak sesuai Nota Dinas."></textarea><small class="field-hint">Transaksi lama tetap tersimpan sebagai DIBATALKAN. Nomor transaksi pengganti akan dibuat otomatis.</small></label>'+
+      '<div class="form-actions"><button class="primary" id="ce_save" type="submit">Simpan Koreksi & Buat Transaksi Pengganti</button><button class="ghost ce_cancel" type="button">Batal</button></div></form></div>';
+    document.body.appendChild(box);
+    const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.querySelector('.ce_cancel').onclick=close;box.onclick=e=>{if(e.target===box)close()};
+    const rowsBox=$('ce_items');
+    $('ce_add').onclick=()=>rowsBox.insertAdjacentHTML('beforeend',makeRow('',1));
+    rowsBox.addEventListener('click',e=>{const btn=e.target.closest('.ce_remove');if(btn){if(rowsBox.querySelectorAll('.correction-item-row').length<=1)return toast('Minimal satu barang harus ada.','error');btn.closest('.correction-item-row').remove()}});
+    rowsBox.addEventListener('focusout',e=>{if(e.target.classList.contains('ce_jumlah'))e.target.value=formatAngka(parseAngka(e.target.value))});
+    $('correctionKeluarForm').onsubmit=async e=>{
+      e.preventDefault();
+      const p_items=[...rowsBox.querySelectorAll('.correction-item-row')].map(row=>({
+        barang_id:Number(row.querySelector('.ce_barang').value),
+        jumlah:parseAngka(row.querySelector('.ce_jumlah').value)
+      }));
+      if(!p_items.length||p_items.some(x=>!Number.isInteger(x.barang_id)||x.barang_id<1||!Number.isInteger(x.jumlah)||x.jumlah<1))
+        return toast('Setiap barang dan jumlah harus diisi dengan benar.','error');
+      const alasan=$('ce_alasan').value.trim();
+      if(alasan.length<8)return toast('Alasan koreksi wajib diisi minimal 8 karakter.','error');
+      const btn=$('ce_save');btn.disabled=true;btn.textContent='Memproses koreksi...';
+      try{
+        const result=await client.rpc('correct_barang_keluar',{
+          p_transaksi_id:Number(id),p_tanggal:$('ce_tanggal').value,
+          p_penyerah_nama:$('ce_penyerah').value.trim(),
+          p_penyerah_jabatan:$('ce_penyerah_jabatan').value.trim()||null,
+          p_penyerah_nip:$('ce_penyerah_nip').value.trim()||null,
+          p_penerima_nama:$('ce_penerima').value.trim(),
+          p_penerima_jabatan:$('ce_penerima_jabatan').value.trim()||null,
+          p_penerima_nip:$('ce_penerima_nip').value.trim()||null,
+          p_tujuan_ruangan:$('ce_tujuan').value.trim(),
+          p_jenis_dokumen:$('ce_dokumen').value,p_items, p_alasan:alasan
+        });
+        if(result.error)throw result.error;
+        close();toast('Koreksi berhasil. Transaksi lama #'+id+' dibatalkan; transaksi pengganti #'+result.data.new_id+' dibuat.');
+        renderApp('riwayat');
+      }catch(err){btn.disabled=false;btn.textContent='Simpan Koreksi & Buat Transaksi Pengganti';fail(err)}
+    };
+  }
+}
+
 const menu=[['dashboard','Dashboard'],['barang_masuk','Barang Masuk'],['barang_keluar','Barang Keluar'],['stock_opname','Stock Opname'],['barang','Master Barang'],['kategori','Kategori'],['pegawai','Pegawai'],['kartu','Kartu Persediaan'],['kuasi','Stok Kuasi'],['riwayat','Riwayat Transaksi'],['laporan','Laporan Persediaan'],['backup','Backup & Restore'],['pengguna','Kelola Pengguna']];
 const topNavItems=[
   ['dashboard','Dashboard','dashboard'],
@@ -1150,10 +1374,19 @@ async function renderApp(page=currentPage, restoreScrollY=null){
   const renderToken=++renderVersion;
   currentPage=page||'dashboard';
   page=currentPage;
-  const r=await client.auth.getSession();
-  session=r.data.session;
-  if(!session)return showLogin();
-  await loadProfile();
+  session=null;
+  try{
+    const r=await client.auth.getSession();
+    if(r.error)throw r.error;
+    session=r.data?.session||null;
+    if(!session)return showLogin();
+    await loadProfile();
+  }catch(e){
+    if(renderToken!==renderVersion)return;
+    if(!session){showLogin(e?.message||'Sesi tidak dapat dimuat. Silakan masuk kembali.');return;}
+    root.innerHTML='<section class="card error-card"><h2>Gagal memuat profil pengguna</h2><p>'+esc(e?.message||'Terjadi kesalahan saat memeriksa akses akun.')+'</p><button type="button" class="primary retry" data-page="'+esc(page)+'">Coba lagi</button></section>';
+    return;
+  }
   if(renderToken!==renderVersion)return;
   document.documentElement.dataset.theme=uiTheme;
   root.innerHTML=`<div class="dashboard top-nav-layout"><main class="main"><header class="top">
@@ -1345,27 +1578,39 @@ function bind(page){
     });
   }
   if(page==='riwayat'){
-    const apply=()=>{const q=$('historySearch').value.toLowerCase().trim(),t=$('historyType').value;document.querySelectorAll('#historyTable tbody tr[data-search]').forEach(r=>{r.style.display=(!q||r.dataset.search.includes(q))&&(!t||r.dataset.type===t)?'':'none'})};
+    const apply=()=>{
+      const q=$('historySearch').value.toLowerCase().trim(),t=$('historyType').value;
+      document.querySelectorAll('#historyTable tbody tr[data-search]').forEach(r=>{
+        r.style.display=(!q||r.dataset.search.includes(q))&&(!t||r.dataset.type===t)?'':'none';
+      });
+    };
     $('historySearch').oninput=apply;$('historyType').onchange=apply;
-    const historyTable=$('historyTable');
-    if(historyTable){
-      historyTable.onclick=e=>{
-        const detail=e.target.closest('.history-detail');
-        if(!detail)return;
-        e.preventDefault();
-        e.stopPropagation();
-        showHistoryDetail(detail.dataset.key);
-      };
-    }
+    $('historyTable').onclick=async e=>{
+      const detail=e.target.closest('.history-detail');
+      const correction=e.target.closest('.history-correct');
+      if(detail){e.preventDefault();e.stopPropagation();showHistoryDetail(detail.dataset.key);return}
+      if(correction){
+        e.preventDefault();e.stopPropagation();correction.disabled=true;
+        try{await showCorrectionModal(correction.dataset.type,Number(correction.dataset.id))}
+        catch(err){fail(err)}
+        finally{correction.disabled=false}
+      }
+    };
+    $('auditTable').onclick=e=>{
+      const btn=e.target.closest('.audit-detail');if(!btn)return;
+      e.preventDefault();e.stopPropagation();showAuditDetail(Number(btn.dataset.id));
+    };
     document.querySelectorAll('.history-cancel').forEach(btn=>btn.onclick=async()=>{
-      const id=Number(btn.dataset.id); if(!id)return;
-      if(!(await sipbConfirm('Batalkan transaksi barang keluar #'+id+'? Stok akan dikembalikan dan transaksi tetap tercatat sebagai DIBATALKAN.')))return;
+      const id=Number(btn.dataset.id);if(!id)return;
+      const reason=await sipbPrompt('Alasan pembatalan transaksi Barang Keluar #'+id+':');
+      if(!reason||reason.trim().length<8)return toast('Alasan pembatalan wajib diisi minimal 8 karakter.','error');
+      if(!(await sipbConfirm('Batalkan transaksi #'+id+'? Stok akan dikembalikan, transaksi tetap disimpan dengan status DIBATALKAN, dan alasan masuk ke audit.')))return;
       btn.disabled=true;btn.textContent='Memproses...';
       try{
-        await cancelAndDeleteOutgoing(id);
-        toast('Transaksi #'+id+' dibatalkan. Stok telah dikembalikan.');
+        await cancelOutgoing(id,reason);
+        toast('Transaksi #'+id+' dibatalkan. Stok telah dipulihkan dan riwayat tetap tersimpan.');
         renderApp('riwayat');
-      }catch(e){btn.disabled=false;btn.textContent='Batalkan';fail(e)}
+      }catch(err){btn.disabled=false;btn.textContent='Batalkan';fail(err)}
     });
   }
   if(page==='barang'){
@@ -1381,17 +1626,22 @@ function bind(page){
       }catch(err){fail(err)}
     };
     const apply=()=>{
-      const q=$('barangSearch').value.toLowerCase().trim(),cat=$('barangFilter').value;
+      const q=$('barangSearch').value.toLowerCase().trim(),cat=$('barangFilter').value,status=$('barangStatus').value;
       let shown=0;
       document.querySelectorAll('#barangTable tbody tr[data-search]').forEach(r=>{
-        const ok=(!q||r.dataset.search.includes(q))&&(!cat||r.dataset.kategori===cat);
+        const archived=r.dataset.archived==='1';
+        const statusOk=status==='all'||(status==='archived'?archived:!archived);
+        const ok=statusOk&&(!q||r.dataset.search.includes(q))&&(!cat||r.dataset.kategori===cat);
         r.style.display=ok?'':'none';
         if(ok)shown++;
       });
       $('barangCount').textContent=shown+' data';
+      $('barangTable').refreshPagination?.();
     };
     $('barangSearch').oninput=apply;
     $('barangFilter').onchange=apply;
+    $('barangStatus').onchange=apply;
+    apply();
     document.querySelectorAll('.edit-barang').forEach(btn=>btn.onclick=async e=>{
       e.preventDefault();
       e.stopPropagation();
@@ -1410,15 +1660,21 @@ function bind(page){
         btn.disabled=false;
       }
     });
-    document.querySelectorAll('.delete-barang').forEach(btn=>btn.onclick=async evt=>{evt.preventDefault();evt.stopPropagation();
-      const id=Number(btn.dataset.id);
+    document.querySelectorAll('.archive-barang').forEach(btn=>btn.onclick=async evt=>{
+      evt.preventDefault();evt.stopPropagation();
+      const id=Number(btn.dataset.id),wasArchived=btn.dataset.archived==='1';
       if(!id)return;
-      if(!(await sipbConfirm('Hapus barang ini dari Master Barang? Penghapusan hanya diizinkan jika barang sudah tidak memiliki riwayat Barang Keluar. Data terkait barang yang memang masih tersimpan akan ikut mengikuti aturan database.')))return;
+      const question=wasArchived
+        ?'Pulihkan barang ini dari arsip agar dapat digunakan kembali pada transaksi?'
+        :'Arsipkan barang ini? Stok aktif harus sudah nol. Riwayat transaksi tidak akan dihapus.';
+      if(!(await sipbConfirm(question)))return;
       btn.disabled=true;
       try{
-        const {error}=await client.from('barang').delete().eq('id',id);
+        const {error}=await client.rpc('set_barang_archived',{
+          p_barang_id:id,p_is_archived:!wasArchived
+        });
         if(error)throw error;
-        toast('Barang berhasil dihapus.');
+        toast(wasArchived?'Barang berhasil dipulihkan.':'Barang berhasil diarsipkan.');
         renderApp('barang');
       }catch(e){
         btn.disabled=false;
@@ -1523,6 +1779,7 @@ init()
 async function stockOpnameForm(){
   const {data:items,error}=await client.from('barang')
     .select('id,nama_barang,satuan,sisa,stok_minimum,kategori:kategori_id(nama_kategori)')
+    .eq('is_archived',false)
     .order('nama_barang');
   if(error)throw error;
   const eligible=(items||[]).filter(x=>!String(x.kategori?.nama_kategori||'').toLowerCase().includes('kuasi'));
@@ -1561,7 +1818,7 @@ async function bindOpnameForm(){
   };
 }
 async function bindKeluarForm(){
-  const result=await client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,kategori:kategori_id(id,nama_kategori)').order('nama_barang');
+  const result=await client.from('barang').select('id,kode_barang,nama_barang,keterangan,satuan,sisa,kategori:kategori_id(id,nama_kategori)').eq('is_archived',false).order('nama_barang');
   if(result.error)throw result.error;
   const items=result.data||[];
   const pegawaiQ=await client.from('pegawai').select('id,nama_pegawai,nip,status_pegawai,jabatan,unit_kerja').order('nama_pegawai');

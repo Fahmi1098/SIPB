@@ -6091,3 +6091,16 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
   .ki-selected-info span{grid-column:1/-1}
   .ki-selected-info small{grid-column:1/-1}
 }
+
+
+/* Transaction correction and audit views */
+.correction-form-grid{grid-template-columns:repeat(2,minmax(0,1fr));margin:14px 0}
+.correction-form-grid label,.correction-items select,.correction-items input{min-width:0}
+.correction-total{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}
+.correction-total span{color:var(--muted);font-size:.75rem}
+.correction-total strong{font-size:1rem}
+.correction-items{display:grid;gap:9px;margin:12px 0 16px}
+.correction-item-row{display:grid;grid-template-columns:minmax(0,1fr) 130px 36px;gap:9px;align-items:center}
+.correction-item-row select,.correction-item-row input{width:100%;min-width:0}
+.audit-json{max-height:300px;overflow:auto;padding:12px;border:1px solid var(--line);border-radius:9px;background:var(--surface-soft);font-size:.68rem;white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:720px){.correction-form-grid{grid-template-columns:1fr}.correction-item-row{grid-template-columns:1fr 100px 34px}}
