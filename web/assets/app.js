@@ -533,7 +533,7 @@ async function dashboard(){
 async function barangPage(){
   const [data,k,masuk]=await Promise.all([
     fetchAllSipbRows('barang','*, kategori:kategori_id(nama_kategori)',q=>q.order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true})),
-    fetchAllSipbRows('kategori','*',q=>q.order('nama_kategori')),
+    fetchAllSipbRows('kategori','*',q=>q.order('nama_kategori').order('id',{ascending:true})),
     fetchAllSipbRows('barang_masuk','id,barang_id,keterangan,harga_satuan,tanggal_masuk',q=>q.order('tanggal_masuk',{ascending:false}).order('id',{ascending:false}))
   ]);
 
@@ -752,7 +752,7 @@ async function barangMasukForm(){
   const canCreate=profile?.role==='admin';
   const [items,kats]=await Promise.all([
     fetchAllSipbRows('barang','id,nama_barang,satuan,kategori_id,tipe,merk,kode_barang,keterangan,kategori:kategori_id(id,nama_kategori)',q=>q.eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true})),
-    fetchAllSipbRows('kategori','*',q=>q.order('nama_kategori'))
+    fetchAllSipbRows('kategori','*',q=>q.order('nama_kategori').order('id',{ascending:true}))
   ]);
   return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PENERIMAAN</span><h2>Rekam Barang Masuk</h2><p>Stok, transaksi penerimaan, dan batch Kuasi disimpan atomik dalam satu transaksi database.</p></div><button class="ghost" id="backMasuk">← Kembali</button></div><div class="form-grid">
   <label>Barang yang sudah ada <select id="m_barang">${canCreate?'<option value="">＋ Barang baru</option>':''}${items.map(x=>`<option value="${x.id}" data-kode="${esc(x.kode_barang||'')}" data-kuasi="${String(x.kategori?.nama_kategori||'').toLowerCase().includes('kuasi')?'1':'0'}" data-kategori="${x.kategori_id||''}" data-satuan="${esc(x.satuan||'')}" data-tipe="${esc(x.tipe||'')}" data-merk="${esc(x.merk||'')}">${esc(x.nama_barang)} — ${esc(x.kode_barang||'Tanpa Kode')} · ${esc(x.satuan||'-')}</option>`).join('')}</select></label>
@@ -767,7 +767,7 @@ async function barangMasukForm(){
   <label class="field-wide">Keterangan / Spesifikasi <textarea id="m_keterangan" rows="3" maxlength="500" placeholder="Contoh: ukuran, warna, model, jenis, bahan, atau keterangan lain untuk membedakan nama barang yang sama"></textarea><small class="field-hint">Keterangan ini melekat pada transaksi Barang Masuk, bukan Master Barang.</small></label>
   </div><div id="masukKuasi" class="kuasi-box" style="display:none"><strong>📑 Batch Kuasi</strong><span>Isi rentang nomor seri yang diterima. Jumlah harus sama dengan rentang.</span><div class="form-grid"><label>No. Dus <input id="m_dus" placeholder="Contoh: 411"></label><label>No. Seri Awal <input id="m_awal" placeholder="A-001"></label><label>No. Seri Akhir <input id="m_akhir" placeholder="A-100"></label></div></div><div class="form-actions"><button class="primary" id="saveMasuk">Rekam & Tambah Stok</button><button class="ghost" id="cancelMasuk">Batal</button></div></section>`;
 }
-async function barangKeluarForm(){const [items,pegawai]=await Promise.all([fetchAllSipbRows('barang','id,kode_barang,nama_barang,keterangan,satuan,sisa,kategori:kategori_id(id,nama_kategori)',q=>q.eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true})),fetchAllSipbRows('pegawai','id,nama_pegawai,nip,status_pegawai,jabatan,unit_kerja',q=>q.order('nama_pegawai'))]);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h2>Rekam Barang Keluar</h2><p>Stok akan dikurangi setelah seluruh item lolos validasi.</p></div><button class="ghost" id="backKeluar">← Kembali</button></div><div class="form-grid"><label>Tanggal Keluar <input id="k_tanggal" type="date" value="${localDate()}"></label><label>Penyerah (Gudang) <select id="k_penyerah"><option value="">- Pilih penyerah -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penyerah <input id="k_penyerah_jabatan" readonly></label><label>NIP Penyerah <input id="k_penyerah_nip" readonly></label><label>Penerima (Pemohon) <select id="k_penerima"><option value="">- Pilih pegawai -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penerima <input id="k_jabatan" readonly></label><label>NIP Penerima <input id="k_nip" readonly></label><label>Tujuan / Ruangan <input id="k_tujuan" placeholder="Otomatis dari Unit Kerja/Ruangan Penerima; dapat diedit" required></label></div><div class="section-head compact"><div><h3>Daftar Barang</h3><p>Tambahkan satu atau beberapa item.</p></div><button class="ghost" id="addItemKeluar">＋ Tambah Item</button></div><div id="keluarItems"></div><div class="form-actions"><button class="primary" id="saveKeluar">Rekam Transaksi & Kurangi Stok</button><button class="ghost" id="cancelKeluar">Batal</button></div></section>`}
+async function barangKeluarForm(){const [items,pegawai]=await Promise.all([fetchAllSipbRows('barang','id,kode_barang,nama_barang,keterangan,satuan,sisa,kategori:kategori_id(id,nama_kategori)',q=>q.eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true})),fetchAllSipbRows('pegawai','id,nama_pegawai,nip,status_pegawai,jabatan,unit_kerja',q=>q.order('nama_pegawai').order('id',{ascending:true}))]);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DISTRIBUSI</span><h2>Rekam Barang Keluar</h2><p>Stok akan dikurangi setelah seluruh item lolos validasi.</p></div><button class="ghost" id="backKeluar">← Kembali</button></div><div class="form-grid"><label>Tanggal Keluar <input id="k_tanggal" type="date" value="${localDate()}"></label><label>Penyerah (Gudang) <select id="k_penyerah"><option value="">- Pilih penyerah -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penyerah <input id="k_penyerah_jabatan" readonly></label><label>NIP Penyerah <input id="k_penyerah_nip" readonly></label><label>Penerima (Pemohon) <select id="k_penerima"><option value="">- Pilih pegawai -</option>${pegawai.map(p=>`<option value="${esc(p.nama_pegawai)}" data-nip="${esc(p.nip||'')}" data-jabatan="${esc(p.jabatan||'')}" data-status="${esc(p.status_pegawai||'')}">${esc(p.nama_pegawai)}</option>`).join('')}</select></label><label>Jabatan Penerima <input id="k_jabatan" readonly></label><label>NIP Penerima <input id="k_nip" readonly></label><label>Tujuan / Ruangan <input id="k_tujuan" placeholder="Otomatis dari Unit Kerja/Ruangan Penerima; dapat diedit" required></label></div><div class="section-head compact"><div><h3>Daftar Barang</h3><p>Tambahkan satu atau beberapa item.</p></div><button class="ghost" id="addItemKeluar">＋ Tambah Item</button></div><div id="keluarItems"></div><div class="form-actions"><button class="primary" id="saveKeluar">Rekam Transaksi & Kurangi Stok</button><button class="ghost" id="cancelKeluar">Batal</button></div></section>`}
 
 function keluarItemRow(items){
   const id='ki_'+Math.random().toString(36).slice(2,9);
@@ -816,8 +816,8 @@ async function showKuasiDetail(id){
   if(be)throw be;
   const [allocations,legacy,batchRows]=await Promise.all([
     fetchAllSipbRows('transaksi_kuasi_alokasi','id,transaksi_keluar_id,detail_barang_keluar_id,jumlah,digit_awal,digit_akhir,created_at,transaksi:transaksi_keluar_id(id,tanggal_keluar,penerima_nama,penerima_jabatan,tujuan_ruangan,status,jenis_dokumen),detail:detail_barang_keluar_id(nomor_awal,nomor_akhir,nomor_dus)',q=>q.eq('stok_kuasi_id',id).order('id',{ascending:false})),
-    fetchAllSipbRows('detail_barang_keluar','id,jumlah,nomor_awal,nomor_akhir,nomor_dus,transaksi:transaksi_keluar_id(id,status)',q=>q.eq('barang_id',batch.barang_id)),
-    fetchAllSipbRows('stok_kuasi','id',q=>q.eq('barang_id',batch.barang_id))
+    fetchAllSipbRows('detail_barang_keluar','id,jumlah,nomor_awal,nomor_akhir,nomor_dus,transaksi:transaksi_keluar_id(id,status)',q=>q.eq('barang_id',batch.barang_id).order('id',{ascending:true})),
+    fetchAllSipbRows('stok_kuasi','id',q=>q.eq('barang_id',batch.barang_id).order('id',{ascending:true}))
   ]);
   const batchIds=(batchRows||[]).map(r=>Number(r.id)).filter(Number.isFinite);
   const allAllocationRows=batchIds.length?await fetchAllSipbRowsByValues('transaksi_kuasi_alokasi','detail_barang_keluar_id','stok_kuasi_id',batchIds):[];
@@ -1062,7 +1062,7 @@ async function backupPage(){
 async function kategoriPage(){const data=await fetchAllSipbRows('kategori','*',q=>q.order('id'));return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DATA REFERENSI</span><h2>Kategori</h2><p>Kelola klasifikasi barang.</p></div>${profile?.role==='admin'?'<button class="primary" id="addKategori">＋ Tambah Kategori</button>':''}</div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Nama Kategori</th><th>Aksi</th></tr></thead><tbody>${data.map(r=>`<tr><td>#${r.id}</td><td><strong>${esc(r.nama_kategori)}</strong></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-kat" data-id="'+r.id+'">Edit</button><button class="btn-sm danger delete-kat" data-id="'+r.id+'">Hapus</button></div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`).join('')||emptyRow(3)}</tbody></table></div></section>`}
 async function penggunaPage(){
   if(profile?.role!=='admin')return '<section class="card error-card"><h2>Akses ditolak</h2><p>Halaman ini hanya dapat diakses admin.</p></section>';
-  const rows=await fetchAllSipbRows('user_profiles','id,legacy_user_id,username,nama_lengkap,role,is_active,created_at',q=>q.order('nama_lengkap'));
+  const rows=await fetchAllSipbRows('user_profiles','id,legacy_user_id,username,nama_lengkap,role,is_active,created_at',q=>q.order('nama_lengkap').order('id',{ascending:true}));
   const active=rows.filter(u=>u.is_active).length;
   const admins=rows.filter(u=>u.is_active&&u.role==='admin').length;
   return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">ADMINISTRASI</span><h2>Kelola Pengguna</h2><p>Kelola akun SIPB, peran, dan status pengguna.</p></div><div class="kartu-head-actions"><span class="status-pill">'+rows.length+' pengguna</span><button class="primary" id="addUser">＋ Tambah Pengguna</button></div></div>'+
@@ -1188,7 +1188,7 @@ function showUserCreateModal(){
 }
 
 async function pegawaiPage(){
-  const data=await fetchAllSipbRows('pegawai','*',q=>q.order('nama_pegawai'));
+  const data=await fetchAllSipbRows('pegawai','*',q=>q.order('nama_pegawai').order('id',{ascending:true}));
   return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">DATA REFERENSI</span><h2>Pegawai</h2><p>Kelola data pegawai untuk kebutuhan penyerah dan penerima barang.</p></div>'+
     (profile?.role==='admin'?'<button class="primary" id="addPegawai">＋ Tambah Pegawai</button>':'')+
     '</div><div class="filter-bar"><div class="search-box">⌕<input id="pegawaiSearch" placeholder="Cari nama, NIP, status, jabatan, atau unit kerja..."></div><span id="pegawaiCount" class="result-count">'+(data?.length||0)+' data</span></div>'+
@@ -1891,7 +1891,7 @@ async function bindOpnameForm(){
 async function bindKeluarForm(){
   const [items,pegawai]=await Promise.all([
     fetchAllSipbRows('barang','id,kode_barang,nama_barang,keterangan,satuan,sisa,kategori:kategori_id(id,nama_kategori)',q=>q.eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true})),
-    fetchAllSipbRows('pegawai','id,nama_pegawai,nip,status_pegawai,jabatan,unit_kerja',q=>q.order('nama_pegawai'))
+    fetchAllSipbRows('pegawai','id,nama_pegawai,nip,status_pegawai,jabatan,unit_kerja',q=>q.order('nama_pegawai').order('id',{ascending:true}))
   ]);
   $('backKeluar').onclick=()=>renderApp('dashboard');
   $('cancelKeluar').onclick=()=>renderApp('dashboard');
