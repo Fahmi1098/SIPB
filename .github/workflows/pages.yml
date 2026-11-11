@@ -33,7 +33,7 @@ jobs:
       - name: Validate PostgreSQL migration statement syntax
         run: |
           python -m pip install --quiet pglast
-          python -c "from pathlib import Path; from pglast import parse_sql; paths = ['supabase/migrations/20261102090000_security_integrity_followup.sql', 'supabase/migrations/20261102110000_transaction_corrections.sql', 'supabase/migrations/20261102120000_fix_cancel_definer_permissions.sql', 'supabase/migrations/20261102140000_fifo_cost_layers.sql', 'supabase/migrations/20261102160000_preimport_data_integrity.sql', 'supabase/migrations/20261111100000_barang_identity_import_guard.sql']; [parse_sql(Path(p).read_text(encoding='utf-8')) for p in paths]; print('SQL statement syntax OK:', ', '.join(paths))"
+          python -c "from pathlib import Path; from pglast import parse_sql; paths = ['supabase/migrations/20261102090000_security_integrity_followup.sql', 'supabase/migrations/20261102110000_transaction_corrections.sql', 'supabase/migrations/20261102120000_fix_cancel_definer_permissions.sql', 'supabase/migrations/20261102140000_fifo_cost_layers.sql', 'supabase/migrations/20261102160000_preimport_data_integrity.sql', 'supabase/migrations/20261111100000_barang_identity_import_guard.sql', 'supabase/migrations/20261111120000_test_item_cleanup_history_corrections.sql']; [parse_sql(Path(p).read_text(encoding='utf-8')) for p in paths]; print('SQL statement syntax OK:', ', '.join(paths))"
   deploy:
     needs: validate
     if: github.event_name != 'pull_request'

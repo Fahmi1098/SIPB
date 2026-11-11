@@ -7,6 +7,7 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&
 const idCollator=new Intl.Collator('id-ID',{numeric:true,sensitivity:'base'});
 function normalizeSearchText(value){return String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('id-ID').replace(/\s+/g,' ').trim()}
 function matchesSearch(value,query){const terms=normalizeSearchText(query).split(/\s+/).filter(Boolean);if(!terms.length)return true;const hay=normalizeSearchText(value);return terms.every(term=>hay.includes(term))}
+const isTestBarangName=value=>(/(^|[^a-z0-9])(tes|test|dummy|percobaan)(?=$|[^a-z0-9])/.test(normalizeSearchText(value)));
 const rupiah=v=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Number(v)||0);
 const formatAngka=v=>{const n=Number(v);return Number.isFinite(n)?Math.trunc(n).toLocaleString('id-ID'):''};
 const parseAngka=v=>{const s=String(v??'').replace(/[^0-9-]/g,'');return s?Number(s):0};
@@ -185,7 +186,7 @@ function enhanceTables(scope=document){
           table.dataset.sortCol=String(col);
           table.dataset.sortDir=String(nextDir);
           sortTable(table,col,nextDir);
-          const card=table.closest('.page-card,.recent');
+          const card=table.closest('.page-card,.recent,.modal-card');
           const sel=card?.querySelector('.table-sort-select');
           const dir=card?.querySelector('.table-sort-direction');
           if(sel)sel.value=String(col);
@@ -195,7 +196,7 @@ function enhanceTables(scope=document){
       });
       table.dataset.sortReady='1';
     }
-    const card=table.closest('.page-card,.recent');
+    const card=table.closest('.page-card,.recent,.modal-card');
     if(!card)return;
     let toolbar=card.querySelector(':scope > .table-tools');
     if(!toolbar){
@@ -248,7 +249,7 @@ function enhanceTables(scope=document){
       search.innerHTML='<span aria-hidden="true">⌕</span><input class="table-filter-search" type="search" placeholder="Cari di tabel...">';
       toolbar.insertBefore(search,toolbar.firstChild);
       search.querySelector('input').addEventListener('input',e=>{
-        const q=e.target.value.toLowerCase().trim();
+        const q=e.target.value;
         table.tBodies?.[0]?.querySelectorAll('tr').forEach(row=>{
           if(row.querySelector('.empty'))return;
           row.dataset.tableSearchMatch=matchesSearch(row.textContent,q)?'1':'0';
@@ -567,7 +568,10 @@ function barangRow(r){
   const archiveAction=profile?.role==='admin'
     ?'<button class="btn-sm '+(archived?'':'danger')+' archive-barang" data-id="'+r.id+'" data-archived="'+(archived?'1':'0')+'">'+(archived?'Pulihkan':'Arsipkan')+'</button>'
     :'';
-  return `<tr data-sort-key="${r.id}" data-search="${esc([r.kode_barang,r.nama_barang,ket,r.tipe,r.merk,r.satuan,r.kategori?.nama_kategori].join(' ').toLowerCase())}" data-kategori="${r.kategori_id||''}" data-archived="${archived?'1':'0'}"><td class="id-cell">#${r.id}<br><small>${archived?'Diarsipkan':'Aktif'}</small></td><td><small>${esc(r.kode_barang||"-")}</small></td><td><strong>${esc(r.nama_barang)}</strong></td><td>${esc(ket||'-')}</td><td>${esc(r.kategori?.nama_kategori||'-')}</td><td>${esc(r.tipe||'-')}</td><td>${esc(r.merk||'-')}</td><td>${esc(r.satuan||'-')}</td><td>${rupiah(r.harga_terakhir)}</td><td><span class="stock ${low?'low':''}">${formatAngka(r.sisa??0)}</span></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-barang" data-id="'+r.id+'">Edit</button>'+archiveAction+'</div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`;
+  const purgeAction=profile?.role==='admin'&&isTestBarangName(r.nama_barang)
+    ?'<button class="btn-sm danger purge-test-barang" data-id="'+r.id+'" data-name="'+esc(r.nama_barang)+'" title="Hapus permanen khusus data uji">Hapus Data Uji</button>'
+    :'';
+  return `<tr data-sort-key="${r.id}" data-search="${esc([r.kode_barang,r.nama_barang,ket,r.tipe,r.merk,r.satuan,r.kategori?.nama_kategori].join(' '))}" data-kategori="${r.kategori_id||''}" data-archived="${archived?'1':'0'}"><td class="id-cell">#${r.id}<br><small>${archived?'Diarsipkan':'Aktif'}</small></td><td><small>${esc(r.kode_barang||"-")}</small></td><td><strong>${esc(r.nama_barang)}</strong></td><td>${esc(ket||'-')}</td><td>${esc(r.kategori?.nama_kategori||'-')}</td><td>${esc(r.tipe||'-')}</td><td>${esc(r.merk||'-')}</td><td>${esc(r.satuan||'-')}</td><td>${rupiah(r.harga_terakhir)}</td><td><span class="stock ${low?'low':''}">${formatAngka(r.sisa??0)}</span></td><td>${profile?.role==='admin'?'<div class="actions"><button class="btn-sm edit-barang" data-id="'+r.id+'">Edit</button>'+archiveAction+purgeAction+'</div>':'<span class="badge-soft">Lihat</span>'}</td></tr>`;
 }
 function emptyRow(n){return `<tr><td colspan="${n}" class="empty">Belum ada data.</td></tr>`}
 async function showImportPersediaanModal(){
@@ -823,7 +827,24 @@ function keluarItemRow(items){
   '</div>';
 }
 
-async function stockOpnamePage(){const [rows,items]=await Promise.all([fetchAllSipbRows('riwayat_opname','*,barang:barang_id(nama_barang)',q=>q.order('id',{ascending:false})),fetchAllSipbRows('barang','id,nama_barang,sisa,satuan',q=>q.order('nama_barang',{ascending:true}).order('id',{ascending:true}))]);return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PERSEDIAAN</span><h2>Stock Opname</h2><p>Penyesuaian stok fisik terhadap stok sistem.</p></div><button class="primary" id="addOpname">＋ Rekam Stock Opname</button></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Barang</th><th>Sistem</th><th>Fisik</th><th>Selisih</th><th>Petugas</th><th>Keterangan</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${fmtDate(r.tanggal_opname)}</td><td>${esc(r.barang?.nama_barang||'-')}</td><td>${r.stok_sistem}</td><td>${r.stok_fisik}</td><td><span class="stock ${r.selisih<0?'low':''}">${r.selisih>0?'+':''}${r.selisih}</span></td><td>${esc(r.petugas||'-')}</td><td>${esc(r.keterangan||'-')}</td></tr>`).join('')||emptyRow(7)}</tbody></table></div></section>`}
+async function stockOpnamePage(){
+  const [rows,items]=await Promise.all([
+    fetchAllSipbRows('riwayat_opname','*,barang:barang_id(kode_barang,nama_barang,satuan,keterangan)',q=>q.order('tanggal_opname',{ascending:false}).order('id',{ascending:false})),
+    fetchAllSipbRows('barang','id,nama_barang,sisa,satuan',q=>q.order('nama_barang',{ascending:true}).order('id',{ascending:true}))
+  ]);
+  const tableRows=(rows||[]).map(r=>{
+    const search=[r.tanggal_opname,r.id,r.barang?.kode_barang,r.barang?.nama_barang,r.barang?.keterangan,r.petugas,r.keterangan,r.stok_sistem,r.stok_fisik,r.selisih].join(' ');
+    return '<tr data-date="'+esc(r.tanggal_opname||'')+'" data-search="'+esc(search)+'">'+
+      '<td>'+fmtDate(r.tanggal_opname)+'</td><td><strong>'+esc(r.barang?.nama_barang||'-')+'</strong><br><small>'+esc(r.barang?.kode_barang||'')+'</small></td>'+
+      '<td>'+r.stok_sistem+'</td><td>'+r.stok_fisik+'</td><td><span class="stock '+(r.selisih<0?'low':'')+'">'+(r.selisih>0?'+':'')+r.selisih+'</span></td>'+
+      '<td>'+esc(r.petugas||'-')+'</td><td>'+esc(r.keterangan||'-')+'</td>'+
+      '<td>'+(profile?.role==='admin'?'<button class="btn-sm opname-correct" data-id="'+r.id+'">Koreksi</button>':'-')+'</td></tr>';
+  }).join('');
+  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PERSEDIAAN</span><h2>Stock Opname</h2><p>Penyesuaian stok fisik terhadap stok sistem.</p></div><button class="primary" id="addOpname">＋ Rekam Stock Opname</button></div>'+
+    '<div class="filter-bar"><div class="search-box">⌕<input id="opnameSearch" type="search" placeholder="Cari tanggal, barang, kode, petugas, atau keterangan..."></div>'+
+    '<label class="table-sort-control"><span>Dari</span><input id="opnameFrom" type="date"></label><label class="table-sort-control"><span>Sampai</span><input id="opnameTo" type="date"></label></div>'+
+    '<div class="table-wrap"><table id="stockOpnameTable"><thead><tr><th>Tanggal</th><th>Barang</th><th>Sistem</th><th>Fisik</th><th>Selisih</th><th>Petugas</th><th>Keterangan</th><th>Aksi</th></tr></thead><tbody>'+(tableRows||emptyRow(8))+'</tbody></table></div></section>';
+}
 
 async function kuasiPage(){
   const rows=await fetchAllSipbRows('stok_kuasi','id,barang_id,prefix_huruf,panjang_digit,digit_awal,digit_akhir,digit_sekarang,sisa_lembar,tanggal_masuk,nomor_dus,barang:barang_id(nama_barang,satuan)',q=>q.gt('sisa_lembar',0).order('tanggal_masuk',{ascending:true}).order('id',{ascending:true}));
@@ -1293,46 +1314,50 @@ async function pegawaiForm(id=null){
 }
 async function riwayatPage(){
   const [keluar,masuk,opname,audit]=await Promise.all([
-    fetchAllSipbRows('transaksi_keluar','*,detail_barang_keluar(id,jumlah,nomor_awal,nomor_akhir,nomor_dus,barang:barang_id(nama_barang,satuan))',q=>q.order('tanggal_keluar',{ascending:false}).order('id',{ascending:false})),
-    fetchAllSipbRows('barang_masuk','*,barang:barang_id(nama_barang,satuan)',q=>q.order('tanggal_masuk',{ascending:false}).order('id',{ascending:false})),
-    fetchAllSipbRows('riwayat_opname','*,barang:barang_id(nama_barang,satuan)',q=>q.order('tanggal_opname',{ascending:false}).order('id',{ascending:false})),
+    fetchAllSipbRows('transaksi_keluar','*,detail_barang_keluar(id,jumlah,nomor_awal,nomor_akhir,nomor_dus,barang:barang_id(kode_barang,nama_barang,keterangan,satuan,kategori:kategori_id(nama_kategori)))',q=>q.order('tanggal_keluar',{ascending:false}).order('id',{ascending:false})),
+    fetchAllSipbRows('barang_masuk','*,barang:barang_id(kode_barang,nama_barang,keterangan,satuan,kategori:kategori_id(nama_kategori))',q=>q.order('tanggal_masuk',{ascending:false}).order('id',{ascending:false})),
+    fetchAllSipbRows('riwayat_opname','*,barang:barang_id(kode_barang,nama_barang,keterangan,satuan,kategori:kategori_id(nama_kategori))',q=>q.order('tanggal_opname',{ascending:false}).order('id',{ascending:false})),
     profile?.role==='admin'?fetchAllSipbRows('sipb_transaction_audit','*',q=>q.order('created_at',{ascending:false})):Promise.resolve([])
   ]);
   const rows=[
     ...(masuk||[]).map(r=>({
       type:'MASUK',date:r.tanggal_masuk,id:r.id,party:r.nama_penyerah||'-',
       target:r.nama_penerima||'-',doc:'Penerimaan',status:'AKTIF',
-      items:[{name:r.barang?.nama_barang||'-',unit:r.barang?.satuan||'',qty:r.jumlah,
+      items:[{code:r.barang?.kode_barang||'',name:r.barang?.nama_barang||'-',category:r.barang?.kategori?.nama_kategori||'',unit:r.barang?.satuan||'',qty:r.jumlah,
         price:Number(r.harga_satuan)||0,total:(Number(r.jumlah)||0)*(Number(r.harga_satuan)||0),
-        keterangan:r.keterangan||'',serial:r.nomor_awal&&r.nomor_akhir?r.nomor_awal+' → '+r.nomor_akhir:''}]
+        keterangan:[r.barang?.keterangan,r.keterangan].filter(Boolean).join(' · '),serial:r.nomor_awal&&r.nomor_akhir?r.nomor_awal+' → '+r.nomor_akhir:''}]
     })),
     ...(keluar||[]).map(r=>({
       type:'KELUAR',date:r.tanggal_keluar,id:r.id,party:r.penerima_nama||'-',
       target:r.tujuan_ruangan||'-',doc:r.jenis_dokumen||'Nota Dinas',status:r.status||'AKTIF',
       items:(r.detail_barang_keluar||[]).map(d=>({
-        name:d.barang?.nama_barang||'-',unit:d.barang?.satuan||'',qty:d.jumlah,
+        code:d.barang?.kode_barang||'',name:d.barang?.nama_barang||'-',category:d.barang?.kategori?.nama_kategori||'',unit:d.barang?.satuan||'',qty:d.jumlah,
+        keterangan:d.barang?.keterangan||'',
         serial:d.nomor_awal&&d.nomor_akhir?d.nomor_awal+' → '+d.nomor_akhir:''
       }))
     })),
     ...(opname||[]).map(r=>({
       type:'OPNAME',date:r.tanggal_opname,id:r.id,party:r.petugas||'-',
       target:r.barang?.nama_barang||'-',doc:'Stock Opname',status:'DICATAT',
-      items:[{name:r.barang?.nama_barang||'-',unit:r.barang?.satuan||'',qty:r.stok_fisik,
-        serial:'Sistem '+(r.stok_sistem??0)+' → Fisik '+(r.stok_fisik??0)+' (Selisih '+(r.selisih??0)+')'}]
+      items:[{code:r.barang?.kode_barang||'',name:r.barang?.nama_barang||'-',category:r.barang?.kategori?.nama_kategori||'',unit:r.barang?.satuan||'',qty:r.stok_fisik,
+        keterangan:r.keterangan||'',serial:'Sistem '+(r.stok_sistem??0)+' → Fisik '+(r.stok_fisik??0)+' (Selisih '+(r.selisih??0)+')'}]
     }))
   ].sort((a,b)=>String(b.date).localeCompare(String(a.date))||Number(b.id)-Number(a.id));
   window.__sipbHistory=Object.fromEntries(rows.map(r=>[r.type+'_'+r.id,r]));
   window.__sipbAudit=audit||[];
+  const historyCategories=[...new Set(rows.flatMap(r=>r.items.map(i=>i.category).filter(Boolean)))].sort((a,b)=>a.localeCompare(b,'id'));
 
   const tableRows=rows.map(r=>{
-    const canCorrect=profile?.role==='admin'&&r.status==='AKTIF'&&(r.type==='KELUAR'||(r.type==='MASUK'&&!r.items.some(i=>i.serial)));
+    const canCorrect=profile?.role==='admin'&&(r.type==='OPNAME'||(r.status==='AKTIF'&&(r.type==='KELUAR'||(r.type==='MASUK'&&!r.items.some(i=>i.serial)))));
     const correctionAction=canCorrect
       ?'<button class="btn-sm history-correct" data-type="'+r.type+'" data-id="'+r.id+'">Koreksi</button>':'';
     const cancelAction=profile?.role==='admin'&&r.type==='KELUAR'&&r.status==='AKTIF'
       ?'<button class="btn-sm danger history-cancel" data-id="'+r.id+'">Batalkan</button>':'';
     const printAction=r.type==='KELUAR'&&r.status==='AKTIF'
       ?'<button class="btn-sm sipb-inline-print" data-id="'+r.id+'">Cetak</button>':'';
-    return '<tr data-type="'+r.type+'" data-search="'+esc([r.date,r.party,r.target,r.doc,r.status,r.items.map(i=>[i.name,i.keterangan].filter(Boolean).join(' ')).join(' ')].join(' ').toLowerCase())+'">'+
+    const searchable=[r.date,r.id,r.type,r.party,r.target,r.doc,r.status,...r.items.flatMap(i=>[i.code,i.name,i.category,i.keterangan,i.serial])].join(' ');
+    const categories=[...new Set(r.items.map(i=>i.category).filter(Boolean))].join('|');
+    return '<tr data-type="'+r.type+'" data-status="'+r.status+'" data-date="'+esc(r.date||'')+'" data-category="'+esc(categories)+'" data-search="'+esc(searchable)+'">'+
       '<td><span class="badge-soft '+(r.type==='MASUK'?'success':'')+'">'+r.type+'</span></td>'+
       '<td>'+fmtDate(r.date)+'</td><td>#'+r.id+'</td><td><strong>'+esc(r.party)+'</strong></td>'+
       '<td>'+esc(r.target)+'</td><td>'+esc(r.doc)+'</td><td>'+r.items.length+'</td>'+
@@ -1342,9 +1367,11 @@ async function riwayatPage(){
   }).join('');
 
   const auditRows=(audit||[]).map(a=>{
-    const label=a.entity_type==='BARANG_MASUK'?'Barang Masuk':a.entity_type==='BARANG_KELUAR'?'Barang Keluar':'Data Barang';
+    const label=a.entity_type==='BARANG_MASUK'?'Barang Masuk':a.entity_type==='BARANG_KELUAR'?'Barang Keluar':a.entity_type==='STOCK_OPNAME'?'Stock Opname':'Data Barang';
     const action=a.action==='PEMBATALAN'?'Pembatalan':a.action==='PERUBAHAN_MASTER'?'Perubahan Master':'Koreksi';
-    return '<tr data-search="'+esc([label,action,a.entity_id,a.new_entity_id,a.reason,a.actor_name].join(' ').toLowerCase())+'">'+
+    const created=new Date(a.created_at);
+    const date=created.getFullYear()+'-'+String(created.getMonth()+1).padStart(2,'0')+'-'+String(created.getDate()).padStart(2,'0');
+    return '<tr data-date="'+esc(date)+'" data-entity="'+esc(a.entity_type)+'" data-action="'+esc(a.action)+'" data-search="'+esc([label,action,a.entity_id,a.new_entity_id,a.reason,a.actor_name].join(' '))+'">'+
       '<td>'+new Date(a.created_at).toLocaleString('id-ID')+'</td><td>'+esc(label)+'</td>'+
       '<td>#'+a.entity_id+(a.new_entity_id?' → #'+a.new_entity_id:'')+'</td>'+
       '<td><span class="badge-soft">'+esc(action)+'</span></td><td>'+esc(a.reason)+'</td>'+
@@ -1352,23 +1379,29 @@ async function riwayatPage(){
       '<td><button class="btn-sm audit-detail" data-id="'+a.id+'">Data Lama/Baru</button></td></tr>';
   }).join('');
 
-  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">AUDIT PERSEDIAAN</span><h2>Riwayat Transaksi</h2><p>Koreksi dan pembatalan tersimpan dengan data sebelum/sesudah, alasan, petugas, dan waktu.</p></div><span class="status-pill">'+rows.length+' transaksi</span></div>'+
-    '<div class="filter-bar"><div class="search-box">⌕<input id="historySearch" placeholder="Cari tanggal, penerima, barang, atau tujuan..."></div>'+
-    '<select id="historyType"><option value="">Semua transaksi</option><option value="MASUK">Barang Masuk</option><option value="KELUAR">Barang Keluar</option><option value="OPNAME">Stock Opname</option></select></div>'+
+  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">AUDIT PERSEDIAAN</span><h2>Riwayat Transaksi</h2><p>Telusuri penerimaan, pengeluaran, Stock Opname, dan status koreksi/pembatalan.</p></div><span class="status-pill">'+rows.length+' transaksi</span></div>'+
+    '<div class="filter-bar"><div class="search-box">⌕<input id="historySearch" type="search" placeholder="Cari nomor, kode, nama barang, pihak, tujuan, atau dokumen..."></div>'+
+    '<select id="historyType"><option value="">Semua transaksi</option><option value="MASUK">Barang Masuk</option><option value="KELUAR">Barang Keluar</option><option value="OPNAME">Stock Opname</option></select>'+
+    '<select id="historyStatus"><option value="">Semua status</option><option value="AKTIF">Aktif</option><option value="DIBATALKAN">Dibatalkan</option><option value="DICATAT">Dicatat</option></select>'+
+    '<select id="historyCategory"><option value="">Semua kategori</option>'+historyCategories.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join('')+'</select>'+
+    '<label class="table-sort-control"><span>Dari</span><input id="historyFrom" type="date"></label><label class="table-sort-control"><span>Sampai</span><input id="historyTo" type="date"></label></div>'+
     '<div class="table-wrap"><table id="historyTable"><thead><tr><th>Jenis</th><th>Tanggal</th><th>No.</th><th>Pihak</th><th>Tujuan/Penerima</th><th>Dokumen</th><th>Item</th><th>Status</th><th>Aksi</th></tr></thead>'+
     '<tbody>'+tableRows+(tableRows?'':emptyRow(9))+'</tbody></table></div></section>'+
-    (profile?.role==='admin'?'<section class="card page-card"><div class="section-head"><div><span class="eyebrow">JEJAK PERUBAHAN</span><h2>Riwayat Koreksi & Pembatalan</h2><p>100 perubahan terakhir. Data lama dan data baru dapat dibuka untuk pemeriksaan.</p></div><span class="status-pill">'+(audit||[]).length+' catatan</span></div>'+
+    (profile?.role==='admin'?'<section class="card page-card"><div class="section-head"><div><span class="eyebrow">JEJAK PERUBAHAN</span><h2>Riwayat Koreksi & Pembatalan</h2><p>Data sebelum/sesudah, alasan, petugas, dan waktu tetap dapat diperiksa.</p></div><span class="status-pill">'+(audit||[]).length+' catatan</span></div>'+
+    '<div class="filter-bar"><div class="search-box">⌕<input id="auditSearch" type="search" placeholder="Cari jenis data, nomor, alasan, atau petugas..."></div>'+
+    '<select id="auditEntity"><option value="">Semua jenis data</option><option value="BARANG_MASUK">Barang Masuk</option><option value="BARANG_KELUAR">Barang Keluar</option><option value="STOCK_OPNAME">Stock Opname</option><option value="MASTER_BARANG">Data Barang</option></select>'+
+    '<select id="auditAction"><option value="">Semua tindakan</option><option value="KOREKSI">Koreksi</option><option value="PEMBATALAN">Pembatalan</option><option value="PERUBAHAN_MASTER">Perubahan Master</option></select>'+
+    '<label class="table-sort-control"><span>Dari</span><input id="auditFrom" type="date"></label><label class="table-sort-control"><span>Sampai</span><input id="auditTo" type="date"></label></div>'+
     '<div class="table-wrap"><table id="auditTable"><thead><tr><th>Waktu</th><th>Jenis Data</th><th>Nomor Transaksi</th><th>Tindakan</th><th>Alasan</th><th>Petugas</th><th>Aksi</th></tr></thead>'+
     '<tbody>'+(auditRows||emptyRow(7))+'</tbody></table></div></section>':'');
 }
-
 function showHistoryDetail(k){
   const r=window.__sipbHistory?.[k];if(!r)return;
   const box=document.createElement('div');box.className='modal-backdrop';
   box.innerHTML='<div class="modal-card"><div class="modal-head"><div><span class="eyebrow">'+(r.type==='MASUK'?'PENERIMAAN':r.type==='OPNAME'?'STOCK OPNAME':'PENGELUARAN')+'</span><h2>Detail Transaksi #'+r.id+'</h2></div><button class="modal-close" aria-label="Tutup">×</button></div>'+
     '<div class="detail-grid"><div><small>Tanggal</small><strong>'+fmtDate(r.date)+'</strong></div><div><small>Pihak</small><strong>'+esc(r.party)+'</strong></div><div><small>Tujuan/Penerima</small><strong>'+esc(r.target)+'</strong></div><div><small>Status</small><strong><span class="badge-soft '+(r.status==='AKTIF'?'success':'')+'">'+r.status+'</span></strong></div></div>'+
-    '<div class="table-wrap"><table><thead><tr><th>Barang</th><th>Keterangan</th><th>Satuan</th><th>Jumlah</th><th>Harga Satuan</th><th>Nilai</th><th>Nomor Seri</th></tr></thead><tbody>'+
-    r.items.map(i=>'<tr><td><strong>'+esc(i.name)+'</strong></td><td>'+esc(i.keterangan||'-')+'</td><td>'+esc(i.unit||'-')+'</td><td>'+i.qty+'</td><td>'+(i.price?rupiah(i.price):'-')+'</td><td>'+(i.total?rupiah(i.total):'-')+'</td><td>'+esc(i.serial||'-')+'</td></tr>').join('')+
+    '<div class="table-wrap"><table><thead><tr><th>Kode</th><th>Barang</th><th>Kategori</th><th>Keterangan</th><th>Satuan</th><th>Jumlah</th><th>Harga Satuan</th><th>Nilai</th><th>Nomor Seri / Catatan</th></tr></thead><tbody>'+
+    r.items.map(i=>'<tr><td>'+esc(i.code||'-')+'</td><td><strong>'+esc(i.name)+'</strong></td><td>'+esc(i.category||'-')+'</td><td>'+esc(i.keterangan||'-')+'</td><td>'+esc(i.unit||'-')+'</td><td>'+i.qty+'</td><td>'+(i.price?rupiah(i.price):'-')+'</td><td>'+(i.total?rupiah(i.total):'-')+'</td><td>'+esc(i.serial||'-')+'</td></tr>').join('')+
     '</tbody></table></div></div>';
   document.body.appendChild(box);enhanceTables(box);
   const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.onclick=e=>{if(e.target===box)close()};
@@ -1385,8 +1418,53 @@ function showAuditDetail(id){
   const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.onclick=e=>{if(e.target===box)close()};
 }
 
+async function showOpnameCorrectionModal(id){
+  const {data:r,error}=await client.from('riwayat_opname')
+    .select('*,barang:barang_id(id,kode_barang,nama_barang,satuan,is_archived,kategori:kategori_id(nama_kategori))')
+    .eq('id',id).single();
+  if(error)throw error;
+  if(!r||!r.barang)throw new Error('Riwayat Stock Opname atau Master Barang tidak ditemukan.');
+  if(r.barang.is_archived)throw new Error('Master Barang sudah diarsipkan dan tidak dapat dikoreksi.');
+  const box=document.createElement('div');box.className='modal-backdrop';
+  box.innerHTML='<div class="modal-card"><div class="modal-head"><div><span class="eyebrow">KOREKSI STOCK OPNAME</span><h2>Stock Opname #'+r.id+'</h2><p>'+esc(r.barang.nama_barang)+' · '+esc(r.barang.kode_barang||'Tanpa kode')+'</p></div><button class="modal-close" aria-label="Tutup">×</button></div>'+
+    '<form id="correctionOpnameForm"><div class="form-grid correction-form-grid">'+
+    '<label>Tanggal Opname <input value="'+esc(r.tanggal_opname||'')+'" readonly></label>'+
+    '<label>Stok Sistem Saat Opname <input value="'+formatAngka(r.stok_sistem||0)+'" readonly></label>'+
+    '<label>Stok Fisik yang Benar <input id="co_fisik" type="text" inputmode="numeric" data-number-format="integer" value="'+formatAngka(r.stok_fisik||0)+'" required></label>'+
+    '<label>Petugas <input id="co_petugas" maxlength="100" value="'+esc(r.petugas||'')+'" required></label>'+
+    '<label class="field-wide">Keterangan <textarea id="co_keterangan" rows="2" maxlength="500">'+esc(r.keterangan||'')+'</textarea></label>'+
+    '<div class="field-wide alert-box">Tanggal tidak diubah agar urutan FIFO tetap konsisten. Koreksi hanya diproses jika belum ada penerimaan, pengeluaran (termasuk yang dibatalkan), atau Stock Opname pada tanggal yang sama atau sesudahnya.</div>'+
+    '<label class="field-wide">Alasan Koreksi <textarea id="co_alasan" rows="3" minlength="8" maxlength="500" required placeholder="Jelaskan sebab koreksi Stock Opname."></textarea></label>'+
+    '</div><div class="form-actions"><button class="primary" id="co_save" type="submit">Simpan Koreksi</button><button class="ghost co_cancel" type="button">Batal</button></div></form></div>';
+  document.body.appendChild(box);
+  const close=()=>box.remove();
+  box.querySelector('.modal-close').onclick=close;
+  box.querySelector('.co_cancel').onclick=close;
+  box.onclick=e=>{if(e.target===box)close()};
+  box.querySelector('[data-number-format]').addEventListener('blur',e=>{e.target.value=formatAngka(parseAngka(e.target.value))});
+  $('correctionOpnameForm').onsubmit=async e=>{
+    e.preventDefault();
+    const stock=parseAngka($('co_fisik').value),petugas=$('co_petugas').value.trim(),alasan=$('co_alasan').value.trim();
+    if(!Number.isInteger(stock)||stock<0)return toast('Stok fisik harus bilangan bulat nol atau lebih.','error');
+    if(!petugas)return toast('Nama petugas wajib diisi.','error');
+    if(alasan.length<8)return toast('Alasan koreksi wajib diisi minimal 8 karakter.','error');
+    const btn=$('co_save');btn.disabled=true;btn.textContent='Menyimpan...';
+    try{
+      const result=await client.rpc('correct_stock_opname_audited',{
+        p_riwayat_opname_id:Number(id),p_stok_fisik:stock,
+        p_keterangan:$('co_keterangan').value.trim()||null,
+        p_petugas:petugas,p_alasan:alasan
+      });
+      if(result.error)throw result.error;
+      close();toast('Stock Opname #'+id+' berhasil dikoreksi dan masuk ke jejak audit.');
+      renderApp('riwayat');
+    }catch(err){btn.disabled=false;btn.textContent='Simpan Koreksi';fail(err)}
+  };
+}
+
 async function showCorrectionModal(type,id){
   if(profile?.role!=='admin')return toast('Hanya admin yang dapat mengoreksi transaksi.','error');
+  if(type==='OPNAME')return showOpnameCorrectionModal(id);
   if(type==='MASUK'){
     const [{data:r,error},items]=await Promise.all([
       client.from('barang_masuk').select('*,barang:barang_id(id,nama_barang,satuan,kode_barang,is_archived,kategori:kategori_id(nama_kategori))').eq('id',id).single(),
@@ -1476,10 +1554,16 @@ async function showCorrectionModal(type,id){
     rowsBox.addEventListener('focusout',e=>{if(e.target.classList.contains('ce_jumlah'))e.target.value=formatAngka(parseAngka(e.target.value))});
     $('correctionKeluarForm').onsubmit=async e=>{
       e.preventDefault();
-      const p_items=[...rowsBox.querySelectorAll('.correction-item-row')].map(row=>({
+      const itemRows=[...rowsBox.querySelectorAll('.correction-item-row')].map(row=>({
         barang_id:Number(row.querySelector('.ce_barang').value),
         jumlah:parseAngka(row.querySelector('.ce_jumlah').value)
       }));
+      const combined=new Map();
+      itemRows.forEach(item=>{
+        if(!Number.isInteger(item.barang_id)||item.barang_id<1||!Number.isInteger(item.jumlah)||item.jumlah<1)return;
+        combined.set(item.barang_id,(combined.get(item.barang_id)||0)+item.jumlah);
+      });
+      const p_items=[...combined.entries()].map(([barang_id,jumlah])=>({barang_id,jumlah}));
       if(!p_items.length||p_items.some(x=>!Number.isInteger(x.barang_id)||x.barang_id<1||!Number.isInteger(x.jumlah)||x.jumlah<1))
         return toast('Setiap barang dan jumlah harus diisi dengan benar.','error');
       const alasan=$('ce_alasan').value.trim();
@@ -1732,13 +1816,34 @@ function bind(page){
   }
   if(page==='riwayat'){
     const apply=()=>{
-      const q=$('historySearch').value,t=$('historyType').value;
+      const q=$('historySearch').value, t=$('historyType').value, status=$('historyStatus').value;
+      const category=$('historyCategory').value, from=$('historyFrom').value, to=$('historyTo').value;
       document.querySelectorAll('#historyTable tbody tr[data-search]').forEach(r=>{
-        setTableRowMatch(r,matchesSearch(r.dataset.search,q)&&(!t||r.dataset.type===t));
+        const date=r.dataset.date||'';
+        const categoryOk=!category||(r.dataset.category||'').split('|').includes(category);
+        const ok=matchesSearch(r.dataset.search,q)&&(!t||r.dataset.type===t)&&(!status||r.dataset.status===status)&&categoryOk&&(!from||date>=from)&&(!to||date<=to);
+        setTableRowMatch(r,ok);
       });
       refreshTableFilter('historyTable');
     };
-    $('historySearch').oninput=apply;$('historyType').onchange=apply;
+    ['historySearch','historyType','historyStatus','historyCategory','historyFrom','historyTo'].forEach(id=>{
+      const el=$(id);if(!el)return;
+      el.addEventListener(el.tagName==='INPUT'?'input':'change',apply);
+    });
+    const applyAudit=()=>{
+      const q=$('auditSearch')?.value||'',entity=$('auditEntity')?.value||'',action=$('auditAction')?.value||'';
+      const from=$('auditFrom')?.value||'',to=$('auditTo')?.value||'';
+      document.querySelectorAll('#auditTable tbody tr[data-search]').forEach(r=>{
+        const date=r.dataset.date||'';
+        const ok=matchesSearch(r.dataset.search,q)&&(!entity||r.dataset.entity===entity)&&(!action||r.dataset.action===action)&&(!from||date>=from)&&(!to||date<=to);
+        setTableRowMatch(r,ok);
+      });
+      refreshTableFilter('auditTable');
+    };
+    ['auditSearch','auditEntity','auditAction','auditFrom','auditTo'].forEach(id=>{
+      const el=$(id);if(!el)return;
+      el.addEventListener(el.tagName==='INPUT'?'input':'change',applyAudit);
+    });
     $('historyTable').onclick=async e=>{
       const detail=e.target.closest('.history-detail');
       const correction=e.target.closest('.history-correct');
@@ -1750,10 +1855,10 @@ function bind(page){
         finally{correction.disabled=false}
       }
     };
-    $('auditTable').onclick=e=>{
+    $('auditTable')?.addEventListener('click',e=>{
       const btn=e.target.closest('.audit-detail');if(!btn)return;
       e.preventDefault();e.stopPropagation();showAuditDetail(Number(btn.dataset.id));
-    };
+    });
     document.querySelectorAll('.history-cancel').forEach(btn=>btn.onclick=async()=>{
       const id=Number(btn.dataset.id);if(!id)return;
       const reason=await sipbPrompt('Alasan pembatalan transaksi Barang Keluar #'+id+':');
@@ -1835,6 +1940,25 @@ function bind(page){
         fail(e);
       }
     });
+    document.querySelectorAll('.purge-test-barang').forEach(btn=>btn.onclick=async evt=>{
+      evt.preventDefault();evt.stopPropagation();
+      const id=Number(btn.dataset.id),name=String(btn.dataset.name||'');
+      if(!id||!name)return;
+      const typed=await sipbPrompt('PENGHAPUSAN PERMANEN DATA UJI. Ketik persis nama barang berikut untuk melanjutkan:',name);
+      if(typed===null||typed===undefined)return;
+      if(typed.trim()!==name)return toast('Nama barang tidak sama. Data tidak dihapus.','error');
+      if(!(await sipbConfirm('Hapus permanen "'+name+'" beserta penerimaan, Stock Opname, dan baris pengeluaran yang sudah dibatalkan? Pengeluaran aktif harus dibatalkan dahulu. Jejak audit koreksi tetap disimpan. Tindakan ini tidak dapat dibatalkan.')))return;
+      btn.disabled=true;btn.textContent='Menghapus...';
+      try{
+        const {data,error}=await client.rpc('purge_test_barang',{p_barang_id:id,p_confirmation:typed.trim()});
+        if(error)throw error;
+        toast(data?.message||'Data barang uji berhasil dihapus.');
+        renderApp('barang');
+      }catch(e){
+        btn.disabled=false;btn.textContent='Hapus Data Uji';
+        fail(e);
+      }
+    });
   }
   if(page==='pegawai'){
     const add=$('addPegawai');
@@ -1854,7 +1978,28 @@ function bind(page){
   }
   if(page==='barang_keluar'){
     bindKeluarForm().catch(fail);
-  }  if(page==='stock_opname') $('addOpname').onclick=async()=>{$('content').innerHTML=await stockOpnameForm();bindOpnameForm()};
+  }
+  if(page==='stock_opname'){
+    $('addOpname').onclick=async()=>{$('content').innerHTML=await stockOpnameForm();bindOpnameForm()};
+    const apply=()=>{
+      const q=$('opnameSearch').value,from=$('opnameFrom').value,to=$('opnameTo').value;
+      document.querySelectorAll('#stockOpnameTable tbody tr[data-search]').forEach(r=>{
+        const date=r.dataset.date||'';
+        setTableRowMatch(r,matchesSearch(r.dataset.search,q)&&(!from||date>=from)&&(!to||date<=to));
+      });
+      refreshTableFilter('stockOpnameTable');
+    };
+    ['opnameSearch','opnameFrom','opnameTo'].forEach(id=>{
+      const el=$(id);if(el)el.addEventListener(id==='opnameSearch'?'input':'change',apply);
+    });
+    $('stockOpnameTable')?.addEventListener('click',async e=>{
+      const btn=e.target.closest('.opname-correct');if(!btn)return;
+      e.preventDefault();e.stopPropagation();btn.disabled=true;
+      try{await showCorrectionModal('OPNAME',Number(btn.dataset.id))}
+      catch(err){fail(err)}
+      finally{btn.disabled=false}
+    });
+  }
 }
 
 function bindForm(id){
