@@ -5693,7 +5693,7 @@ tbody tr:hover{background:rgba(11,92,171,.045) !important}
 }
 .report-summary-grid{
   display:grid;
-  grid-template-columns:repeat(5,minmax(0,1fr));
+  grid-template-columns:repeat(6,minmax(0,1fr));
   gap:12px;
   margin:14px 0 18px;
 }
