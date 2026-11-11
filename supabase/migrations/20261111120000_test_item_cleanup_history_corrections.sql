@@ -300,7 +300,7 @@ BEGIN
     UNION ALL
     SELECT 1 FROM public.detail_barang_keluar d
     JOIN public.transaksi_keluar t ON t.id=d.transaksi_keluar_id
-    WHERE d.barang_id = v_old.barang_id AND COALESCE(t.status,'AKTIF')='AKTIF'
+    WHERE d.barang_id = v_old.barang_id
       AND t.tanggal_keluar >= v_old.tanggal_opname
     UNION ALL
     SELECT 1 FROM public.riwayat_opname

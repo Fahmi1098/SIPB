@@ -1369,7 +1369,8 @@ async function riwayatPage(){
   const auditRows=(audit||[]).map(a=>{
     const label=a.entity_type==='BARANG_MASUK'?'Barang Masuk':a.entity_type==='BARANG_KELUAR'?'Barang Keluar':a.entity_type==='STOCK_OPNAME'?'Stock Opname':'Data Barang';
     const action=a.action==='PEMBATALAN'?'Pembatalan':a.action==='PERUBAHAN_MASTER'?'Perubahan Master':'Koreksi';
-    const date=String(a.created_at||'').slice(0,10);
+    const created=new Date(a.created_at);
+    const date=created.getFullYear()+'-'+String(created.getMonth()+1).padStart(2,'0')+'-'+String(created.getDate()).padStart(2,'0');
     return '<tr data-date="'+esc(date)+'" data-entity="'+esc(a.entity_type)+'" data-action="'+esc(a.action)+'" data-search="'+esc([label,action,a.entity_id,a.new_entity_id,a.reason,a.actor_name].join(' '))+'">'+
       '<td>'+new Date(a.created_at).toLocaleString('id-ID')+'</td><td>'+esc(label)+'</td>'+
       '<td>#'+a.entity_id+(a.new_entity_id?' → #'+a.new_entity_id:'')+'</td>'+
@@ -1432,7 +1433,7 @@ async function showOpnameCorrectionModal(id){
     '<label>Stok Fisik yang Benar <input id="co_fisik" type="text" inputmode="numeric" data-number-format="integer" value="'+formatAngka(r.stok_fisik||0)+'" required></label>'+
     '<label>Petugas <input id="co_petugas" maxlength="100" value="'+esc(r.petugas||'')+'" required></label>'+
     '<label class="field-wide">Keterangan <textarea id="co_keterangan" rows="2" maxlength="500">'+esc(r.keterangan||'')+'</textarea></label>'+
-    '<div class="field-wide alert-box">Tanggal tidak diubah agar urutan FIFO tetap konsisten. Koreksi hanya diproses jika belum ada penerimaan, pengeluaran aktif, atau Stock Opname lanjutan pada tanggal yang sama atau sesudahnya.</div>'+
+    '<div class="field-wide alert-box">Tanggal tidak diubah agar urutan FIFO tetap konsisten. Koreksi hanya diproses jika belum ada penerimaan, pengeluaran (termasuk yang dibatalkan), atau Stock Opname pada tanggal yang sama atau sesudahnya.</div>'+
     '<label class="field-wide">Alasan Koreksi <textarea id="co_alasan" rows="3" minlength="8" maxlength="500" required placeholder="Jelaskan sebab koreksi Stock Opname."></textarea></label>'+
     '</div><div class="form-actions"><button class="primary" id="co_save" type="submit">Simpan Koreksi</button><button class="ghost co_cancel" type="button">Batal</button></div></form></div>';
   document.body.appendChild(box);
