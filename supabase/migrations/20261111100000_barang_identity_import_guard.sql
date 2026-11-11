@@ -69,7 +69,7 @@ BEGIN
 
   IF v_existing > 0 THEN
     RAISE EXCEPTION
-      'Sebagian Kode Barang sudah ada di Master Barang. Import dibatalkan agar stok tidak terduplikasi.';
+      'Sebagian Kode Barang sudah ada di Data Barang. Import dibatalkan agar stok tidak terduplikasi.';
   END IF;
 
 
