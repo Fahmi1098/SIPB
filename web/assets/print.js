@@ -163,8 +163,27 @@
       if (q.error) throw q.error;
       barang = q.data || [];
     }
+
+    // Ambil seluruh alokasi, termasuk yang sudah dibalik saat pembatalan,
+    // agar cetak ulang dokumen historis tetap memakai HPP aslinya.
+    const detailIds = (details.data||[]).map(x=>x.id).filter(Boolean);
+    let fifoAllocations = [];
+    if (detailIds.length) {
+      const fifoQ = await printClient.from('sipb_fifo_allocations')
+        .select('detail_barang_keluar_id,jumlah,harga_satuan,source_type,reversed_at')
+        .in('detail_barang_keluar_id', detailIds)
+        .eq('source_type', 'BARANG_KELUAR');
+      if (fifoQ.error) throw fifoQ.error;
+      fifoAllocations = fifoQ.data || [];
+    }
+
     const byId = Object.fromEntries(barang.map(x=>[x.id,x]));
-    return { head:head.data, details:(details.data||[]).map(d=>({...d,barang:byId[d.barang_id]||{}})), allocations:allocations.data||[] };
+    return {
+      head:head.data,
+      details:(details.data||[]).map(d=>({...d,barang:byId[d.barang_id]||{}})),
+      allocations:allocations.data||[],
+      fifoAllocations
+    };
   }
 
   async function getKepala() {
@@ -214,6 +233,34 @@
     return d.nomor_dus ? 'Dus '+esc(d.nomor_dus) : '-';
   }
 
+  function buildFifoCostMap(rows, foreignKey) {
+    const map = new Map();
+    (rows || []).forEach(row => {
+      const key = Number(row?.[foreignKey]);
+      if (!Number.isSafeInteger(key) || key <= 0) return;
+      const qty = Number(row.jumlah) || 0;
+      const price = Number(row.harga_satuan) || 0;
+      const current = map.get(key) || { qty:0, value:0 };
+      current.qty += qty;
+      current.value += qty * price;
+      map.set(key, current);
+    });
+    return map;
+  }
+
+  function requireFifoCost(costMap, detailId, expectedQty, context='Barang Keluar') {
+    const cost = costMap.get(Number(detailId));
+    const qty = Number(expectedQty) || 0;
+    if (!cost || cost.qty !== qty) {
+      const allocated = cost?.qty || 0;
+      throw new Error(
+        'Nilai '+context+' tidak dapat dihitung dengan aman: alokasi FIFO untuk detail #'+detailId+
+        ' baru mencakup '+allocated+' dari '+qty+' unit. Periksa Kartu Persediaan atau lakukan rekonsiliasi FIFO terlebih dahulu. Dokumen tidak dicetak agar nilainya tidak keliru.'
+      );
+    }
+    return { qty:cost.qty, value:cost.value, unitPrice:cost.value / cost.qty };
+  }
+
   async function printTransaction(id) {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -222,7 +269,8 @@
     }
     printWindow.document.write('<!doctype html><html><body style="font-family:Arial;padding:30px">Menyiapkan dokumen SIPB...</body></html>');
     try {
-      const {head,details,allocations}=await getTransaction(id);
+      const {head,details,allocations,fifoAllocations}=await getTransaction(id);
+      const fifoByDetail=buildFifoCostMap(fifoAllocations,'detail_barang_keluar_id');
       const kepala=await getKepala();
       const active=(head.status||'AKTIF')==='AKTIF';
       const regular=details.filter(d=>!String(d.barang?.kategori?.nama_kategori||'').toLowerCase().includes('kuasi'));
@@ -314,11 +362,26 @@
       </section>`:'';
 
 
-      const total=details.reduce((sum,d)=>sum+Number(d.jumlah||0)*Number(d.barang?.harga_terakhir||0),0);
+      // BEND29 memakai HPP FIFO aktual, bukan harga_terakhir Master Barang.
+      // Harga Kuasi tetap menggunakan harga referensi karena memiliki mekanisme
+      // alokasi batch/nomor seri tersendiri, bukan lapisan FIFO umum.
+      const bendCosts=new Map();
+      details.forEach(d=>{
+        const qty=Number(d.jumlah)||0;
+        const isKuasi=String(d.barang?.kategori?.nama_kategori||'').toLowerCase().includes('kuasi');
+        if(isKuasi){
+          const price=Number(d.barang?.harga_terakhir)||0;
+          bendCosts.set(d.id,{unitPrice:price,value:qty*price});
+        }else{
+          bendCosts.set(d.id,requireFifoCost(fifoByDetail,d.id,qty,'BEND29'));
+        }
+      });
+      const total=details.reduce((sum,d)=>sum+(bendCosts.get(d.id)?.value||0),0);
       const bendRows=details.map((d,i)=>{
-        const price=Number(d.barang?.harga_terakhir||0);
+        const cost=bendCosts.get(d.id)||{unitPrice:0,value:0};
+        const price=cost.unitPrice;
         const qty=Number(d.jumlah||0);
-        const totalRow=price*qty;
+        const totalRow=cost.value;
         return '<tr><td class="center">'+(i+1)+'</td><td>'+esc(d.barang?.nama_barang||'-')+'</td><td class="center">'+esc(d.barang?.satuan||'-')+'</td><td class="center">'+qty+'</td><td class="center">'+serial(d)+'</td><td class="right">'+(price?rupiah(price):'-')+'</td><td class="right">'+(totalRow?rupiah(totalRow):'-')+'</td></tr>'
       }).join('');
       const bend29=`<section class='sheet bend29-landscape'>${kop()}
@@ -391,18 +454,47 @@
       ]);
       if(itemQ.error||masukQ.error||keluarQ.error||opnameQ.error) throw itemQ.error||masukQ.error||keluarQ.error||opnameQ.error;
       const item=itemQ.data;
+      const isKuasi=String(item.kategori?.nama_kategori||'').toLowerCase().includes('kuasi');
+      const activeOutgoing=(keluarQ.data||[]).filter(x=>(x.transaksi?.status||'AKTIF')!=='DIBATALKAN');
+      const negativeOpname=(opnameQ.data||[]).filter(x=>Number(x.selisih)<0);
+      const detailIds=activeOutgoing.map(x=>x.id).filter(Boolean);
+      const opnameIds=negativeOpname.map(x=>x.id).filter(Boolean);
+      const [detailAllocQ,opnameAllocQ]=await Promise.all([
+        detailIds.length
+          ? printClient.from('sipb_fifo_allocations').select('detail_barang_keluar_id,jumlah,harga_satuan,source_type,reversed_at').in('detail_barang_keluar_id',detailIds).eq('source_type','BARANG_KELUAR').is('reversed_at',null)
+          : Promise.resolve({data:[],error:null}),
+        opnameIds.length
+          ? printClient.from('sipb_fifo_allocations').select('riwayat_opname_id,jumlah,harga_satuan,source_type,reversed_at').in('riwayat_opname_id',opnameIds).eq('source_type','OPNAME').is('reversed_at',null)
+          : Promise.resolve({data:[],error:null})
+      ]);
+      if(detailAllocQ.error||opnameAllocQ.error)throw detailAllocQ.error||opnameAllocQ.error;
+      const detailCosts=buildFifoCostMap(detailAllocQ.data,'detail_barang_keluar_id');
+      const opnameCosts=buildFifoCostMap(opnameAllocQ.data,'riwayat_opname_id');
       const rows=[
-        ...(masukQ.data||[]).map(x=>({date:x.tanggal_masuk,id:x.id,type:'MASUK',in:x.jumlah,out:0,price:x.harga_satuan,desc:'Penerimaan dari '+(x.nama_penyerah||'-')+(x.nomor_awal?' · '+x.nomor_awal+' → '+x.nomor_akhir:'')})),
-        ...(keluarQ.data||[]).filter(x=>(x.transaksi?.status||'AKTIF')!=='DIBATALKAN').map(x=>({date:x.transaksi?.tanggal_keluar,id:x.id,type:'KELUAR',in:0,out:x.jumlah,price:0,desc:'Kepada '+(x.transaksi?.penerima_nama||'-')+' · '+(x.transaksi?.tujuan_ruangan||'-')+(x.nomor_awal?' · '+x.nomor_awal+' → '+x.nomor_akhir:'')})),
-        ...(opnameQ.data||[]).map(x=>({date:x.tanggal_opname,id:x.id,type:x.selisih>=0?'OPNAME +':'OPNAME -',in:x.selisih>0?x.selisih:0,out:x.selisih<0?Math.abs(x.selisih):0,price:0,desc:'Stok sistem '+x.stok_sistem+' → fisik '+x.stok_fisik+(x.keterangan?' · '+x.keterangan:'')}))
+        ...(masukQ.data||[]).map(x=>({date:x.tanggal_masuk,id:x.id,type:'MASUK',in:x.jumlah,out:0,price:x.harga_satuan,value:(Number(x.jumlah)||0)*(Number(x.harga_satuan)||0),desc:'Penerimaan dari '+(x.nama_penyerah||'-')+(x.nomor_awal?' · '+x.nomor_awal+' → '+x.nomor_akhir:'' )})),
+        ...activeOutgoing.map(x=>{
+          const cost=isKuasi
+            ?{unitPrice:Number(item.harga_terakhir)||0,value:(Number(x.jumlah)||0)*(Number(item.harga_terakhir)||0)}
+            :requireFifoCost(detailCosts,x.id,x.jumlah,'Kartu Persediaan');
+          return {date:x.transaksi?.tanggal_keluar,id:x.id,type:'KELUAR',in:0,out:x.jumlah,price:cost.unitPrice,value:cost.value,desc:'Kepada '+(x.transaksi?.penerima_nama||'-')+' · '+(x.transaksi?.tujuan_ruangan||'-')+(x.nomor_awal?' · '+x.nomor_awal+' → '+x.nomor_akhir:'')};
+        }),
+        ...(opnameQ.data||[]).map(x=>{
+          let cost={unitPrice:0,value:0};
+          if(Number(x.selisih)<0){
+            cost=isKuasi
+              ?{unitPrice:Number(item.harga_terakhir)||0,value:Math.abs(Number(x.selisih))*(Number(item.harga_terakhir)||0)}
+              :requireFifoCost(opnameCosts,x.id,Math.abs(Number(x.selisih)),'Kartu Persediaan Stock Opname');
+          }
+          return {date:x.tanggal_opname,id:x.id,type:x.selisih>=0?'OPNAME +':'OPNAME -',in:x.selisih>0?x.selisih:0,out:x.selisih<0?Math.abs(x.selisih):0,price:cost.unitPrice,value:cost.value,desc:'Stok sistem '+x.stok_sistem+' → fisik '+x.stok_fisik+(x.keterangan?' · '+x.keterangan:'')};
+        })
       ].sort((a,b)=>String(a.date).localeCompare(String(b.date))||Number(a.id)-Number(b.id));
       let saldo=0;
-      const body=rows.map((r,i)=>{saldo+=Number(r.in||0)-Number(r.out||0);return `<tr><td class="center">${i+1}</td><td class="center">${shortDate(r.date)}</td><td class="center">${esc(r.type)}</td><td class="right">${r.in?r.in:'-'}</td><td class="right">${r.out?r.out:'-'}</td><td class="right">${saldo}</td><td class="right">${r.price?rupiah(r.price):'-'}</td><td>${esc(r.desc)}</td></tr>`}).join('');
+      const body=rows.map((r,i)=>{saldo+=Number(r.in||0)-Number(r.out||0);return `<tr><td class="center">${i+1}</td><td class="center">${shortDate(r.date)}</td><td class="center">${esc(r.type)}</td><td class="right">${r.in?r.in:'-'}</td><td class="right">${r.out?r.out:'-'}</td><td class="right">${saldo}</td><td class="right">${r.price?rupiah(r.price):'-'}</td><td class="right">${r.value?rupiah(r.value):'-'}</td><td>${esc(r.desc)}</td></tr>`}).join('');
       const html=`<section class="sheet landscape page-landscape">${kop()}
         <div class="title">KARTU PERSEDIAAN BARANG</div>
         <table class="meta"><tr><td>Nama Barang</td><td>:</td><td><b>${esc(item.nama_barang)}</b></td><td style="width:13%">Satuan</td><td>:</td><td>${esc(item.satuan||'-')}</td></tr>
         <tr><td>Merk / Tipe</td><td>:</td><td>${esc([item.merk,item.tipe].filter(Boolean).join(' ')||'-')}</td><td>Saldo Saat Ini</td><td>:</td><td><b>${item.sisa??0}</b></td></tr></table>
-        <table class="data"><thead><tr><th>NO</th><th>TANGGAL</th><th>JENIS</th><th>MASUK</th><th>KELUAR</th><th>SALDO</th><th>HARGA</th><th>KETERANGAN</th></tr></thead><tbody>${body||'<tr><td colspan="8" class="center">Belum ada mutasi.</td></tr>'}</tbody></table>
+        <table class="data"><thead><tr><th>NO</th><th>TANGGAL</th><th>JENIS</th><th>MASUK</th><th>KELUAR</th><th>SALDO</th><th>HARGA SATUAN / HPP</th><th>NILAI MUTASI</th><th>KETERANGAN</th></tr></thead><tbody>${body||'<tr><td colspan="9" class="center">Belum ada mutasi.</td></tr>'}</tbody></table>
         <p class="note">Saldo akhir kartu: ${saldo}. Saldo master barang saat ini: ${item.sisa??0}.</p>
       </section>`;
       openPrint('Kartu Persediaan - '+item.nama_barang,html,'landscape',printWindow);

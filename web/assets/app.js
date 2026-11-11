@@ -1040,18 +1040,48 @@ async function laporanPage(){
   ]);
   const bmap=Object.fromEntries((barang||[]).map(x=>[x.id,x]));
   const txmap=Object.fromEntries((keluar||[]).map(x=>[x.id,x]));
+  const activeDetails=(details||[]).filter(d=>(txmap[d.transaksi_keluar_id]?.status||'AKTIF')==='AKTIF');
+  const activeDetailIds=activeDetails.map(d=>d.id);
+  const fifoAllocations=await fetchAllSipbRowsByValues(
+    'sipb_fifo_allocations',
+    'detail_barang_keluar_id,jumlah,harga_satuan,reversed_at',
+    'detail_barang_keluar_id',
+    activeDetailIds,
+    q=>q.eq('source_type','BARANG_KELUAR').is('reversed_at',null)
+  );
+  const fifoByDetail=new Map();
+  (fifoAllocations||[]).forEach(a=>{
+    const id=Number(a.detail_barang_keluar_id);
+    const current=fifoByDetail.get(id)||{qty:0,value:0};
+    const qty=Number(a.jumlah)||0;
+    current.qty+=qty;
+    current.value+=qty*(Number(a.harga_satuan)||0);
+    fifoByDetail.set(id,current);
+  });
   const rows=[
     ...(masuk||[]).map(r=>{
       const b=bmap[r.barang_id]||{};
       return {id:'M'+r.id,type:'MASUK',date:r.tanggal_masuk,barang:b.nama_barang||'-',category:b.kategori?.nama_kategori||'Tanpa Kategori',unit:b.satuan||'-',qty:Number(r.jumlah)||0,value:(Number(r.jumlah)||0)*(Number(r.harga_satuan)||0),party:r.nama_penyerah||'-',target:r.nama_penerima||'-',note:(r.sumber_dana||'-')+(r.keterangan?' · '+r.keterangan:'')+(r.nomor_dus?' · Dus '+r.nomor_dus:'')+(r.nomor_awal?' · '+r.nomor_awal+' → '+(r.nomor_akhir||'-'):'')};
     }),
-    ...(details||[]).filter(d=>(txmap[d.transaksi_keluar_id]?.status||'AKTIF')==='AKTIF').map(d=>{
+    ...activeDetails.map(d=>{
       const b=bmap[d.barang_id]||{},t=txmap[d.transaksi_keluar_id]||{};
-      return {id:'K'+d.id,type:'KELUAR',date:t.tanggal_keluar,barang:b.nama_barang||'-',category:b.kategori?.nama_kategori||'Tanpa Kategori',unit:b.satuan||'-',qty:Number(d.jumlah)||0,value:0,party:t.penerima_nama||'-',target:t.tujuan_ruangan||'-',note:(t.jenis_dokumen||'Nota Dinas')+(d.nomor_dus?' · Dus '+d.nomor_dus:'')+(d.nomor_awal?' · '+d.nomor_awal+' → '+(d.nomor_akhir||'-'):'')};
+      const qty=Number(d.jumlah)||0;
+      const isKuasi=String(b.kategori?.nama_kategori||'').toLowerCase().includes('kuasi');
+      const allocation=fifoByDetail.get(Number(d.id));
+      const fifoComplete=!!allocation&&allocation.qty===qty;
+      const value=isKuasi
+        ?qty*(Number(b.harga_terakhir)||0)
+        :(fifoComplete?allocation.value:null);
+      const note=(t.jenis_dokumen||'Nota Dinas')+
+        (d.nomor_dus?' · Dus '+d.nomor_dus:'')+
+        (d.nomor_awal?' · '+d.nomor_awal+' → '+(d.nomor_akhir||'-'):'')+
+        (isKuasi?' · Nilai memakai harga referensi Kuasi':
+          (!fifoComplete?' · Alokasi FIFO belum lengkap; nilai belum dihitung':''));
+      return {id:'K'+d.id,type:'KELUAR',date:t.tanggal_keluar,barang:b.nama_barang||'-',category:b.kategori?.nama_kategori||'Tanpa Kategori',unit:b.satuan||'-',qty,value,party:t.penerima_nama||'-',target:t.tujuan_ruangan||'-',note};
     }),
     ...(opname||[]).map(r=>{
       const b=bmap[r.barang_id]||{};
-      return {id:'O'+r.id,type:'OPNAME',date:r.tanggal_opname,barang:b.nama_barang||'-',category:b.kategori?.nama_kategori||'Tanpa Kategori',unit:b.satuan||'-',qty:Number(r.selisih)||0,value:0,party:r.petugas||'-',target:'Stok Fisik',note:'Sistem '+(r.stok_sistem??0)+' → Fisik '+(r.stok_fisik??0)+(r.keterangan?' · '+r.keterangan:'')};
+      return {id:'O'+r.id,type:'OPNAME',date:r.tanggal_opname,barang:b.nama_barang||'-',category:b.kategori?.nama_kategori||'Tanpa Kategori',unit:b.satuan||'-',qty:Number(r.selisih)||0,value:null,party:r.petugas||'-',target:'Stok Fisik',note:'Sistem '+(r.stok_sistem??0)+' → Fisik '+(r.stok_fisik??0)+(r.keterangan?' · '+r.keterangan:'')};
     })
   ].filter(r=>r.date).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.id).localeCompare(String(a.id)));
   window.__sipbReportRows=rows;
@@ -1060,23 +1090,40 @@ async function laporanPage(){
   const iso=x=>x.toISOString().slice(0,10);
   return '<section class="card page-card report-page"><div class="section-head"><div><span class="eyebrow">PELAPORAN</span><h2>Laporan Persediaan</h2><p>Rekap penerimaan, pengeluaran, dan penyesuaian stok berdasarkan periode.</p></div><span class="status-pill">'+rows.length+' mutasi</span></div>'+
     '<div class="report-filter-bar"><label>Tanggal Awal<input id="reportFrom" type="date" value="'+iso(first)+'"></label><label>Tanggal Akhir<input id="reportTo" type="date" value="'+iso(last)+'"></label><label>Jenis<select id="reportType"><option value="">Semua jenis</option><option value="MASUK">Barang Masuk</option><option value="KELUAR">Barang Keluar</option><option value="OPNAME">Stock Opname</option></select></label><label>Kategori<select id="reportCategory"><option value="">Semua kategori</option>'+categories.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join('')+'</select></label></div>'+
-    '<div class="report-summary-grid"><div class="kartu-summary"><small>Total Mutasi</small><strong id="reportTotal">0</strong></div><div class="kartu-summary"><small>Total Masuk</small><strong id="reportIn">0</strong></div><div class="kartu-summary"><small>Total Keluar</small><strong id="reportOut">0</strong></div><div class="kartu-summary"><small>Selisih Opname</small><strong id="reportAdj">0</strong></div><div class="kartu-summary"><small>Nilai Penerimaan</small><strong id="reportValue">Rp0</strong></div></div>'+
-    '<div class="table-wrap"><table id="laporanTable"><thead><tr><th>Tanggal</th><th>Jenis</th><th>Barang</th><th>Kategori</th><th>Jumlah</th><th>Satuan</th><th>Nilai Penerimaan</th><th>Pihak</th><th>Tujuan</th><th>Keterangan</th></tr></thead><tbody></tbody></table></div></section>';
+    '<div class="report-summary-grid"><div class="kartu-summary"><small>Total Mutasi</small><strong id="reportTotal">0</strong></div><div class="kartu-summary"><small>Total Masuk</small><strong id="reportIn">0</strong></div><div class="kartu-summary"><small>Total Keluar</small><strong id="reportOut">0</strong></div><div class="kartu-summary"><small>Selisih Opname</small><strong id="reportAdj">0</strong></div><div class="kartu-summary"><small>Nilai Penerimaan</small><strong id="reportValue">Rp0</strong></div><div class="kartu-summary"><small>Nilai Pengeluaran / HPP</small><strong id="reportOutValue">Rp0</strong></div></div>'+
+    '<div id="reportFifoWarning" class="alert-box" style="display:none"></div>'+
+    '<div class="table-wrap"><table id="laporanTable"><thead><tr><th>Tanggal</th><th>Jenis</th><th>Barang</th><th>Kategori</th><th>Jumlah</th><th>Satuan</th><th>Nilai Masuk / Keluar</th><th>Pihak</th><th>Tujuan</th><th>Keterangan</th></tr></thead><tbody></tbody></table></div></section>';
 }
 function applyLaporanFilter(){
   const from=$('reportFrom')?.value||'',to=$('reportTo')?.value||'',type=$('reportType')?.value||'',category=$('reportCategory')?.value||'';
   const rows=(window.__sipbReportRows||[]).filter(r=>(!from||String(r.date)>=from)&&(!to||String(r.date)<=to)&&(!type||r.type===type)&&(!category||r.category===category));
   const body=$('laporanTable')?.tBodies?.[0];
-  if(body)body.innerHTML=rows.length?rows.map(r=>'<tr><td>'+fmtDate(r.date)+'</td><td><span class="badge-soft '+(r.type==='MASUK'?'success':'')+'">'+reportTypeLabel(r.type)+'</span></td><td><strong>'+esc(r.barang)+'</strong></td><td>'+esc(r.category)+'</td><td class="'+(r.type==='OPNAME'&&r.qty<0?'stock low':'')+'">'+(r.type==='OPNAME'&&r.qty>0?'+':'')+r.qty+'</td><td>'+esc(r.unit)+'</td><td>'+(r.value?rupiah(r.value):'-')+'</td><td>'+esc(r.party)+'</td><td>'+esc(r.target)+'</td><td>'+esc(r.note)+'</td></tr>').join(''):emptyRow(10);
+  if(body)body.innerHTML=rows.length?rows.map(r=>{
+    const valueCell=r.value===null||r.value===undefined
+      ?(r.type==='KELUAR'?'<span class="badge-soft warning">FIFO belum lengkap</span>':'-')
+      :rupiah(r.value);
+    return '<tr><td>'+fmtDate(r.date)+'</td><td><span class="badge-soft '+(r.type==='MASUK'?'success':'')+'">'+reportTypeLabel(r.type)+'</span></td><td><strong>'+esc(r.barang)+'</strong></td><td>'+esc(r.category)+'</td><td class="'+(r.type==='OPNAME'&&r.qty<0?'stock low':'')+'">'+(r.type==='OPNAME'&&r.qty>0?'+':'')+r.qty+'</td><td>'+esc(r.unit)+'</td><td>'+valueCell+'</td><td>'+esc(r.party)+'</td><td>'+esc(r.target)+'</td><td>'+esc(r.note)+'</td></tr>';
+  }).join(''):emptyRow(10);
   const totalIn=rows.filter(r=>r.type==='MASUK').reduce((n,r)=>n+r.qty,0);
   const totalOut=rows.filter(r=>r.type==='KELUAR').reduce((n,r)=>n+r.qty,0);
   const adj=rows.filter(r=>r.type==='OPNAME').reduce((n,r)=>n+r.qty,0);
-  const value=rows.reduce((n,r)=>n+r.value,0);
+  const valueIn=rows.filter(r=>r.type==='MASUK').reduce((n,r)=>n+(Number(r.value)||0),0);
+  const outgoingRows=rows.filter(r=>r.type==='KELUAR');
+  const valueOut=outgoingRows.reduce((n,r)=>n+(r.value===null||r.value===undefined?0:Number(r.value)||0),0);
+  const missingFifo=outgoingRows.filter(r=>r.value===null||r.value===undefined).length;
   $('reportTotal').textContent=rows.length.toLocaleString('id-ID');
   $('reportIn').textContent=totalIn.toLocaleString('id-ID');
   $('reportOut').textContent=totalOut.toLocaleString('id-ID');
   $('reportAdj').textContent=(adj>0?'+':'')+adj.toLocaleString('id-ID');
-  $('reportValue').textContent=rupiah(value);
+  $('reportValue').textContent=rupiah(valueIn);
+  $('reportOutValue').textContent=rupiah(valueOut);
+  const fifoWarning=$('reportFifoWarning');
+  if(fifoWarning){
+    fifoWarning.style.display=missingFifo?'block':'none';
+    fifoWarning.textContent=missingFifo
+      ?missingFifo+' transaksi keluar belum memiliki alokasi FIFO lengkap. Nilainya tidak ditebak dari harga terakhir; periksa Kartu Persediaan atau lakukan rekonsiliasi FIFO.'
+      :'';
+  }
   $('content')?.querySelector('.report-page .status-pill')?.replaceChildren(document.createTextNode(rows.length+' mutasi'));
   const table=$('laporanTable');
   if(table){table.dataset.page='1';table.refreshPagination?.()}

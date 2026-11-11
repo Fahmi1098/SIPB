@@ -23,7 +23,9 @@ jobs:
         with:
           node-version: 22
       - name: Validate application JavaScript
-        run: node --check web/assets/app.js
+        run: |
+          node --check web/assets/app.js
+          node --check web/assets/print.js
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
