@@ -79,15 +79,15 @@ BEGIN
   IF EXISTS (
     SELECT 1
     FROM jsonb_array_elements(p_rows) x
+    WHERE NULLIF(btrim(COALESCE(x->>'nama_barang', '')), '') IS NOT NULL
+      AND NULLIF(btrim(COALESCE(x->>'satuan', '')), '') IS NOT NULL
     GROUP BY
       lower(regexp_replace(btrim(COALESCE(x->>'nama_barang', '')), '[[:space:]]+', ' ', 'g')),
       lower(regexp_replace(btrim(COALESCE(x->>'satuan', '')), '[[:space:]]+', ' ', 'g')),
       lower(regexp_replace(btrim(COALESCE(x->>'keterangan', x->>'Keterangan', x->>'keterangan_spesifikasi', '')), '[[:space:]]+', ' ', 'g')),
       lower(regexp_replace(btrim(COALESCE(NULLIF(btrim(x->>'tipe'), '-'), '')), '[[:space:]]+', ' ', 'g')),
       lower(regexp_replace(btrim(COALESCE(NULLIF(btrim(x->>'merk'), '-'), '')), '[[:space:]]+', ' ', 'g'))
-    HAVING NULLIF(btrim(COALESCE(x->>'nama_barang', '')), '') IS NOT NULL
-       AND NULLIF(btrim(COALESCE(x->>'satuan', '')), '') IS NOT NULL
-       AND count(*) > 1
+    HAVING count(*) > 1
   ) THEN
     RAISE EXCEPTION
       'File import memuat identitas barang yang sama lebih dari sekali. Satukan menjadi satu barang; harga berbeda dicatat sebagai transaksi Barang Masuk.';
