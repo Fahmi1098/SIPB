@@ -131,7 +131,7 @@ BEGIN
   FROM public.kategori k
   WHERE k.id = v_barang.kategori_id;
 
-  IF lower(COALESCE(v_category,'')) LIKE '%kuasi%'
+  IF public.sipb_fifo_is_kuasi(p_barang_id)
      OR EXISTS (SELECT 1 FROM public.stok_kuasi sk WHERE sk.barang_id = p_barang_id) THEN
     RAISE EXCEPTION 'Barang Kuasi tidak dapat dihapus melalui pembersihan data uji. Gunakan prosedur batch/serial khusus.';
   END IF;
