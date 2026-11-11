@@ -793,7 +793,7 @@ async function barangMasukForm(){
     fetchAllSipbRows('barang','id,nama_barang,satuan,kategori_id,tipe,merk,kode_barang,keterangan,kategori:kategori_id(id,nama_kategori)',q=>q.eq('is_archived',false).order('nama_barang',{ascending:true}).order('keterangan',{ascending:true,nullsFirst:false}).order('kode_barang',{ascending:true,nullsFirst:false}).order('id',{ascending:true})),
     fetchAllSipbRows('kategori','*',q=>q.order('nama_kategori').order('id',{ascending:true}))
   ]);
-  return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PENERIMAAN</span><h2>Rekam Barang Masuk</h2><p>Stok, transaksi penerimaan, dan batch Kuasi disimpan atomik dalam satu transaksi database.</p></div><button class="ghost" id="backMasuk">← Kembali</button></div><div class="form-grid">
+  return `<section class="card page-card"><div class="section-head"><div><span class="eyebrow">PENERIMAAN</span><h2>Rekam Barang Masuk</h2><p>Stok, transaksi penerimaan, dan batch Kuasi disimpan atomik. Untuk memperbaiki penerimaan yang sudah tersimpan, buka Riwayat Transaksi lalu pilih Koreksi Penerimaan.</p></div><div class="actions"><button type="button" class="ghost" data-page="riwayat">Riwayat & Koreksi</button><button class="ghost" id="backMasuk">← Kembali</button></div></div><div class="form-grid">
   <label>Barang yang sudah ada <select id="m_barang">${canCreate?'<option value="">＋ Barang baru</option>':''}${items.map(x=>`<option value="${x.id}" data-kode="${esc(x.kode_barang||'')}" data-kuasi="${String(x.kategori?.nama_kategori||'').toLowerCase().includes('kuasi')?'1':'0'}" data-kategori="${x.kategori_id||''}" data-satuan="${esc(x.satuan||'')}" data-tipe="${esc(x.tipe||'')}" data-merk="${esc(x.merk||'')}">${esc(x.nama_barang)} — ${esc(x.kode_barang||'Tanpa Kode')} · ${esc(x.satuan||'-')}</option>`).join('')}</select></label>
   <label>Kode Barang <input id="m_kode" maxlength="80" placeholder="Contoh: 01.01.01.001"><small class="field-hint">Barang lama ditampilkan otomatis; barang baru dapat diisi di sini.</small></label>
   <label${canCreate?'':' style="display:none"'}>Nama Barang Baru <input id="m_nama" placeholder="Isi jika memilih Barang baru"></label>
@@ -1350,7 +1350,8 @@ async function riwayatPage(){
   const tableRows=rows.map(r=>{
     const canCorrect=profile?.role==='admin'&&(r.type==='OPNAME'||(r.status==='AKTIF'&&(r.type==='KELUAR'||(r.type==='MASUK'&&!r.items.some(i=>i.serial)))));
     const correctionAction=canCorrect
-      ?'<button class="btn-sm history-correct" data-type="'+r.type+'" data-id="'+r.id+'">Koreksi</button>':'';
+      ?'<button class="btn-sm history-correct" data-type="'+r.type+'" data-id="'+r.id+'">'+(r.type==='MASUK'?'Koreksi Penerimaan':'Koreksi')+'</button>'
+      :(profile?.role==='admin'&&r.type==='MASUK'&&r.items.some(i=>i.serial)?'<span class="badge-soft">Koreksi batch khusus</span>':'');
     const cancelAction=profile?.role==='admin'&&r.type==='KELUAR'&&r.status==='AKTIF'
       ?'<button class="btn-sm danger history-cancel" data-id="'+r.id+'">Batalkan</button>':'';
     const printAction=r.type==='KELUAR'&&r.status==='AKTIF'
@@ -1379,7 +1380,7 @@ async function riwayatPage(){
       '<td><button class="btn-sm audit-detail" data-id="'+a.id+'">Data Lama/Baru</button></td></tr>';
   }).join('');
 
-  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">AUDIT PERSEDIAAN</span><h2>Riwayat Transaksi</h2><p>Telusuri penerimaan, pengeluaran, Stock Opname, dan status koreksi/pembatalan.</p></div><span class="status-pill">'+rows.length+' transaksi</span></div>'+
+  return '<section class="card page-card"><div class="section-head"><div><span class="eyebrow">AUDIT PERSEDIAAN</span><h2>Riwayat Transaksi</h2><p>Telusuri penerimaan, pengeluaran, Stock Opname, dan audit perubahan. Untuk barang masuk biasa, gunakan tombol Koreksi Penerimaan pada baris transaksi (khusus admin); Kuasi/nomor seri memerlukan penanganan batch khusus.</p></div><span class="status-pill">'+rows.length+' transaksi</span></div>'+
     '<div class="filter-bar"><div class="search-box">⌕<input id="historySearch" type="search" placeholder="Cari nomor, kode, nama barang, pihak, tujuan, atau dokumen..."></div>'+
     '<select id="historyType"><option value="">Semua transaksi</option><option value="MASUK">Barang Masuk</option><option value="KELUAR">Barang Keluar</option><option value="OPNAME">Stock Opname</option></select>'+
     '<select id="historyStatus"><option value="">Semua status</option><option value="AKTIF">Aktif</option><option value="DIBATALKAN">Dibatalkan</option><option value="DICATAT">Dicatat</option></select>'+
@@ -1397,14 +1398,17 @@ async function riwayatPage(){
 }
 function showHistoryDetail(k){
   const r=window.__sipbHistory?.[k];if(!r)return;
+  const canCorrectReceipt=profile?.role==='admin'&&r.type==='MASUK'&&!r.items.some(i=>i.serial);
   const box=document.createElement('div');box.className='modal-backdrop';
   box.innerHTML='<div class="modal-card"><div class="modal-head"><div><span class="eyebrow">'+(r.type==='MASUK'?'PENERIMAAN':r.type==='OPNAME'?'STOCK OPNAME':'PENGELUARAN')+'</span><h2>Detail Transaksi #'+r.id+'</h2></div><button class="modal-close" aria-label="Tutup">×</button></div>'+
     '<div class="detail-grid"><div><small>Tanggal</small><strong>'+fmtDate(r.date)+'</strong></div><div><small>Pihak</small><strong>'+esc(r.party)+'</strong></div><div><small>Tujuan/Penerima</small><strong>'+esc(r.target)+'</strong></div><div><small>Status</small><strong><span class="badge-soft '+(r.status==='AKTIF'?'success':'')+'">'+r.status+'</span></strong></div></div>'+
     '<div class="table-wrap"><table><thead><tr><th>Kode</th><th>Barang</th><th>Kategori</th><th>Keterangan</th><th>Satuan</th><th>Jumlah</th><th>Harga Satuan</th><th>Nilai</th><th>Nomor Seri / Catatan</th></tr></thead><tbody>'+
     r.items.map(i=>'<tr><td>'+esc(i.code||'-')+'</td><td><strong>'+esc(i.name)+'</strong></td><td>'+esc(i.category||'-')+'</td><td>'+esc(i.keterangan||'-')+'</td><td>'+esc(i.unit||'-')+'</td><td>'+i.qty+'</td><td>'+(i.price?rupiah(i.price):'-')+'</td><td>'+(i.total?rupiah(i.total):'-')+'</td><td>'+esc(i.serial||'-')+'</td></tr>').join('')+
-    '</tbody></table></div></div>';
+    '</tbody></table></div>'+(canCorrectReceipt?'<div class="form-actions"><button type="button" class="primary" id="detailCorrectReceipt">Koreksi Penerimaan</button></div>':'')+'</div>';
   document.body.appendChild(box);enhanceTables(box);
   const close=()=>box.remove();box.querySelector('.modal-close').onclick=close;box.onclick=e=>{if(e.target===box)close()};
+  const correct=box.querySelector('#detailCorrectReceipt');
+  if(correct)correct.onclick=()=>{close();showCorrectionModal('MASUK',r.id).catch(fail)};
 }
 
 function showAuditDetail(id){
